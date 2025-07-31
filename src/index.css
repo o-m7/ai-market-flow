@@ -148,7 +148,6 @@ All colors MUST be HSL for perfect theming.
     border-color: hsl(var(--bear));
   }
 }
-}
 
 @layer base {
   * {
