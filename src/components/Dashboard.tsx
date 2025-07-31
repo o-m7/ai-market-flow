@@ -74,6 +74,7 @@ const mockSymbols = [
 ];
 
 export const Dashboard = () => {
+  console.log("Dashboard component is rendering");
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
