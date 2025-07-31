@@ -1,0 +1,81 @@
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+
+const marketTypes = [
+  { value: "all", label: "All Markets" },
+  { value: "stocks", label: "Stocks" },
+  { value: "crypto", label: "Crypto" },
+  { value: "forex", label: "Forex" },
+  { value: "indices", label: "Indices" },
+];
+
+const trendFilters = [
+  { value: "all", label: "All", icon: null },
+  { value: "bullish", label: "Bullish", icon: TrendingUp },
+  { value: "bearish", label: "Bearish", icon: TrendingDown },
+  { value: "neutral", label: "Neutral", icon: Minus },
+];
+
+export const MarketFilters = () => {
+  return (
+    <div className="bg-gradient-card border border-border rounded-lg p-4 mb-6">
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Market Type Filter */}
+        <div className="flex items-center space-x-2">
+          <span className="text-sm font-medium text-muted-foreground">Market:</span>
+          <Select defaultValue="all">
+            <SelectTrigger className="w-40 bg-secondary border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              {marketTypes.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Trend Filter */}
+        <div className="flex items-center space-x-2">
+          <span className="text-sm font-medium text-muted-foreground">Trend:</span>
+          <div className="flex space-x-1">
+            {trendFilters.map((filter) => {
+              const Icon = filter.icon;
+              return (
+                <Button
+                  key={filter.value}
+                  variant="outline"
+                  size="sm"
+                  className="border-border hover:border-primary"
+                >
+                  {Icon && <Icon className="h-4 w-4 mr-1" />}
+                  {filter.label}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Time Filter */}
+        <div className="flex items-center space-x-2">
+          <span className="text-sm font-medium text-muted-foreground">Timeframe:</span>
+          <Select defaultValue="1d">
+            <SelectTrigger className="w-24 bg-secondary border-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              <SelectItem value="1h">1H</SelectItem>
+              <SelectItem value="4h">4H</SelectItem>
+              <SelectItem value="1d">1D</SelectItem>
+              <SelectItem value="1w">1W</SelectItem>
+              <SelectItem value="1m">1M</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
+  );
+};
