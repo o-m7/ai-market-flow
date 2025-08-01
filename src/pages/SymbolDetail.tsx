@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Navigation } from "@/components/Navigation";
 import { AIAssistant } from "@/components/AIAssistant";
+import { TradingChart } from "@/components/TradingChart";
 
 export const SymbolDetail = () => {
   const { symbol } = useParams();
@@ -129,17 +130,8 @@ export const SymbolDetail = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Chart and Tabs */}
           <div className="lg:col-span-2">
-            {/* TradingView Chart Placeholder */}
-            <Card className="bg-gradient-card border-border mb-6">
-              <CardContent className="p-6">
-                <div className="h-96 bg-secondary/30 rounded-lg flex items-center justify-center border-2 border-dashed border-border">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-muted-foreground mb-2">TradingView Chart</div>
-                    <p className="text-muted-foreground">Interactive chart widget would be embedded here</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Trading Chart */}
+            <TradingChart symbol={symbolData.symbol} className="mb-6" />
 
             {/* Tabs */}
             <Tabs defaultValue="overview" className="w-full">
