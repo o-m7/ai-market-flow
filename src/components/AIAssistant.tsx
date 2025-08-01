@@ -13,11 +13,18 @@ interface Message {
 
 export const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
+  // Mock Fear & Greed Index data
+  const fearGreedIndex = {
+    value: 68,
+    label: "Greed",
+    lastUpdated: "2 hours ago"
+  };
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
       type: "ai",
-      content: "Hi! I'm your AI trading assistant. Ask me about market sentiment, technical analysis, or any symbols you're interested in.",
+      content: `Hi! I'm your AI trading assistant. Current Fear & Greed Index: ${fearGreedIndex.value} (${fearGreedIndex.label}). Ask me about market sentiment, technical analysis, or any symbols you're interested in.`,
       timestamp: new Date(),
     },
   ]);
@@ -36,12 +43,22 @@ export const AIAssistant = () => {
     setMessages([...messages, newMessage]);
     setInputValue("");
 
-    // Simulate AI response
+    // Simulate AI response with market analysis
     setTimeout(() => {
+      let response = "I'm analyzing the market data for you. ";
+      
+      if (inputValue.toLowerCase().includes("fear") || inputValue.toLowerCase().includes("greed")) {
+        response = `Current Fear & Greed Index is ${fearGreedIndex.value} (${fearGreedIndex.label}), indicating ${fearGreedIndex.value > 50 ? 'market greed' : 'market fear'}. This suggests ${fearGreedIndex.value > 70 ? 'potential overvaluation' : fearGreedIndex.value < 30 ? 'potential buying opportunity' : 'balanced market sentiment'}.`;
+      } else if (inputValue.toLowerCase().includes("sentiment")) {
+        response = `Market sentiment analysis: Fear & Greed Index at ${fearGreedIndex.value} shows ${fearGreedIndex.label.toLowerCase()}. Combined with technical indicators, this suggests ${fearGreedIndex.value > 60 ? 'cautious optimism with potential correction risk' : 'opportunity for value investors'}.`;
+      } else {
+        response += `Based on current indicators and Fear & Greed Index (${fearGreedIndex.value}), here's what I found...`;
+      }
+
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: "ai",
-        content: "I'm analyzing the market data for you. Based on current indicators, here's what I found...",
+        content: response,
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, aiResponse]);
@@ -73,6 +90,16 @@ export const AIAssistant = () => {
               >
                 <X className="h-4 w-4" />
               </Button>
+            </div>
+            {/* Fear & Greed Index */}
+            <div className="flex items-center justify-between text-xs bg-secondary/50 rounded p-2 mt-2">
+              <span className="text-muted-foreground">Fear & Greed Index:</span>
+              <div className="flex items-center space-x-2">
+                <span className={`font-bold ${fearGreedIndex.value > 50 ? 'text-bull' : 'text-bear'}`}>
+                  {fearGreedIndex.value}
+                </span>
+                <span className="text-muted-foreground">({fearGreedIndex.label})</span>
+              </div>
             </div>
           </CardHeader>
           
