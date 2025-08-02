@@ -10,6 +10,7 @@ import { SearchResults } from "./pages/SearchResults";
 import { Watchlist } from "./pages/Watchlist";
 import { Alerts } from "./pages/Alerts";
 import { Settings } from "./pages/Settings";
+import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/search" element={<SearchResults />} />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/alerts" element={<Alerts />} />
+            <Route path="/integrations" element={<Integrations />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/markets/:assetType/:symbol" element={<SymbolDetail />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

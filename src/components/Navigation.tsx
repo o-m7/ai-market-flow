@@ -1,4 +1,4 @@
-import { Search, Bell, User, BarChart3, Star, Settings, LogOut } from "lucide-react";
+import { Search, Bell, User, BarChart3, Star, Settings, LogOut, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoginDialog } from "@/components/auth/LoginDialog";
@@ -33,6 +33,10 @@ export const Navigation = () => {
             <a href="/alerts" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
               <Bell className="h-4 w-4" />
               <span>Alerts</span>
+            </a>
+            <a href="/integrations" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
+              <Settings2 className="h-4 w-4" />
+              <span>Integrations</span>
             </a>
           </nav>
         </div>
