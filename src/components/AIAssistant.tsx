@@ -24,7 +24,7 @@ export const AIAssistant = () => {
     {
       id: "1",
       type: "ai",
-      content: `Hi! I'm your AI trading assistant. Current Fear & Greed Index: ${fearGreedIndex.value} (${fearGreedIndex.label}). Ask me about market sentiment, technical analysis, or any symbols you're interested in.`,
+      content: `Hi! I'm your AI day trading assistant. Current Fear & Greed Index: ${fearGreedIndex.value} (${fearGreedIndex.label}). Ask me about scalp setups, momentum plays, breakout patterns, or intraday analysis for quick trades.`,
       timestamp: new Date(),
     },
   ]);
@@ -43,16 +43,20 @@ export const AIAssistant = () => {
     setMessages([...messages, newMessage]);
     setInputValue("");
 
-    // Simulate AI response with market analysis
+    // Simulate AI response with day trading analysis
     setTimeout(() => {
-      let response = "I'm analyzing the market data for you. ";
+      let response = "I'm analyzing intraday patterns for you. ";
       
       if (inputValue.toLowerCase().includes("fear") || inputValue.toLowerCase().includes("greed")) {
-        response = `Current Fear & Greed Index is ${fearGreedIndex.value} (${fearGreedIndex.label}), indicating ${fearGreedIndex.value > 50 ? 'market greed' : 'market fear'}. This suggests ${fearGreedIndex.value > 70 ? 'potential overvaluation' : fearGreedIndex.value < 30 ? 'potential buying opportunity' : 'balanced market sentiment'}.`;
+        response = `Current Fear & Greed Index is ${fearGreedIndex.value} (${fearGreedIndex.label}), indicating ${fearGreedIndex.value > 50 ? 'market greed' : 'market fear'}. For day trading: ${fearGreedIndex.value > 70 ? 'watch for reversal patterns and momentum fades' : fearGreedIndex.value < 30 ? 'look for oversold bounces and dip-buying opportunities' : 'balanced conditions favor range trading'}.`;
       } else if (inputValue.toLowerCase().includes("sentiment")) {
-        response = `Market sentiment analysis: Fear & Greed Index at ${fearGreedIndex.value} shows ${fearGreedIndex.label.toLowerCase()}. Combined with technical indicators, this suggests ${fearGreedIndex.value > 60 ? 'cautious optimism with potential correction risk' : 'opportunity for value investors'}.`;
+        response = `Market sentiment analysis: Fear & Greed Index at ${fearGreedIndex.value} shows ${fearGreedIndex.label.toLowerCase()}. For intraday trades: ${fearGreedIndex.value > 60 ? 'consider fade strategies on extended moves' : 'momentum strategies may work well with supportive sentiment'}.`;
+      } else if (inputValue.toLowerCase().includes("scalp") || inputValue.toLowerCase().includes("quick")) {
+        response = `Scalping conditions: Fear & Greed at ${fearGreedIndex.value} suggests ${fearGreedIndex.value > 50 ? 'high volatility - perfect for quick scalps on momentum' : 'lower volatility - focus on range-bound scalping strategies'}.`;
+      } else if (inputValue.toLowerCase().includes("momentum") || inputValue.toLowerCase().includes("breakout")) {
+        response = `Momentum analysis: Current sentiment (F&G: ${fearGreedIndex.value}) indicates ${fearGreedIndex.value > 60 ? 'strong momentum potential - look for continuation patterns' : 'weak momentum - wait for clear breakout confirmations'}.`;
       } else {
-        response += `Based on current indicators and Fear & Greed Index (${fearGreedIndex.value}), here's what I found...`;
+        response += `Based on current intraday indicators and Fear & Greed Index (${fearGreedIndex.value}), here's what I found for today's trading...`;
       }
 
       const aiResponse: Message = {
@@ -80,7 +84,7 @@ export const AIAssistant = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center text-lg">
                 <Bot className="h-5 w-5 mr-2 text-primary" />
-                AI Trading Assistant
+                AI Day Trading Assistant
               </CardTitle>
               <Button
                 variant="ghost"
@@ -138,7 +142,7 @@ export const AIAssistant = () => {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask about markets, signals, or analysis..."
+                placeholder="Ask about scalps, momentum, breakouts, or intraday setups..."
                 className="flex-1 bg-secondary border-border"
               />
               <Button onClick={handleSendMessage} size="icon" className="bg-primary hover:bg-primary/90">
