@@ -38,7 +38,7 @@ All colors MUST be HSL for perfect theming.
     --ring: 214 100% 50%;                  /* Blue focus rings */
 
     /* Day Trading specific colors */
-    --bull: 214 100% 50%;                  /* Blue for bullish */
+    --bull: 142 84% 47%;                   /* Green for bullish */
     --bear: 0 84% 60%;                     /* Red for bearish */
     --neutral: 215 16% 47%;                /* Gray for neutral */
     
