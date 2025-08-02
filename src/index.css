@@ -43,8 +43,8 @@ All colors MUST be HSL for perfect theming.
     --neutral: 215 16% 47%;                /* Gray for neutral */
     
     /* Chart colors */
-    --chart-1: 214 100% 50%;               /* Primary blue */
-    --chart-2: 346 87% 43%;                /* Primary red */
+    --chart-1: 142 84% 47%;                /* Green for bullish */
+    --chart-2: 0 84% 60%;                  /* Red for bearish */
     --chart-3: 214 100% 35%;               /* Darker blue */
     --chart-4: 262 83% 58%;                /* Purple */
     --chart-5: 43 74% 66%;                 /* Yellow */
