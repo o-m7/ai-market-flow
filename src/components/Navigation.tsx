@@ -26,9 +26,21 @@ export const Navigation = () => {
           
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center space-x-6">
+            <a href="/portfolio" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
+              <BarChart3 className="h-4 w-4" />
+              <span>Portfolio</span>
+            </a>
+            <a href="/trading" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
+              <BarChart3 className="h-4 w-4" />
+              <span>Trading</span>
+            </a>
             <a href="/watchlist" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
               <Star className="h-4 w-4" />
               <span>Watchlist</span>
+            </a>
+            <a href="/news" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
+              <Bell className="h-4 w-4" />
+              <span>News</span>
             </a>
             <a href="/alerts" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
               <Bell className="h-4 w-4" />

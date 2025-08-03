@@ -10,6 +10,9 @@ import { SearchResults } from "./pages/SearchResults";
 import { Watchlist } from "./pages/Watchlist";
 import { Alerts } from "./pages/Alerts";
 import { Settings } from "./pages/Settings";
+import Portfolio from "./pages/Portfolio";
+import Trading from "./pages/Trading";
+import News from "./pages/News";
 import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
 
@@ -27,6 +30,9 @@ const App = () => (
             <Route path="/search" element={<SearchResults />} />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/alerts" element={<Alerts />} />
+            <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/trading" element={<Trading />} />
+            <Route path="/news" element={<News />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/markets/:assetType/:symbol" element={<SymbolDetail />} />
