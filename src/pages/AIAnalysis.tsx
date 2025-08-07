@@ -131,6 +131,12 @@ export const AIAnalysis = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="1m">1 Minute</SelectItem>
+                    <SelectItem value="5m">5 Minutes</SelectItem>
+                    <SelectItem value="15m">15 Minutes</SelectItem>
+                    <SelectItem value="30m">30 Minutes</SelectItem>
+                    <SelectItem value="1h">1 Hour</SelectItem>
+                    <SelectItem value="4h">4 Hours</SelectItem>
                     <SelectItem value="1D">1 Day</SelectItem>
                     <SelectItem value="1W">1 Week</SelectItem>
                     <SelectItem value="1M">1 Month</SelectItem>

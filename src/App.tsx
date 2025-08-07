@@ -13,7 +13,6 @@ import { Settings } from "./pages/Settings";
 import Portfolio from "./pages/Portfolio";
 import { AIAnalysis } from "./pages/AIAnalysis";
 import News from "./pages/News";
-import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,7 +32,6 @@ const App = () => (
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/ai-analysis" element={<AIAnalysis />} />
             <Route path="/news" element={<News />} />
-            <Route path="/integrations" element={<Integrations />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/markets/:assetType/:symbol" element={<SymbolDetail />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

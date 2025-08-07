@@ -46,10 +46,6 @@ export const Navigation = () => {
               <Bell className="h-4 w-4" />
               <span>Alerts</span>
             </a>
-            <a href="/integrations" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
-              <Settings2 className="h-4 w-4" />
-              <span>Integrations</span>
-            </a>
           </nav>
         </div>
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { User, Bell, Smartphone, Mail, MessageSquare, Lock, Eye, CreditCard, HelpCircle } from "lucide-react";
+import { User, Bell, Smartphone, Mail, MessageSquare, Lock, Eye, CreditCard, HelpCircle, Settings2, Key, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -80,6 +80,10 @@ export const Settings = () => {
                     <Lock className="h-4 w-4" />
                     <span>Security</span>
                   </a>
+                  <a href="#apis" className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors">
+                    <Settings2 className="h-4 w-4" />
+                    <span>API Keys</span>
+                  </a>
                   <a href="#billing" className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-accent transition-colors">
                     <CreditCard className="h-4 w-4" />
                     <span>Billing</span>
@@ -96,10 +100,11 @@ export const Settings = () => {
           {/* Settings Content */}
           <div className="lg:col-span-3">
             <Tabs defaultValue="profile" className="w-full">
-              <TabsList className="grid w-full grid-cols-4 mb-8 bg-secondary">
+              <TabsList className="grid w-full grid-cols-5 mb-8 bg-secondary">
                 <TabsTrigger value="profile">Profile</TabsTrigger>
                 <TabsTrigger value="notifications">Notifications</TabsTrigger>
                 <TabsTrigger value="preferences">Preferences</TabsTrigger>
+                <TabsTrigger value="apis">API Keys</TabsTrigger>
                 <TabsTrigger value="security">Security</TabsTrigger>
               </TabsList>
 
@@ -360,6 +365,142 @@ export const Settings = () => {
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              {/* API Keys */}
+              <TabsContent value="apis">
+                <div className="space-y-6">
+                  <Card className="bg-gradient-card border-border">
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        <span>API Keys & Integrations</span>
+                        <Button size="sm" className="flex items-center gap-2">
+                          <Plus className="h-4 w-4" />
+                          Add API Key
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* TradingView API */}
+                        <div className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <Key className="h-5 w-5 text-primary" />
+                            <div>
+                              <div className="font-medium">TradingView API</div>
+                              <div className="text-sm text-muted-foreground">Real-time charting and market data</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              placeholder="Enter API key"
+                              type="password"
+                              className="w-40"
+                            />
+                            <Button size="sm" variant="outline">Save</Button>
+                            <Button size="sm" variant="ghost">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Stripe API */}
+                        <div className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <CreditCard className="h-5 w-5 text-primary" />
+                            <div>
+                              <div className="font-medium">Stripe API</div>
+                              <div className="text-sm text-muted-foreground">Payment processing and subscriptions</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              placeholder="Enter secret key"
+                              type="password"
+                              className="w-40"
+                            />
+                            <Button size="sm" variant="outline">Save</Button>
+                            <Button size="sm" variant="ghost">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Alpha Vantage API */}
+                        <div className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <Key className="h-5 w-5 text-primary" />
+                            <div>
+                              <div className="font-medium">Alpha Vantage API</div>
+                              <div className="text-sm text-muted-foreground">Stock market data and indicators</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              placeholder="Enter API key"
+                              type="password"
+                              className="w-40"
+                            />
+                            <Button size="sm" variant="outline">Save</Button>
+                            <Button size="sm" variant="ghost">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Polygon.io API */}
+                        <div className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <Key className="h-5 w-5 text-primary" />
+                            <div>
+                              <div className="font-medium">Polygon.io API</div>
+                              <div className="text-sm text-muted-foreground">Real-time and historical market data</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Input
+                              placeholder="Enter API key"
+                              type="password"
+                              className="w-40"
+                            />
+                            <Button size="sm" variant="outline">Save</Button>
+                            <Button size="sm" variant="ghost">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-card border-border">
+                    <CardHeader>
+                      <CardTitle>Popular APIs</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Market Data</h4>
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <div>• TradingView - Advanced charting</div>
+                            <div>• Alpha Vantage - Real-time quotes</div>
+                            <div>• Polygon.io - Market data API</div>
+                            <div>• Finnhub - Stock fundamentals</div>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <h4 className="font-medium">Payment & Trading</h4>
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <div>• Stripe - Payment processing</div>
+                            <div>• Alpaca - Commission-free trading</div>
+                            <div>• Interactive Brokers - Professional trading</div>
+                            <div>• TD Ameritrade - Trading API</div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
 
               {/* Security */}
