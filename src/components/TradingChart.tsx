@@ -1,48 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ComposedChart, Bar } from "recharts";
-
-// Mock candlestick chart data
-const generateMockData = (timeframe: string) => {
-  const basePrice = 185.25;
-  const points = timeframe === "1D" ? 24 : timeframe === "1W" ? 7 : timeframe === "1M" ? 30 : 365;
-  
-  return Array.from({ length: points }, (_, i) => {
-    const open = basePrice + (i * 0.5) + (Math.random() * 5 - 2.5);
-    const volatility = Math.random() * 8 + 2; // 2-10 range
-    const high = open + (Math.random() * volatility);
-    const low = open - (Math.random() * volatility);
-    const close = low + (Math.random() * (high - low));
-    
-    // Generate specific times based on timeframe
-    let time: string;
-    if (timeframe === "1D") {
-      const hour = 9 + i; // Market hours 9 AM to 5 PM
-      time = `${hour.toString().padStart(2, '0')}:00`;
-    } else if (timeframe === "1W") {
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      time = days[i % 7];
-    } else if (timeframe === "1M") {
-      const date = new Date();
-      date.setDate(date.getDate() - (30 - i));
-      time = `${date.getMonth() + 1}/${date.getDate()}`;
-    } else {
-      const date = new Date();
-      date.setMonth(date.getMonth() - (12 - i));
-      time = date.toLocaleDateString('en-US', { month: 'short' });
-    }
-    
-    return {
-      time,
-      open: Number(open.toFixed(2)),
-      high: Number(high.toFixed(2)),
-      low: Number(low.toFixed(2)),
-      close: Number(close.toFixed(2)),
-      volume: Math.floor(Math.random() * 50) + 20
-    };
-  });
-};
+import { useBinanceData } from "@/hooks/useBinanceData";
+import { Loader2, WifiOff } from "lucide-react";
 
 interface TradingChartProps {
   symbol?: string;
@@ -50,17 +12,45 @@ interface TradingChartProps {
 }
 
 export const TradingChart = ({ symbol = "AAPL", className }: TradingChartProps) => {
-  const [timeframe, setTimeframe] = useState("1D");
+  const [timeframe, setTimeframe] = useState("1h");
   const [chartType, setChartType] = useState<"candlestick" | "line" | "area">("candlestick");
   
-  const data = generateMockData(timeframe);
-  const timeframes = ["1D", "1W", "1M", "1Y"];
+  // Convert timeframe to Binance interval format
+  const getBinanceInterval = (tf: string) => {
+    const intervalMap: Record<string, string> = {
+      "1m": "1m",
+      "5m": "5m", 
+      "15m": "15m",
+      "30m": "30m",
+      "1h": "1h",
+      "4h": "4h",
+      "1D": "1d",
+      "1W": "1w",
+      "1M": "1M"
+    };
+    return intervalMap[tf] || "1h";
+  };
+
+  const { data, loading, error, source } = useBinanceData(symbol, getBinanceInterval(timeframe));
+  const timeframes = ["1m", "5m", "15m", "30m", "1h", "4h", "1D", "1W", "1M"];
 
   return (
     <Card className={`bg-gradient-card border-border ${className}`}>
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">{symbol} Price Chart</CardTitle>
+          <div className="flex items-center space-x-2">
+            <CardTitle className="text-lg font-semibold">{symbol} Price Chart</CardTitle>
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Badge variant={source === 'binance' ? 'default' : 'secondary'}>
+              {source === 'binance' ? 'Live' : 'Demo'}
+            </Badge>
+            {error && (
+              <Badge variant="destructive">
+                <WifiOff className="h-3 w-3 mr-1" />
+                Offline
+              </Badge>
+            )}
+          </div>
           <div className="flex items-center space-x-2">
             {/* Chart Type Toggle */}
             <div className="flex bg-secondary rounded-lg p-1">
@@ -91,14 +81,15 @@ export const TradingChart = ({ symbol = "AAPL", className }: TradingChartProps) 
             </div>
             
             {/* Timeframe Selector */}
-            <div className="flex bg-secondary rounded-lg p-1">
+            <div className="flex bg-secondary rounded-lg p-1 max-w-md overflow-x-auto">
               {timeframes.map((tf) => (
                 <Button
                   key={tf}
                   variant={timeframe === tf ? "default" : "ghost"}
                   size="sm"
                   onClick={() => setTimeframe(tf)}
-                  className="h-8 px-3"
+                  className="h-8 px-2 text-xs whitespace-nowrap"
+                  disabled={loading}
                 >
                   {tf}
                 </Button>
@@ -109,8 +100,18 @@ export const TradingChart = ({ symbol = "AAPL", className }: TradingChartProps) 
       </CardHeader>
       
       <CardContent>
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-80 w-full">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Loading market data...</span>
+            </div>
+          ) : data.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              No data available
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
             {chartType === "candlestick" ? (
               <ComposedChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -137,13 +138,13 @@ export const TradingChart = ({ symbol = "AAPL", className }: TradingChartProps) 
                       return (
                         <div className="bg-popover border border-border rounded-md p-3 text-xs">
                           <p className="font-medium mb-2">{label}</p>
-                          <div className="space-y-1">
-                            <p>Open: <span className="font-medium">${data.open}</span></p>
-                            <p>High: <span className="font-medium text-bull">${data.high}</span></p>
-                            <p>Low: <span className="font-medium text-bear">${data.low}</span></p>
-                            <p>Close: <span className="font-medium">${data.close}</span></p>
-                            <p>Volume: <span className="font-medium">{data.volume}M</span></p>
-                          </div>
+                           <div className="space-y-1">
+                             <p>Open: <span className="font-medium">${data.open}</span></p>
+                             <p>High: <span className="font-medium text-bull">${data.high}</span></p>
+                             <p>Low: <span className="font-medium text-bear">${data.low}</span></p>
+                             <p>Close: <span className="font-medium">${data.close}</span></p>
+                             <p>Volume: <span className="font-medium">{data.volume}</span></p>
+                           </div>
                         </div>
                       );
                     }
@@ -247,29 +248,38 @@ export const TradingChart = ({ symbol = "AAPL", className }: TradingChartProps) 
               </LineChart>
             )}
           </ResponsiveContainer>
+          )}
         </div>
         
         {/* Chart Stats */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-          <div className="text-sm">
-            <span className="text-muted-foreground">High: </span>
-            <span className="font-medium text-bull">
-              ${Math.max(...data.map(d => d.high)).toFixed(2)}
-            </span>
+        {data.length > 0 && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+            <div className="text-sm">
+              <span className="text-muted-foreground">High: </span>
+              <span className="font-medium text-bull">
+                ${Math.max(...data.map(d => d.high)).toFixed(2)}
+              </span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Low: </span>
+              <span className="font-medium text-bear">
+                ${Math.min(...data.map(d => d.low)).toFixed(2)}
+              </span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Avg Volume: </span>
+              <span className="font-medium">
+                {(data.reduce((sum, d) => sum + d.volume, 0) / data.length).toFixed(0)}
+              </span>
+            </div>
+            <div className="text-sm">
+              <span className="text-muted-foreground">Source: </span>
+              <span className="font-medium">
+                {source === 'binance' ? 'Binance API' : 'Demo Data'}
+              </span>
+            </div>
           </div>
-          <div className="text-sm">
-            <span className="text-muted-foreground">Low: </span>
-            <span className="font-medium text-bear">
-              ${Math.min(...data.map(d => d.low)).toFixed(2)}
-            </span>
-          </div>
-          <div className="text-sm">
-            <span className="text-muted-foreground">Avg Volume: </span>
-            <span className="font-medium">
-              {(data.reduce((sum, d) => sum + d.volume, 0) / data.length).toFixed(1)}M
-            </span>
-          </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
