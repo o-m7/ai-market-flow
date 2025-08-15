@@ -1,8 +1,7 @@
-import { Dashboard } from "@/components/Dashboard";
+import { LandingPage } from "@/components/LandingPage";
 
 const Index = () => {
-  console.log("Index page is rendering");
-  return <Dashboard />;
+  return <LandingPage />;
 };
 
 export default Index;
