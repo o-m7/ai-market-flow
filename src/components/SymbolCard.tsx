@@ -1,7 +1,9 @@
-import { TrendingUp, TrendingDown, Star, Plus, Share2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Star, Plus, Share2, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { QuickAnalysis } from "./QuickAnalysis";
 
 interface SymbolCardProps {
   symbol: string;
@@ -106,14 +108,22 @@ export const SymbolCard = ({
         </div>
 
         {/* Actions */}
-        <div className="flex space-x-2">
-          <Button size="sm" className="flex-1 bg-primary hover:bg-primary/90">
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="sm" className="bg-primary hover:bg-primary/90">
             <Plus className="h-4 w-4 mr-1" />
-            Add to Watchlist
+            Watchlist
           </Button>
-          <Button variant="outline" size="sm" className="border-border hover:border-primary" asChild>
-            <a href={`/markets/stocks/${symbol.toLowerCase()}`}>View Details</a>
-          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="border-border hover:border-primary">
+                <Brain className="h-4 w-4 mr-1" />
+                AI Analysis
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <QuickAnalysis symbol={symbol} />
+            </DialogContent>
+          </Dialog>
         </div>
       </CardContent>
     </Card>

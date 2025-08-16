@@ -2,6 +2,8 @@ import { Navigation } from "./Navigation";
 import { MarketFilters } from "./MarketFilters";
 import { SymbolCard } from "./SymbolCard";
 import { AIAssistant } from "./AIAssistant";
+import { AIAnalysisPanel } from "./AIAnalysisPanel";
+import { RealtimeStatus } from "./RealtimeStatus";
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -45,6 +47,11 @@ export const Dashboard = () => {
 
         <MarketFilters />
 
+        {/* Real-time Status */}
+        <div className="mb-6">
+          <RealtimeStatus />
+        </div>
+
         {/* Error State */}
         {error && (
           <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -55,26 +62,35 @@ export const Dashboard = () => {
         )}
 
         {/* Symbols Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loading ? (
-            // Loading skeletons
-            Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-gradient-card border border-border rounded-lg p-6">
-                <Skeleton className="h-6 w-20 mb-2" />
-                <Skeleton className="h-4 w-32 mb-4" />
-                <Skeleton className="h-8 w-24 mb-2" />
-                <Skeleton className="h-4 w-16 mb-4" />
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                </div>
-              </div>
-            ))
-          ) : (
-            marketData.map((symbol) => (
-              <SymbolCard key={symbol.symbol} {...symbol} />
-            ))
-          )}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+          <div className="lg:col-span-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {loading ? (
+                // Loading skeletons
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="bg-gradient-card border border-border rounded-lg p-6">
+                    <Skeleton className="h-6 w-20 mb-2" />
+                    <Skeleton className="h-4 w-32 mb-4" />
+                    <Skeleton className="h-8 w-24 mb-2" />
+                    <Skeleton className="h-4 w-16 mb-4" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                marketData.map((symbol) => (
+                  <SymbolCard key={symbol.symbol} {...symbol} />
+                ))
+              )}
+            </div>
+          </div>
+          
+          {/* AI Analysis Panel */}
+          <div className="lg:col-span-1">
+            <AIAnalysisPanel symbols={marketData.map(s => s.symbol)} />
+          </div>
         </div>
 
         {/* Performance Stats */}
