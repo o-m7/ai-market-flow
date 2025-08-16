@@ -27,105 +27,58 @@ export default function TechnicalChart({
   onSymbolChange 
 }: Props) {
   const containerRef = useRef<HTMLDivElement|null>(null);
-  const widgetRef = useRef<any>(null);
   
   const [timeframe, setTimeframe] = useState<'1'|'5'|'15'|'30'|'60'|'240'|'D'>(tf);
   const [showIndicators, setShowIndicators] = useState(true);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
 
-  // Load TradingView script
+
+  // Initialize TradingView widget using iframe approach
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.type = 'text/javascript';
-    script.async = true;
-    script.onload = () => setScriptLoaded(true);
-    document.head.appendChild(script);
+    if (!containerRef.current) return;
 
-    return () => {
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
-      }
-    };
-  }, []);
+    // Clear previous content
+    containerRef.current.innerHTML = '';
 
-  // Initialize TradingView widget
-  useEffect(() => {
-    if (!scriptLoaded || !containerRef.current) return;
-
-    // Clear previous widget
-    if (containerRef.current) {
-      containerRef.current.innerHTML = '';
-    }
-
-    // Create new widget container
-    const widgetContainer = document.createElement('div');
-    widgetContainer.className = 'tradingview-widget-container';
-    widgetContainer.style.height = `${height}px`;
-    widgetContainer.style.width = '100%';
-
-    const widgetDiv = document.createElement('div');
-    widgetDiv.className = 'tradingview-widget-container__widget';
-    widgetDiv.style.height = 'calc(100% - 32px)';
-    widgetDiv.style.width = '100%';
-
-    widgetContainer.appendChild(widgetDiv);
-    containerRef.current.appendChild(widgetContainer);
-
-    // Configure widget
-    const config = {
-      autosize: true,
+    // Create TradingView iframe
+    const iframe = document.createElement('iframe');
+    
+    // Build the TradingView URL with parameters
+    const baseUrl = 'https://s.tradingview.com/widgetembed/';
+    const params = new URLSearchParams({
+      frameElementId: 'tradingview_chart',
       symbol: symbol,
       interval: timeframe,
-      timezone: "Etc/UTC",
-      theme: theme === 'dark' ? 'dark' : 'light',
-      style: "1",
-      locale: "en",
-      toolbar_bg: "#f1f3f6",
-      enable_publishing: false,
-      allow_symbol_change: true,
-      save_image: false,
-      studies: showIndicators ? [
-        "RSI@tv-basicstudies",
-        "MACD@tv-basicstudies", 
-        "EMA@tv-basicstudies"
-      ] : [],
-      container_id: widgetDiv,
-      hide_top_toolbar: false,
-      hide_legend: false,
-      hide_side_toolbar: false,
-      details: true,
-      hotlist: true,
-      calendar: true,
-      studies_overrides: {},
-      overrides: {
-        "paneProperties.background": theme === 'dark' ? "#0b0f14" : "#ffffff",
-        "paneProperties.vertGridProperties.color": theme === 'dark' ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)",
-        "paneProperties.horzGridProperties.color": theme === 'dark' ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)",
-        "symbolWatermarkProperties.transparency": 90,
-        "scalesProperties.textColor": theme === 'dark' ? "#e5e7eb" : "#111111",
-        "mainSeriesProperties.candleStyle.upColor": "#26a69a",
-        "mainSeriesProperties.candleStyle.downColor": "#ef5350",
-        "mainSeriesProperties.candleStyle.drawWick": true,
-        "mainSeriesProperties.candleStyle.drawBorder": true,
-        "mainSeriesProperties.candleStyle.borderUpColor": "#26a69a",
-        "mainSeriesProperties.candleStyle.borderDownColor": "#ef5350",
-        "mainSeriesProperties.candleStyle.wickUpColor": "#26a69a",
-        "mainSeriesProperties.candleStyle.wickDownColor": "#ef5350"
-      }
-    };
+      hidesidetoolbar: '0',
+      symboledit: '1',
+      saveimage: '1',
+      toolbarbg: 'F1F3F6',
+      studies: showIndicators ? 'RSI@tv-basicstudies,MACD@tv-basicstudies,EMA@tv-basicstudies' : '',
+      theme: theme,
+      style: '1',
+      timezone: 'Etc/UTC',
+      withdateranges: '1',
+      details: '1',
+      hotlist: '1',
+      calendar: '1',
+      allow_symbol_change: 'true',
+      referral_id: 'lovable',
+      utm_source: 'localhost',
+      utm_medium: 'widget_new',
+      utm_campaign: 'chart',
+      utm_term: symbol
+    });
 
-    // Create script tag with configuration
-    const script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.innerHTML = `
-      new TradingView.widget(${JSON.stringify(config)});
-    `;
+    iframe.src = `${baseUrl}?${params.toString()}`;
+    iframe.width = '100%';
+    iframe.height = `${height}px`;
+    iframe.style.border = 'none';
+    iframe.style.display = 'block';
+    iframe.frameBorder = '0';
+    iframe.allow = 'fullscreen';
+    
+    containerRef.current.appendChild(iframe);
 
-    widgetDiv.appendChild(script);
-    widgetRef.current = widgetContainer;
-
-  }, [scriptLoaded, symbol, timeframe, height, theme, showIndicators]);
+  }, [symbol, timeframe, theme, showIndicators, height]);
 
   return (
     <Card>
@@ -163,17 +116,10 @@ export default function TechnicalChart({
         <div className="rounded-lg border bg-card overflow-hidden">
           <div 
             ref={containerRef} 
-            style={{ width: '100%', height: `${height}px` }}
+            style={{ width: '100%', height: `${height}px`, minHeight: `${height}px` }}
             className="tradingview-chart-container"
           />
         </div>
-        
-        {!scriptLoaded && (
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="ml-2">Loading TradingView Chart...</span>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
