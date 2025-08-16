@@ -15,15 +15,10 @@ serve(async (req) => {
   try {
     const newsApiKey = Deno.env.get('NEWS_API_KEY');
     if (!newsApiKey) {
-      console.error('NEWS_API_KEY environment variable not found');
       throw new Error('NEWS_API_KEY not configured');
     }
 
-    console.log('NEWS_API_KEY present:', newsApiKey ? 'Yes' : 'No');
-
     const { query = 'stocks OR trading OR finance', category, country = 'us', pageSize = 20 } = await req.json();
-
-    console.log('Request payload:', { query, category, country, pageSize });
 
     let url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&sortBy=publishedAt&language=en&pageSize=${pageSize}&apiKey=${newsApiKey}`;
     
@@ -35,7 +30,6 @@ serve(async (req) => {
     console.log('Fetching news from:', url.replace(newsApiKey, '[REDACTED]'));
 
     const response = await fetch(url);
-    console.log('NewsAPI response status:', response.status);
     
     if (!response.ok) {
       const error = await response.text();
@@ -50,11 +44,6 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log('NewsAPI response data:', {
-      status: data.status,
-      totalResults: data.totalResults,
-      articlesCount: data.articles?.length || 0
-    });
     
     // Filter out articles with missing essential data
     const filteredArticles = data.articles?.filter((article: any) => 
@@ -69,8 +58,6 @@ serve(async (req) => {
       articles: filteredArticles,
       fetchedAt: new Date().toISOString()
     };
-
-    console.log('Returning result with', filteredArticles.length, 'filtered articles');
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

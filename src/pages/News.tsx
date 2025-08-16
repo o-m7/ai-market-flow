@@ -75,28 +75,17 @@ export default function News() {
         pageSize: 20
       };
 
-      console.log('Calling news-fetch with payload:', payload);
-
       const { data, error } = await supabase.functions.invoke('news-fetch', {
         body: payload
       });
 
-      console.log('Supabase function response:', { data, error });
-
       if (error) {
-        console.error('Supabase function error:', error);
         throw new Error(error.message || 'Failed to invoke function');
       }
 
       if (data?.error) {
-        console.error('Function returned error:', data.error);
         throw new Error(data.error);
       }
-
-      console.log('News data received:', {
-        totalResults: data?.totalResults,
-        articlesCount: data?.articles?.length
-      });
 
       setNewsData(data);
       // Clear previous insights when new news is fetched
@@ -131,11 +120,6 @@ export default function News() {
 
     setInsightsLoading(true);
     try {
-      console.log('Calling news-insights with:', {
-        articlesCount: newsData.articles.length,
-        analysisType
-      });
-
       const { data, error } = await supabase.functions.invoke('news-insights', {
         body: {
           articles: newsData.articles,
@@ -143,15 +127,11 @@ export default function News() {
         }
       });
 
-      console.log('Insights response:', { data, error });
-
       if (error) {
-        console.error('Insights function error:', error);
         throw new Error(error.message || 'Failed to invoke insights function');
       }
 
       if (data?.error) {
-        console.error('Insights function returned error:', data.error);
         throw new Error(data.error);
       }
 
@@ -210,11 +190,7 @@ export default function News() {
     return `${Math.floor(diffInHours / 24)}d ago`;
   };
 
-  const filteredArticles = newsData?.articles?.filter(article => {
-    if (!searchQuery || selectedCategory !== "all") return true;
-    const content = `${article.title} ${article.description}`.toLowerCase();
-    return content.includes(searchQuery.toLowerCase());
-  }) || [];
+  const filteredArticles = newsData?.articles || [];
 
   const sentimentCounts = filteredArticles.reduce((acc, article) => {
     const sentiment = getSentimentFromContent(article);
@@ -463,51 +439,15 @@ export default function News() {
         </Card>
       )}
 
-        {loading && (
-          <Card className="bg-gradient-card border-border">
-            <CardContent className="p-12 text-center">
-              <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
-              <h3 className="text-lg font-semibold mb-2">Loading News</h3>
-              <p className="text-muted-foreground">Fetching the latest market news...</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Debug Panel */}
-        <Card className="bg-gradient-card border-border border-yellow-500/30">
-          <CardHeader>
-            <CardTitle className="text-sm text-yellow-600">Debug Panel</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={async () => {
-                try {
-                  const { data, error } = await supabase.functions.invoke('news-test');
-                  console.log('Test function result:', { data, error });
-                  toast({
-                    title: "Test Result",
-                    description: data ? JSON.stringify(data, null, 2) : error?.message || 'Test failed',
-                  });
-                } catch (e: any) {
-                  console.error('Test error:', e);
-                  toast({
-                    title: "Test Error", 
-                    description: e.message,
-                    variant: "destructive"
-                  });
-                }
-              }}
-            >
-              Test Edge Functions
-            </Button>
-            <div className="text-xs text-muted-foreground">
-              <p>News Data: {newsData ? `${newsData.articles?.length || 0} articles` : 'None'}</p>
-              <p>AI Insights: {aiInsights ? 'Available' : 'None'}</p>
-            </div>
+      {loading && (
+        <Card className="bg-gradient-card border-border">
+          <CardContent className="p-12 text-center">
+            <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+            <h3 className="text-lg font-semibold mb-2">Loading News</h3>
+            <p className="text-muted-foreground">Fetching the latest market news...</p>
           </CardContent>
         </Card>
+      )}
     </div>
   );
 }
