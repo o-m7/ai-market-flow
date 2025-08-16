@@ -49,14 +49,58 @@ export const AIAnalysis = () => {
   const handleAnalysis = async () => {
     setLoading(true);
     try {
-      // Capture screenshot of the entire analysis page
-      const html2canvas = (await import('html2canvas')).default;
-      
-      // Wait a moment for the page to fully render
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Capture the main content area
-      const element = document.querySelector('.analysis-container') as HTMLElement || document.body;
+      // Start both tasks in parallel: import html2canvas and fetch candles
+      const html2canvasPromise = import('html2canvas');
+
+      const { multiplier, timespan, from, to } = (() => {
+        const now = new Date();
+        const to = now.toISOString().slice(0, 10);
+        const d = new Date(now);
+        switch (timeframe) {
+          case '1': d.setDate(now.getDate() - 2); return { multiplier: 1, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+          case '5': d.setDate(now.getDate() - 3); return { multiplier: 5, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+          case '15': d.setDate(now.getDate() - 7); return { multiplier: 15, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+          case '30': d.setDate(now.getDate() - 14); return { multiplier: 30, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+          case '60': d.setDate(now.getDate() - 60); return { multiplier: 1, timespan: 'hour', from: d.toISOString().slice(0,10), to };
+          case '240': d.setDate(now.getDate() - 120); return { multiplier: 4, timespan: 'hour', from: d.toISOString().slice(0,10), to };
+          case 'D': d.setDate(now.getDate() - 365); return { multiplier: 1, timespan: 'day', from: d.toISOString().slice(0,10), to };
+          default: return { multiplier: 1, timespan: 'hour', from: to, to };
+        }
+      })();
+
+      const candlesPromise = fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: symbol.toUpperCase(),
+          timeframe: timeframe === 'D' ? '1d' : (timeframe === '240' ? '4h' : `${timeframe}m`),
+          multiplier,
+          timespan,
+          from,
+          to,
+          limit: 500
+        })
+      })
+        .then(r => r.json())
+        .then(d => Array.isArray(d.candles) ? d.candles.map((c: any) => ({
+          time: Math.floor(c.t / 1000),
+          open: c.o,
+          high: c.h,
+          low: c.l,
+          close: c.c,
+          volume: c.v ?? 0
+        })) : [] )
+        .catch(() => [] as any[]);
+
+      // Await html2canvas import and candles together
+      const [html2canvasModule, chartData] = await Promise.all([html2canvasPromise, candlesPromise]);
+      const html2canvas = (html2canvasModule as any).default as (el: HTMLElement, opts?: any) => Promise<HTMLCanvasElement>;
+
+      // Small delay to ensure UI settled
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Capture the main content area (TradingView iframe cannot be captured due to browser security/CORS)
+      const element = (document.querySelector('.analysis-container') as HTMLElement) || document.body as HTMLElement;
       const canvas = await html2canvas(element, {
         height: window.innerHeight,
         width: window.innerWidth,
@@ -66,22 +110,18 @@ export const AIAnalysis = () => {
         backgroundColor: '#ffffff'
       });
 
-      // Convert canvas to base64 image
       const imageData = canvas.toDataURL('image/png', 0.8);
-      
-      console.log('Screenshot captured, sending to AI for analysis...');
 
-      // Send screenshot to AI for visual analysis
+      // Send both visual context and quantitative chart data for accurate analysis
       const analysisResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/ai-chart-analysis`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           symbol: symbol.toUpperCase(), 
-          timeframe: timeframe,
+          timeframe,
           analysisType: 'comprehensive',
-          pageScreenshot: imageData
+          pageScreenshot: imageData,
+          chartData
         })
       });
 
@@ -90,21 +130,21 @@ export const AIAnalysis = () => {
         console.error('Analysis error response:', errorData);
         throw new Error(`Analysis failed: ${analysisResponse.status}`);
       }
-      
+
       const analysisData = await analysisResponse.json();
       console.log('Analysis result:', analysisData);
-      
+
       setAnalysis(analysisData.result || analysisData);
       toast({
-        title: "Visual Analysis Complete",
-        description: `AI analyzed the entire page and chart for ${symbol.toUpperCase()} (${timeframe})`,
+        title: 'Analysis Complete',
+        description: `AI analyzed ${symbol.toUpperCase()} (${timeframe}) using the live chart data and page context`,
       });
     } catch (error) {
       console.error('Analysis error:', error);
       toast({
-        title: "Analysis Failed",
-        description: error instanceof Error ? error.message : "Unable to capture page or generate analysis. Please try again.",
-        variant: "destructive",
+        title: 'Analysis Failed',
+        description: error instanceof Error ? error.message : 'Unable to analyze. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);

@@ -14,6 +14,14 @@ interface ChartAnalysisRequest {
   timeframe: string;
   analysisType: 'technical' | 'pattern' | 'comprehensive';
   pageScreenshot?: string; // Base64 encoded image
+  chartData?: Array<{
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume?: number;
+  }>;
 }
 
 interface ChartAnalysisResult {
@@ -54,15 +62,18 @@ serve(async (req) => {
     }
 
     const requestData: ChartAnalysisRequest = await req.json();
-    const { symbol, timeframe, analysisType = 'comprehensive', pageScreenshot } = requestData;
+    const { symbol, timeframe, analysisType = 'comprehensive', pageScreenshot, chartData } = requestData;
 
-    console.log(`Generating AI visual analysis for ${symbol} on ${timeframe} timeframe`);
+    console.log(`Generating AI analysis for ${symbol} on ${timeframe} timeframe`);
     console.log(`Screenshot provided: ${pageScreenshot ? 'Yes' : 'No'}`);
+    console.log(`Chart data points: ${Array.isArray(chartData) ? chartData.length : 0}`);
 
-    // Generate comprehensive visual analysis using AI agent
-    const analysis = pageScreenshot 
-      ? await generateVisualAnalysis(symbol, timeframe, analysisType, pageScreenshot)
-      : await generateAIAgentAnalysis(symbol, timeframe, analysisType);
+    // Choose the best analysis mode based on available inputs
+    const analysis = (chartData && chartData.length > 0)
+      ? await generateHybridAnalysis(symbol, timeframe, analysisType, chartData, pageScreenshot)
+      : pageScreenshot 
+        ? await generateVisualAnalysis(symbol, timeframe, analysisType, pageScreenshot)
+        : await generateAIAgentAnalysis(symbol, timeframe, analysisType);
 
     return new Response(JSON.stringify({
       success: true,
@@ -248,6 +259,127 @@ Respond in JSON format:
     
     // Fallback to text-based analysis if visual analysis fails
     return await generateAIAgentAnalysis(symbol, timeframe, analysisType);
+  }
+}
+
+async function generateHybridAnalysis(
+  symbol: string,
+  timeframe: string,
+  analysisType: string,
+  chartData: Array<{ time: number; open: number; high: number; low: number; close: number; volume?: number; }>,
+  pageScreenshot?: string
+): Promise<ChartAnalysisResult> {
+  console.log(`Hybrid analysis for ${symbol} with ${chartData.length} candles`);
+
+  // Compute technical summary from chart data
+  const prices = chartData.map(d => d.close);
+  const highs = chartData.map(d => d.high);
+  const lows = chartData.map(d => d.low);
+  const currentPrice = prices[prices.length - 1];
+  const previousPrice = prices[prices.length - 2] || currentPrice;
+  const priceChange = ((currentPrice - previousPrice) / previousPrice) * 100;
+  const rsi = calculateSimpleRSI(prices);
+  const supportLevels = findSupportLevels(lows);
+  const resistanceLevels = findResistanceLevels(highs);
+  const volatility = calculateVolatility(prices);
+
+  const summary = {
+    symbol,
+    timeframe,
+    dataPoints: chartData.length,
+    currentPrice,
+    priceChange: Number(priceChange.toFixed(2)),
+    highestPrice: Math.max(...highs),
+    lowestPrice: Math.min(...lows),
+    averagePrice: prices.reduce((a, b) => a + b, 0) / prices.length,
+    rsi: Number(rsi.toFixed(1)),
+    supportLevels,
+    resistanceLevels,
+    volatility: Number(volatility.toFixed(2))
+  };
+
+  const basePrompt = `You are an elite trading agent. Use the QUANT DATA provided to ground your analysis; if an IMAGE is provided, use it to validate patterns and indicator readings.
+
+QUANT DATA:
+${JSON.stringify(summary, null, 2)}
+
+REQUIREMENTS:
+- Provide precise technical analysis grounded in the QUANT DATA.
+- If IMAGE is provided, cross-check patterns, indicator readings (RSI/MACD/EMA), and price levels.
+- Output ONLY valid JSON in the exact schema: analysis, recommendation, confidence, keyLevels.support/resistance, technicalIndicators.rsi/trend/momentum, chartPatterns[], priceTargets.bullish/bearish, riskAssessment.level/factors.`;
+
+  try {
+    const useVision = Boolean(pageScreenshot);
+
+    const payload = useVision
+      ? {
+          model: 'gpt-4.1-2025-04-14',
+          messages: [
+            { role: 'system', content: 'You are an institutional-grade trading agent producing grounded, JSON-only outputs.' },
+            { role: 'user', content: [
+              { type: 'text', text: basePrompt },
+              { type: 'image_url', image_url: { url: pageScreenshot!, detail: 'high' } }
+            ] }
+          ],
+          max_tokens: 2500
+        }
+      : {
+          model: 'gpt-5-2025-08-07',
+          messages: [
+            { role: 'system', content: 'You are an institutional-grade trading agent producing grounded, JSON-only outputs.' },
+            { role: 'user', content: basePrompt }
+          ],
+          max_completion_tokens: 2500
+        };
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload as any)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI API error (hybrid): ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
+    const analysisData = JSON.parse(aiResponse);
+
+    return {
+      symbol,
+      analysis: analysisData.analysis,
+      recommendation: analysisData.recommendation,
+      confidence: analysisData.confidence,
+      keyLevels: analysisData.keyLevels,
+      technicalIndicators: analysisData.technicalIndicators,
+      chartPatterns: analysisData.chartPatterns,
+      priceTargets: analysisData.priceTargets,
+      riskAssessment: analysisData.riskAssessment,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error(`Hybrid analysis failed for ${symbol}:`, error);
+    // Fallback: basic rule-based from QUANT DATA
+    const trend = rsi > 60 ? 'bullish' : rsi < 40 ? 'bearish' : 'neutral';
+    const recommendation = trend === 'bullish' ? 'buy' : trend === 'bearish' ? 'sell' : 'hold';
+    return {
+      symbol,
+      analysis: `Data-grounded analysis for ${symbol}: price ${priceChange >= 0 ? 'up' : 'down'} ${summary.priceChange}%. RSI ${summary.rsi} indicates ${trend}. Support ${supportLevels.map(v=>v.toFixed(2)).join(', ')}; resistance ${resistanceLevels.map(v=>v.toFixed(2)).join(', ')}. Volatility ${summary.volatility}%`,
+      recommendation,
+      confidence: 0.7,
+      keyLevels: { support: supportLevels, resistance: resistanceLevels },
+      technicalIndicators: { rsi, trend, momentum: Math.abs(priceChange) > 2 ? 'strong' : 'weak' },
+      chartPatterns: [],
+      priceTargets: { bullish: currentPrice * 1.1, bearish: currentPrice * 0.9 },
+      riskAssessment: { level: volatility > 4 ? 'high' : volatility > 2 ? 'medium' : 'low', factors: ['Volatility', 'Recent momentum'] },
+      timestamp: new Date().toISOString()
+    };
   }
 }
 
@@ -447,7 +579,7 @@ function getRandomPatterns(): string[] {
   ];
   
   const numPatterns = Math.floor(Math.random() * 3);
-  const selectedPatterns = [];
+  const selectedPatterns: string[] = [];
   
   for (let i = 0; i < numPatterns; i++) {
     const randomIndex = Math.floor(Math.random() * patterns.length);
@@ -457,4 +589,48 @@ function getRandomPatterns(): string[] {
   }
   
   return selectedPatterns;
+}
+
+// Helper technical functions used by hybrid analysis
+function calculateSimpleRSI(prices: number[], period: number = 14): number {
+  if (!prices || prices.length < period + 1) return 50;
+  let gains = 0, losses = 0;
+  for (let i = prices.length - period - 1; i < prices.length - 1; i++) {
+    const change = prices[i + 1] - prices[i];
+    if (change > 0) gains += change; else losses += -change;
+  }
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+function findSupportLevels(lows: number[]): number[] {
+  if (!lows || lows.length < 3) return [];
+  const recent = lows.slice(-50);
+  const levels: number[] = [];
+  for (let i = 1; i < recent.length - 1; i++) {
+    if (recent[i] < recent[i-1] && recent[i] < recent[i+1]) levels.push(recent[i]);
+  }
+  return levels.sort((a,b)=>a-b).slice(0,3);
+}
+
+function findResistanceLevels(highs: number[]): number[] {
+  if (!highs || highs.length < 3) return [];
+  const recent = highs.slice(-50);
+  const levels: number[] = [];
+  for (let i = 1; i < recent.length - 1; i++) {
+    if (recent[i] > recent[i-1] && recent[i] > recent[i+1]) levels.push(recent[i]);
+  }
+  return levels.sort((a,b)=>b-a).slice(0,3);
+}
+
+function calculateVolatility(prices: number[]): number {
+  if (!prices || prices.length < 2) return 0;
+  const returns: number[] = [];
+  for (let i = 1; i < prices.length; i++) returns.push((prices[i]-prices[i-1])/prices[i-1]);
+  const mean = returns.reduce((s,r)=>s+r,0)/returns.length;
+  const variance = returns.reduce((s,r)=>s+Math.pow(r-mean,2),0)/returns.length;
+  return Math.sqrt(variance) * 100;
 }
