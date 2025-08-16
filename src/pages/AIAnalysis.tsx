@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Navigation } from "@/components/Navigation";
 import TechnicalChart from "@/components/TechnicalChart";
-import { MarketDataPanel } from "@/components/MarketDataPanel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -165,9 +164,9 @@ export const AIAnalysis = () => {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-4">
-          {/* Chart Section */}
-          <div className="lg:col-span-3">
+        <div className="grid gap-6">
+          {/* Chart Section - Full Width */}
+          <div className="w-full">
             <TechnicalChart 
               symbol={symbol}
               tf={timeframe}
@@ -175,11 +174,6 @@ export const AIAnalysis = () => {
               theme="light"
               live
             />
-          </div>
-
-          {/* Market Data Panel */}
-          <div className="lg:col-span-1">
-            <MarketDataPanel symbol={symbol} />
           </div>
         </div>
 
