@@ -32,9 +32,27 @@ serve(async (req) => {
       });
     }
 
+    // Sanitize and cap articles
+    const sanitized = (articles ?? [])
+      .slice(0, 10)
+      .map((a: any) => ({
+        title: String(a?.title ?? '').slice(0, 240),
+        description: String(a?.description ?? '').slice(0, 600),
+        source: String(a?.source?.name ?? ''),
+        publishedAt: String(a?.publishedAt ?? '')
+      }))
+      .filter((a: any) => a.title || a.description);
+
+    if (sanitized.length === 0) {
+      return new Response(JSON.stringify({ error: 'No valid articles to analyze' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Prepare articles summary for analysis
-    const articlesText = articles.slice(0, 10).map((article: any, index: number) => 
-      `${index + 1}. Title: ${article.title}\n   Description: ${article.description}\n   Source: ${article.source?.name || 'Unknown'}\n   Published: ${article.publishedAt}`
+    const articlesText = sanitized.map((article: any, index: number) => 
+      `${index + 1}. Title: ${article.title}\n   Description: ${article.description}\n   Source: ${article.source || 'Unknown'}\n   Published: ${article.publishedAt}`
     ).join('\n\n');
 
     let systemPrompt = '';
@@ -127,14 +145,14 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
-  } catch (error) {
-    console.error('Error in news-insights function:', error);
-    
-    return new Response(JSON.stringify({ 
-      error: error.message || 'Failed to generate insights',
-      timestamp: new Date().toISOString()
-    }), {
-      status: 500,
+  } catch (e: any) {
+    const status = e?.status ?? e?.response?.status ?? 500;
+    const body = (e?.response && typeof e.response.text === 'function')
+      ? await e.response.text().catch(() => '')
+      : (e?.message || '');
+    console.error('[news-insights] OpenAI error', status, body);
+    return new Response(JSON.stringify({ error: body || 'OpenAI call failed' }), {
+      status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
