@@ -1,7 +1,7 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const client = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")! });
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,7 +23,7 @@ const analysisSchema = {
         properties: {
           support: { type: "array", items: { type: "number" } },
           resistance: { type: "array", items: { type: "number" } },
-          vwap: { type: ["number", "null"] }
+          vwap: { type: ["number","null"] }
         },
         required: ["support","resistance"]
       },
@@ -31,14 +31,14 @@ const analysisSchema = {
         type: "object",
         properties: {
           direction: { type: "string", enum: ["long","short","none"] },
-          entry: { type: ["number", "null"] },
-          stop: { type: ["number", "null"] },
+          entry: { type: "number" },
+          stop: { type: "number" },
           targets: { type: "array", items: { type: "number" } },
           rationale: { type: "string" }
         },
         required: ["direction","rationale"]
       },
-      confidence: { type: "number" },  // 0-100
+      confidence: { type: "number" },
       risks: { type: "string" },
       json_version: { type: "string" }
     },
@@ -47,6 +47,18 @@ const analysisSchema = {
   strict: true
 };
 
+function sanitizeCandles(raw: any[], max = 400) {
+  const bars = (raw ?? []).slice(-max).map((b) => ({
+    t: Number(b.t), o: Number(b.o), h: Number(b.h),
+    l: Number(b.l), c: Number(b.c), v: Number(b.v ?? 0)
+  })).filter((b) =>
+    Number.isFinite(b.t) && Number.isFinite(b.o) &&
+    Number.isFinite(b.h) && Number.isFinite(b.l) &&
+    Number.isFinite(b.c) && Number.isFinite(b.v)
+  );
+  return bars;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -54,101 +66,49 @@ serve(async (req) => {
   }
 
   try {
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
-
-    const { symbol, timeframe, market, candles } = await req.json() as {
-      symbol: string;
-      timeframe: string;
-      market: string;
-      candles: Array<{t:number,o:number,h:number,l:number,c:number,v:number}>;
-    };
-
-    console.log(`Analyzing ${symbol} (${timeframe}) with ${candles?.length || 0} candles`);
-
-    if (!symbol || !Array.isArray(candles) || candles.length < 20) {
-      return new Response(JSON.stringify({ error: 'symbol and >=20 candles required' }), {
+    const { symbol, timeframe, market, candles } = await req.json();
+    const bars = sanitizeCandles(candles);
+    if (!symbol || bars.length < 20) {
+      return new Response(JSON.stringify({ error: "symbol and >=20 candles required" }), { 
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Sanitize and cap payload to avoid 400s and token bloat
-    const MAX_BARS = 400;
-    const bars = (candles ?? []).slice(-MAX_BARS)
-      .map(b => ({
-        t: Number(b.t),
-        o: Number(b.o),
-        h: Number(b.h),
-        l: Number(b.l),
-        c: Number(b.c),
-        v: Number(b.v ?? 0),
-      }))
-      .filter(b =>
-        Number.isFinite(b.t) && Number.isFinite(b.o) &&
-        Number.isFinite(b.h) && Number.isFinite(b.l) &&
-        Number.isFinite(b.c) && Number.isFinite(b.v)
-      );
-
-    if (bars.length < 20) {
-      return new Response(JSON.stringify({ error: '>=20 valid candles required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    console.log(`Analyzing ${symbol} (${timeframe}) with ${bars.length} candles`);
 
     const prompt =
-      'You are a professional technical analyst. ' +
-      'Return ONLY valid JSON to the provided schema. ' +
-      'Columns: t,o,h,l,c,v (t=epoch seconds). ' +
-      `Analyze ${symbol} on ${timeframe} in ${market}. ` +
-      'Data:\n' + JSON.stringify(bars);
+      "You are a professional technical analyst. " +
+      "Use price action plus EMA20/50/200, RSI, MACD, ATR, Bollinger conceptually. " +
+      "Be concise and numeric. Return ONLY valid JSON to the schema.\n" +
+      "Columns: t,o,h,l,c,v (t=epoch seconds).\n" +
+      "Data:\n" + JSON.stringify(bars);
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        input: prompt,
-        response_format: {
-          type: 'json_schema',
-          json_schema: analysisSchema
-        }
-      }),
+    const r = await client.responses.create({
+      model: "gpt-4o-mini",
+      input: prompt,
+
+      // ✅ NEW PARAM (replaces deprecated response_format)
+      text_format: {
+        type: "json_schema",
+        json_schema: analysisSchema
+      }
+      // In some SDKs this may be nested as:
+      // text: { format: { type: "json_schema", json_schema: analysisSchema } }
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`OpenAI API error: ${response.status} - ${errorText}`);
-      // Bubble up the real status/text so the frontend can see exact error
-      return new Response(JSON.stringify({ error: errorText || 'OpenAI call failed' }), {
-        status: response.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    const out =
+      (r as any).output_text ??
+      (r as any).output?.[0]?.content?.[0]?.text ??
+      (r as any).content?.[0]?.text ??
+      r;
 
-    const data = await response.json();
-    const aiText = data.output_text
-      ?? data?.output?.[0]?.content?.[0]?.text
-      ?? data?.content?.[0]?.text
-      ?? '';
-
-    if (!aiText) {
-      console.error('OpenAI response missing structured text:', JSON.stringify(data));
-      throw new Error('Invalid OpenAI response');
-    }
-
-    const parsed = JSON.parse(aiText);
-
-    // Add metadata
-    const result = {
-      ...parsed,
-      symbol,
-      timeframe,
+    const parsed = typeof out === "string" ? JSON.parse(out) : out;
+    
+    const result = { 
+      ...parsed, 
+      symbol, 
+      timeframe, 
       json_version: "1.0.0",
       analyzed_at: new Date().toISOString(),
       candles_analyzed: bars.length
@@ -160,13 +120,13 @@ serve(async (req) => {
 
   } catch (e: any) {
     const status = e?.status ?? e?.response?.status ?? 500;
-    const body = (e?.response && typeof e.response.text === 'function')
-      ? await e.response.text().catch(() => '')
-      : (e?.message || '');
-    console.error('[ai-analyze] OpenAI error', status, body);
-    return new Response(JSON.stringify({ error: body || 'OpenAI call failed' }), {
+    const body = (e?.response && typeof e.response.text === "function")
+      ? await e.response.text().catch(() => "")
+      : (e?.message || "");
+    console.error("[ai-analyze] OpenAI error", status, body);
+    return new Response(JSON.stringify({ error: body || "OpenAI call failed" }), { 
       status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
