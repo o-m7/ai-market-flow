@@ -1,5 +1,16 @@
 import { useEffect, useRef } from 'react';
-import { createChart, ColorType, IChartApi, Time } from 'lightweight-charts';
+import { 
+  createChart, 
+  ColorType, 
+  IChartApi, 
+  Time,
+  ISeriesApi,
+  CandlestickData,
+  LineData,
+  LineSeries,
+  AreaSeries,
+  CandlestickSeries
+} from 'lightweight-charts';
 import type { LWBar } from '../lib/marketData';
 import { fetchCandles, fetchQuote } from '../lib/marketData';
 
@@ -15,7 +26,7 @@ type Props = {
 export default function TVLightweightChart({ symbol, tf='1m', height=420, theme='light', series='candles', live=true }: Props) {
   const ref = useRef<HTMLDivElement|null>(null);
   const chartRef = useRef<IChartApi|null>(null);
-  const seriesRef = useRef<any>(null);
+  const seriesRef = useRef<ISeriesApi<any> | null>(null);
   const lastBar = useRef<LWBar|undefined>();
 
   useEffect(() => {
@@ -36,9 +47,9 @@ export default function TVLightweightChart({ symbol, tf='1m', height=420, theme=
     });
     chartRef.current = chart;
 
-    // Create series based on type
+    // Create series based on type using correct v5 API
     if (series === 'candles') {
-      seriesRef.current = (chart as any).addCandlestickSeries({
+      seriesRef.current = chart.addSeries(CandlestickSeries, {
         upColor: '#26a69a',
         downColor: '#ef5350',
         borderUpColor: '#26a69a',
@@ -47,14 +58,14 @@ export default function TVLightweightChart({ symbol, tf='1m', height=420, theme=
         wickDownColor: '#ef5350',
       });
     } else if (series === 'area') {
-      seriesRef.current = (chart as any).addAreaSeries({
+      seriesRef.current = chart.addSeries(AreaSeries, {
         lineWidth: 2,
         topColor: 'rgba(38,166,154,.4)',
         bottomColor: 'rgba(38,166,154,.05)',
         lineColor: '#26a69a'
       });
     } else {
-      seriesRef.current = (chart as any).addLineSeries({
+      seriesRef.current = chart.addSeries(LineSeries, {
         lineWidth: 2,
         color: '#26a69a'
       });
