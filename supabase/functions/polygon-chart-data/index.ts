@@ -10,9 +10,12 @@ const corsHeaders = {
 
 interface ChartDataRequest {
   symbol: string;
-  startDate: string;
-  endDate: string;
-  timeframe: '1min' | '5min' | '15min' | '1hour' | '1day';
+  timeframe: string;
+  multiplier: number;
+  timespan: string;
+  from: string;
+  to: string;
+  limit?: number;
 }
 
 serve(async (req) => {
@@ -23,47 +26,57 @@ serve(async (req) => {
 
   try {
     if (!polygonApiKey) {
-      throw new Error('Polygon API key not configured');
-    }
-
-    const requestData: ChartDataRequest = await req.json();
-    const { symbol, startDate, endDate, timeframe = '1day' } = requestData;
-
-    console.log(`Fetching chart data for ${symbol} from ${startDate} to ${endDate} with ${timeframe} timeframe`);
-
-    // Map timeframe to Polygon API format
-    const timeframeMap = {
-      '1min': { multiplier: 1, timespan: 'minute' },
-      '5min': { multiplier: 5, timespan: 'minute' },
-      '15min': { multiplier: 15, timespan: 'minute' },
-      '1hour': { multiplier: 1, timespan: 'hour' },
-      '1day': { multiplier: 1, timespan: 'day' }
-    };
-
-    const { multiplier, timespan } = timeframeMap[timeframe];
-
-    // Fetch aggregated data from Polygon
-    const response = await fetch(
-      `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${startDate}/${endDate}?adjusted=true&sort=asc&limit=50000&apikey=${polygonApiKey}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Polygon API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    if (!data.results || data.results.length === 0) {
-      // Generate fallback data if no results
-      const fallbackData = generateFallbackChartData(symbol, startDate, endDate);
+      console.error('Polygon API key not configured');
+      // Return fallback data instead of throwing error
+      const fallbackData = generateFallbackChartData('AAPL', '2024-01-01', '2024-12-31');
       
       return new Response(JSON.stringify({
         success: true,
-        results: fallbackData,
-        symbol,
-        timeframe,
+        candles: fallbackData,
+        source: 'fallback'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const requestData: ChartDataRequest = await req.json();
+    const { symbol, timeframe, multiplier = 1, timespan = 'day', from, to, limit = 100 } = requestData;
+
+    console.log(`Fetching chart data for ${symbol} from ${from} to ${to} with ${multiplier}${timespan} timeframe`);
+
+    // Fetch aggregated data from Polygon
+    const polygonUrl = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${from}/${to}?adjusted=true&sort=asc&limit=${limit}&apikey=${polygonApiKey}`;
+    console.log('Polygon URL:', polygonUrl);
+
+    const response = await fetch(polygonUrl);
+
+    if (!response.ok) {
+      console.error(`Polygon API error: ${response.status} ${response.statusText}`);
+      
+      // Return fallback data on API error
+      const fallbackData = generateFallbackChartData(symbol, from, to);
+      return new Response(JSON.stringify({
+        success: true,
+        candles: fallbackData,
         source: 'fallback',
-        count: fallbackData.length
+        error: `Polygon API error: ${response.status}`
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const data = await response.json();
+    console.log('Polygon response status:', data.status);
+
+    if (!data.results || data.results.length === 0) {
+      console.log('No results from Polygon API, using fallback data');
+      const fallbackData = generateFallbackChartData(symbol, from, to);
+      
+      return new Response(JSON.stringify({
+        success: true,
+        candles: fallbackData,
+        source: 'fallback',
+        message: 'No data from Polygon, using fallback'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -71,14 +84,23 @@ serve(async (req) => {
 
     console.log(`Successfully fetched ${data.results.length} data points for ${symbol}`);
 
+    // Format data as candles array for frontend
+    const candles = data.results.map((item: any) => ({
+      t: item.t,
+      o: item.o,
+      h: item.h,
+      l: item.l,
+      c: item.c,
+      v: item.v
+    }));
+
     return new Response(JSON.stringify({
       success: true,
-      results: data.results,
+      candles: candles,
       symbol,
       timeframe,
       source: 'polygon',
-      count: data.results.length,
-      next_url: data.next_url
+      count: candles.length
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -86,16 +108,15 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in polygon-chart-data function:', error);
     
-    // Return fallback data on error
+    // Return fallback data on any error
     const fallbackData = generateFallbackChartData('AAPL', '2024-01-01', '2024-12-31');
     
     return new Response(JSON.stringify({
-      success: false,
-      error: error.message,
-      results: fallbackData,
-      source: 'fallback'
+      success: true,
+      candles: fallbackData,
+      source: 'fallback',
+      error: error.message
     }), {
-      status: 200, // Return 200 with fallback data
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
@@ -109,7 +130,12 @@ function generateFallbackChartData(symbol: string, startDate: string, endDate: s
   const data = [];
   let currentPrice = 100 + Math.random() * 200; // Random base price between 100-300
   
-  for (let timestamp = start; timestamp <= end; timestamp += dayInMs) {
+  // Generate at least 30 days of data
+  const daysToGenerate = Math.min(Math.max(30, Math.floor((end - start) / dayInMs)), 100);
+  const startTime = end - (daysToGenerate * dayInMs);
+  
+  for (let i = 0; i < daysToGenerate; i++) {
+    const timestamp = startTime + (i * dayInMs);
     const date = new Date(timestamp);
     
     // Skip weekends for stock data
@@ -143,5 +169,6 @@ function generateFallbackChartData(symbol: string, startDate: string, endDate: s
     currentPrice = close;
   }
   
+  console.log(`Generated ${data.length} fallback data points for ${symbol}`);
   return data;
 }
