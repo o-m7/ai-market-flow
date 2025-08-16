@@ -1,17 +1,14 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Navigation } from "@/components/Navigation";
-import { TradingChart } from "@/components/TradingChart";
+import TechnicalChart from "@/components/TechnicalChart";
 import { MarketDataPanel } from "@/components/MarketDataPanel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, TrendingDown, Activity, Brain, BarChart3 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { CandlestickData } from 'lightweight-charts';
+import { LWBar } from '@/lib/marketData';
 
 interface AnalysisResult {
   symbol: string;
@@ -39,23 +36,28 @@ interface AnalysisResult {
   timestamp: string;
 }
 
+const POPULAR_SYMBOLS = [
+  'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX',
+  'BTCUSD', 'ETHUSD', 'EURUSD', 'GBPUSD', 'USDJPY'
+];
+
 export const AIAnalysis = () => {
   const [symbol, setSymbol] = useState("AAPL");
-  const [timeframe, setTimeframe] = useState("1day");
+  const [timeframe, setTimeframe] = useState<'1m'|'5m'|'15m'|'30m'|'1h'|'4h'|'1d'>("1h");
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [chartData, setChartData] = useState<CandlestickData[]>([]);
+  const [chartData, setChartData] = useState<LWBar[]>([]);
   const { toast } = useToast();
 
-  const handleChartDataChange = (data: CandlestickData[]) => {
+  const handleChartDataChange = useCallback((data: LWBar[]) => {
     setChartData(data);
-  };
+  }, []);
 
   const handleAnalysis = async () => {
-    if (!symbol) {
+    if (chartData.length === 0) {
       toast({
-        title: "Error",
-        description: "Please enter a stock symbol",
+        title: "Loading Chart Data",
+        description: "Please wait for the chart to load before analyzing",
         variant: "destructive",
       });
       return;
@@ -63,40 +65,7 @@ export const AIAnalysis = () => {
 
     setLoading(true);
     try {
-      // Get chart data first
-      const chartDataResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          symbol: symbol.toUpperCase(),
-          timeframe: timeframe,
-          multiplier: 1,
-          timespan: timeframe.includes('m') ? 'minute' : timeframe.includes('h') ? 'hour' : 'day',
-          from: new Date(Date.now() - 30*24*3600*1000).toISOString().slice(0,10),
-          to: new Date().toISOString().slice(0,10),
-          limit: 100
-        })
-      });
-
-      if (!chartDataResponse.ok) {
-        throw new Error('Failed to fetch chart data');
-      }
-
-      const chartData = await chartDataResponse.json();
-      console.log('Chart data for analysis:', chartData);
-
-      if (!chartData.candles || chartData.candles.length === 0) {
-        toast({
-          title: "Error", 
-          description: "No chart data available for analysis",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Now call AI analysis with the chart data
+      // Use the current chart data for analysis
       const analysisResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/ai-chart-analysis`, {
         method: 'POST',
         headers: {
@@ -104,13 +73,13 @@ export const AIAnalysis = () => {
         },
         body: JSON.stringify({ 
           symbol: symbol.toUpperCase(), 
-          chartData: chartData.candles.map((candle: any) => ({
-            time: candle.t,
-            open: candle.o,
-            high: candle.h,
-            low: candle.l,
-            close: candle.c,
-            volume: candle.v || 0
+          chartData: chartData.map((candle: any) => ({
+            time: candle.time,
+            open: candle.open,
+            high: candle.high,
+            low: candle.low,
+            close: candle.close,
+            volume: candle.volume || 0
           })),
           timeframe: timeframe,
           analysisType: 'comprehensive'
@@ -129,7 +98,7 @@ export const AIAnalysis = () => {
       setAnalysis(analysisData.result || analysisData);
       toast({
         title: "Analysis Complete",
-        description: `AI chart analysis for ${symbol.toUpperCase()} has been generated`,
+        description: `AI analysis for ${symbol.toUpperCase()} (${timeframe}) completed successfully`,
       });
     } catch (error) {
       console.error('Analysis error:', error);
@@ -164,80 +133,73 @@ export const AIAnalysis = () => {
       <Navigation />
       
       <div className="container mx-auto px-4 py-8">
+        {/* Header with Symbol Selector */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-            <Brain className="h-8 w-8 text-primary" />
-            AI Chart Analysis
-          </h1>
-          <p className="text-muted-foreground">
-            Comprehensive technical analysis powered by AI using live chart data
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+                <Brain className="h-8 w-8 text-primary" />
+                AI Technical Analysis
+              </h1>
+              <p className="text-muted-foreground">
+                Real-time technical analysis with indicators and AI insights
+              </p>
+            </div>
+            
+            {/* Symbol Selector */}
+            <div className="flex items-center gap-4">
+              <Select value={symbol} onValueChange={setSymbol}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select Symbol" />
+                </SelectTrigger>
+                <SelectContent>
+                  {POPULAR_SYMBOLS.map((sym) => (
+                    <SelectItem key={sym} value={sym}>
+                      {sym}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={timeframe} onValueChange={(value: any) => setTimeframe(value)}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1m">1 Min</SelectItem>
+                  <SelectItem value="5m">5 Min</SelectItem>
+                  <SelectItem value="15m">15 Min</SelectItem>
+                  <SelectItem value="30m">30 Min</SelectItem>
+                  <SelectItem value="1h">1 Hour</SelectItem>
+                  <SelectItem value="4h">4 Hours</SelectItem>
+                  <SelectItem value="1d">1 Day</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Button 
+                onClick={handleAnalysis} 
+                disabled={loading || chartData.length === 0}
+                className="min-w-[140px]"
+              >
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {loading ? 'Analyzing...' : 'AI Analysis'}
+              </Button>
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-4">
-          {/* Chart and Analysis Input */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Chart */}
-            <TradingChart 
+          {/* Chart Section */}
+          <div className="lg:col-span-3">
+            <TechnicalChart 
               symbol={symbol}
+              tf={timeframe}
+              series="candles"
+              height={600}
+              theme="light"
+              live
+              onDataChange={handleChartDataChange}
             />
-            
-            {/* Analysis Controls */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  Chart Analysis Controls
-                </CardTitle>
-                <CardDescription>
-                  Analyze the chart above with AI-powered technical analysis
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="symbol">Stock Symbol</Label>
-                    <Input
-                      id="symbol"
-                      placeholder="e.g., AAPL, MSFT, TSLA"
-                      value={symbol}
-                      onChange={(e) => setSymbol(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="timeframe">Timeframe</Label>
-                    <Select value={timeframe} onValueChange={setTimeframe}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1min">1 Minute</SelectItem>
-                        <SelectItem value="5min">5 Minutes</SelectItem>
-                        <SelectItem value="15min">15 Minutes</SelectItem>
-                        <SelectItem value="1hour">1 Hour</SelectItem>
-                        <SelectItem value="1day">1 Day</SelectItem>
-                        <SelectItem value="1week">1 Week</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-end">
-                    <Button 
-                      onClick={handleAnalysis} 
-                      disabled={loading}
-                      className="w-full"
-                    >
-                      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {loading ? 'Analyzing Chart...' : 'Analyze Chart'}
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Remove the chart data status message since we're getting data directly from functions */}
-              </CardContent>
-            </Card>
           </div>
 
           {/* Market Data Panel */}
@@ -253,7 +215,7 @@ export const AIAnalysis = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>{analysis.symbol} Chart Analysis</span>
+                  <span>{analysis.symbol} Analysis ({timeframe})</span>
                   <Badge className={getRecommendationColor(analysis.recommendation)}>
                     {getRecommendationIcon(analysis.recommendation)}
                     <span className="ml-1 capitalize">{analysis.recommendation}</span>
@@ -385,8 +347,11 @@ export const AIAnalysis = () => {
           <Card className="mt-8">
             <CardContent className="flex flex-col items-center justify-center h-64">
               <Brain className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground text-center">
-                Enter a stock symbol above and click "Analyze Chart" to get AI-powered technical analysis with live market data
+              <p className="text-muted-foreground text-center max-w-md">
+                Select a symbol and timeframe above. The AI will automatically analyze the live chart data with technical indicators including RSI, EMA, and MACD.
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Chart data points loaded: {chartData.length}
               </p>
             </CardContent>
           </Card>
