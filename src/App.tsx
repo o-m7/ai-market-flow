@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Dashboard } from "./components/Dashboard";
 import Index from "./pages/Index";
 import { SymbolDetail } from "./pages/SymbolDetail";
 import { SearchResults } from "./pages/SearchResults";
@@ -24,7 +25,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/dashboard" element={<div className="min-h-screen bg-background"><div className="container mx-auto px-6 py-8"><div className="mb-8"><h2 className="text-3xl font-bold text-foreground mb-2">Coming Soon</h2><p className="text-muted-foreground">The trading dashboard will be available soon.</p></div></div></div>} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/search" element={<SearchResults />} />
           <Route path="/watchlist" element={<Watchlist />} />
           <Route path="/alerts" element={<Alerts />} />
