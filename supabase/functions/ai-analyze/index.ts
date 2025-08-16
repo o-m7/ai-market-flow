@@ -6,6 +6,7 @@ const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
 
 const analysisSchema = {
@@ -110,24 +111,22 @@ Data: ${JSON.stringify(input)}
 Return structured JSON analysis that a professional trader would find actionable.
 `;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini", // Fast, capable, cost-effective
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userPrompt }
+        model: 'gpt-4o-mini',
+        input: [
+          { role: 'system', content: system },
+          { role: 'user', content: userPrompt }
         ],
         response_format: {
-          type: "json_schema",
+          type: 'json_schema',
           json_schema: analysisSchema
-        },
-        max_tokens: 2000,
-        temperature: 0.3
+        }
       }),
     });
 
@@ -138,13 +137,18 @@ Return structured JSON analysis that a professional trader would find actionable
     }
 
     const data = await response.json();
-    const aiContent = data.choices[0].message.content;
-    
-    console.log(`AI analysis response for ${symbol}:`, aiContent);
-    
-    // Parse the structured JSON response
-    const parsed = JSON.parse(aiContent);
-    
+    const aiText = data.output_text
+      ?? data?.output?.[0]?.content?.[0]?.text
+      ?? data?.content?.[0]?.text
+      ?? '';
+
+    if (!aiText) {
+      console.error('OpenAI response missing structured text:', JSON.stringify(data));
+      throw new Error('Invalid OpenAI response');
+    }
+
+    const parsed = JSON.parse(aiText);
+
     // Add metadata
     const result = {
       ...parsed,
