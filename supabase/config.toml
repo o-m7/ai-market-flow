@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.news-insights]
 verify_jwt = false
+
+[functions.news-test]
+verify_jwt = false
