@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.binance-data]
 verify_jwt = false
+
+[functions.polygon-market-data]
+verify_jwt = false
