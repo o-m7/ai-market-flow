@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Navigation } from "@/components/Navigation";
 import TechnicalChart from "@/components/TechnicalChart";
 import { MarketDataPanel } from "@/components/MarketDataPanel";
@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, TrendingDown, Activity, Brain, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { LWBar } from '@/lib/marketData';
 
 interface AnalysisResult {
   symbol: string;
@@ -43,29 +42,15 @@ const POPULAR_SYMBOLS = [
 
 export const AIAnalysis = () => {
   const [symbol, setSymbol] = useState("AAPL");
-  const [timeframe, setTimeframe] = useState<'1m'|'5m'|'15m'|'30m'|'1h'|'4h'|'1d'>("1h");
+  const [timeframe, setTimeframe] = useState<'1'|'5'|'15'|'30'|'60'|'240'|'D'>("60");
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [chartData, setChartData] = useState<LWBar[]>([]);
   const { toast } = useToast();
 
-  const handleChartDataChange = useCallback((data: LWBar[]) => {
-    setChartData(data);
-  }, []);
-
   const handleAnalysis = async () => {
-    if (chartData.length === 0) {
-      toast({
-        title: "Loading Chart Data",
-        description: "Please wait for the chart to load before analyzing",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setLoading(true);
     try {
-      // Use the current chart data for analysis
+      // Generate AI analysis directly from symbol and timeframe
       const analysisResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/ai-chart-analysis`, {
         method: 'POST',
         headers: {
@@ -73,14 +58,6 @@ export const AIAnalysis = () => {
         },
         body: JSON.stringify({ 
           symbol: symbol.toUpperCase(), 
-          chartData: chartData.map((candle: any) => ({
-            time: candle.time,
-            open: candle.open,
-            high: candle.high,
-            low: candle.low,
-            close: candle.close,
-            volume: candle.volume || 0
-          })),
           timeframe: timeframe,
           analysisType: 'comprehensive'
         })
@@ -166,19 +143,19 @@ export const AIAnalysis = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1m">1 Min</SelectItem>
-                  <SelectItem value="5m">5 Min</SelectItem>
-                  <SelectItem value="15m">15 Min</SelectItem>
-                  <SelectItem value="30m">30 Min</SelectItem>
-                  <SelectItem value="1h">1 Hour</SelectItem>
-                  <SelectItem value="4h">4 Hours</SelectItem>
-                  <SelectItem value="1d">1 Day</SelectItem>
+                  <SelectItem value="1">1 Min</SelectItem>
+                  <SelectItem value="5">5 Min</SelectItem>
+                  <SelectItem value="15">15 Min</SelectItem>
+                  <SelectItem value="30">30 Min</SelectItem>
+                  <SelectItem value="60">1 Hour</SelectItem>
+                  <SelectItem value="240">4 Hours</SelectItem>
+                  <SelectItem value="D">1 Day</SelectItem>
                 </SelectContent>
               </Select>
               
               <Button 
                 onClick={handleAnalysis} 
-                disabled={loading || chartData.length === 0}
+                disabled={loading}
                 className="min-w-[140px]"
               >
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -194,11 +171,9 @@ export const AIAnalysis = () => {
             <TechnicalChart 
               symbol={symbol}
               tf={timeframe}
-              series="candles"
               height={600}
               theme="light"
               live
-              onDataChange={handleChartDataChange}
             />
           </div>
 
@@ -348,10 +323,10 @@ export const AIAnalysis = () => {
             <CardContent className="flex flex-col items-center justify-center h-64">
               <Brain className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center max-w-md">
-                Select a symbol and timeframe above. The AI will automatically analyze the live chart data with technical indicators including RSI, EMA, and MACD.
+                Real-time TradingView charts with live market data. Select a symbol and timeframe above, then click "AI Analysis" to get comprehensive technical analysis with AI insights.
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Chart data points loaded: {chartData.length}
+                Live charts powered by TradingView
               </p>
             </CardContent>
           </Card>

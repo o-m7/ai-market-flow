@@ -1,251 +1,153 @@
 import { useEffect, useRef, useState } from 'react';
-import { 
-  createChart, 
-  ColorType, 
-  IChartApi, 
-  Time,
-  ISeriesApi,
-  LineSeries,
-  AreaSeries,
-  CandlestickSeries
-} from 'lightweight-charts';
-import type { LWBar } from '../lib/marketData';
-import { fetchCandles, fetchQuote } from '../lib/marketData';
-import { calculateAllIndicators } from '../lib/technicalIndicators';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart3, TrendingUp } from "lucide-react";
 
 type Props = {
   symbol: string;
-  tf?: '1m'|'5m'|'15m'|'30m'|'1h'|'4h'|'1d';
+  tf?: '1'|'5'|'15'|'30'|'60'|'240'|'D';
   height?: number;
   theme?: 'light'|'dark';
-  series?: 'candles'|'line'|'area';
   live?: boolean;
-  onDataChange?: (data: LWBar[]) => void;
+  onSymbolChange?: (symbol: string) => void;
 };
+
+declare global {
+  interface Window {
+    TradingView: any;
+  }
+}
 
 export default function TechnicalChart({ 
   symbol, 
-  tf='1h', 
+  tf='60', 
   height=500, 
   theme='light', 
-  series='candles', 
   live=true,
-  onDataChange 
+  onSymbolChange 
 }: Props) {
-  const ref = useRef<HTMLDivElement|null>(null);
-  const chartRef = useRef<IChartApi|null>(null);
-  const mainSeriesRef = useRef<ISeriesApi<any> | null>(null);
-  const rsiSeriesRef = useRef<ISeriesApi<any> | null>(null);
-  const ema12SeriesRef = useRef<ISeriesApi<any> | null>(null);
-  const ema26SeriesRef = useRef<ISeriesApi<any> | null>(null);
-  const macdSeriesRef = useRef<ISeriesApi<any> | null>(null);
-  const macdSignalSeriesRef = useRef<ISeriesApi<any> | null>(null);
-  const lastBar = useRef<LWBar|undefined>();
+  const containerRef = useRef<HTMLDivElement|null>(null);
+  const widgetRef = useRef<any>(null);
   
-  const [showIndicators, setShowIndicators] = useState({
-    rsi: true,
-    ema: true,
-    macd: true
-  });
-  const [chartType, setChartType] = useState<"candles" | "line" | "area">(series);
-  const [timeframe, setTimeframe] = useState<'1m'|'5m'|'15m'|'30m'|'1h'|'4h'|'1d'>(tf);
+  const [timeframe, setTimeframe] = useState<'1'|'5'|'15'|'30'|'60'|'240'|'D'>(tf);
+  const [showIndicators, setShowIndicators] = useState(true);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
 
+  // Load TradingView script
   useEffect(() => {
-    if (!ref.current) return;
-    
-    const chart = createChart(ref.current, {
-      height,
-      layout: { 
-        background: { type: ColorType.Solid, color: theme==='dark' ? '#0b0f14' : '#fff' }, 
-        textColor: theme==='dark' ? '#e5e7eb' : '#111' 
-      },
-      rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, secondsVisible: timeframe.endsWith('m') },
-      grid: { 
-        vertLines: { color: theme==='dark' ? 'rgba(255,255,255,.04)' : 'rgba(0,0,0,.06)' }, 
-        horzLines: { color: theme==='dark' ? 'rgba(255,255,255,.04)' : 'rgba(0,0,0,.06)' } 
-      }
-    });
-    chartRef.current = chart;
-
-    // Create main price series
-    if (chartType === 'candles') {
-      mainSeriesRef.current = chart.addSeries(CandlestickSeries, {
-        upColor: '#26a69a',
-        downColor: '#ef5350',
-        borderUpColor: '#26a69a',
-        borderDownColor: '#ef5350',
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350',
-      });
-    } else if (chartType === 'area') {
-      mainSeriesRef.current = chart.addSeries(AreaSeries, {
-        lineWidth: 2,
-        topColor: 'rgba(38,166,154,.4)',
-        bottomColor: 'rgba(38,166,154,.05)',
-        lineColor: '#26a69a'
-      });
-    } else {
-      mainSeriesRef.current = chart.addSeries(LineSeries, {
-        lineWidth: 2,
-        color: '#26a69a'
-      });
-    }
-
-    // Add technical indicator series
-    if (showIndicators.ema) {
-      ema12SeriesRef.current = chart.addSeries(LineSeries, {
-        lineWidth: 1,
-        color: '#2196F3',
-      });
-      ema26SeriesRef.current = chart.addSeries(LineSeries, {
-        lineWidth: 1,
-        color: '#FF9800',
-      });
-    }
-
-    // Handle resize
-    const resizeObserver = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        chart.applyOptions({ width: entry.contentRect.width });
-      }
-    });
-    resizeObserver.observe(ref.current);
-
-    // Load initial data
-    (async () => {
-      try {
-        const data = await fetchCandles(symbol, timeframe);
-        lastBar.current = data.at(-1);
-        
-        if (data.length > 0) {
-          // Set main series data
-          if (chartType === 'candles') {
-            mainSeriesRef.current?.setData(data);
-          } else {
-            mainSeriesRef.current?.setData(data.map(b => ({ time: b.time as Time, value: b.close })));
-          }
-
-          // Calculate and set technical indicators
-          const prices = data.map(d => d.close);
-          const indicators = calculateAllIndicators(prices);
-
-          if (showIndicators.ema && ema12SeriesRef.current && ema26SeriesRef.current) {
-            const ema12Data = indicators.ema12.map((value, index) => ({
-              time: data[index].time as Time,
-              value
-            }));
-            const ema26Data = indicators.ema26.map((value, index) => ({
-              time: data[index].time as Time,
-              value
-            }));
-            
-            ema12SeriesRef.current.setData(ema12Data);
-            ema26SeriesRef.current.setData(ema26Data);
-          }
-
-          // Notify parent component of data change
-          onDataChange?.(data);
-        }
-      } catch (error) {
-        console.error('Failed to load chart data:', error);
-      }
-    })();
-
-    // Live updates
-    let tickTimer: NodeJS.Timeout | null = null;
-    if (live) {
-      tickTimer = setInterval(async () => {
-        try {
-          const q = await fetchQuote(symbol);
-          if (!q.price || !lastBar.current) return;
-
-          // Update the last bar with live price like TradingView does
-          const lb = lastBar.current;
-          const patched: LWBar = {
-            time: lb.time,
-            open: lb.open,
-            high: Math.max(lb.high, q.price),
-            low: Math.min(lb.low, q.price),
-            close: q.price
-          };
-          lastBar.current = patched;
-
-          if (chartType === 'candles') {
-            mainSeriesRef.current?.update(patched);
-          } else {
-            mainSeriesRef.current?.update({ time: patched.time as Time, value: patched.close });
-          }
-
-          // Update EMAs with new price
-          if (showIndicators.ema && ema12SeriesRef.current && ema26SeriesRef.current) {
-            // For live updates, we'd need to recalculate EMAs with the new price
-            // This is simplified - in production you'd maintain the EMA state
-            ema12SeriesRef.current.update({ time: patched.time as Time, value: q.price * 0.98 });
-            ema26SeriesRef.current.update({ time: patched.time as Time, value: q.price * 1.02 });
-          }
-        } catch (error) {
-          console.error('Live update error:', error);
-        }
-      }, 2000); // Update every 2 seconds to avoid too many API calls
-    }
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.type = 'text/javascript';
+    script.async = true;
+    script.onload = () => setScriptLoaded(true);
+    document.head.appendChild(script);
 
     return () => {
-      if (tickTimer) clearInterval(tickTimer);
-      resizeObserver.disconnect();
-      if (chartRef.current) {
-        chart.remove();
-        chartRef.current = null;
-        mainSeriesRef.current = null;
-        rsiSeriesRef.current = null;
-        ema12SeriesRef.current = null;
-        ema26SeriesRef.current = null;
-        macdSeriesRef.current = null;
-        macdSignalSeriesRef.current = null;
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
       }
     };
-  }, [symbol, timeframe, height, theme, chartType, live, showIndicators]);
+  }, []);
+
+  // Initialize TradingView widget
+  useEffect(() => {
+    if (!scriptLoaded || !containerRef.current) return;
+
+    // Clear previous widget
+    if (containerRef.current) {
+      containerRef.current.innerHTML = '';
+    }
+
+    // Create new widget container
+    const widgetContainer = document.createElement('div');
+    widgetContainer.className = 'tradingview-widget-container';
+    widgetContainer.style.height = `${height}px`;
+    widgetContainer.style.width = '100%';
+
+    const widgetDiv = document.createElement('div');
+    widgetDiv.className = 'tradingview-widget-container__widget';
+    widgetDiv.style.height = 'calc(100% - 32px)';
+    widgetDiv.style.width = '100%';
+
+    widgetContainer.appendChild(widgetDiv);
+    containerRef.current.appendChild(widgetContainer);
+
+    // Configure widget
+    const config = {
+      autosize: true,
+      symbol: symbol,
+      interval: timeframe,
+      timezone: "Etc/UTC",
+      theme: theme === 'dark' ? 'dark' : 'light',
+      style: "1",
+      locale: "en",
+      toolbar_bg: "#f1f3f6",
+      enable_publishing: false,
+      allow_symbol_change: true,
+      save_image: false,
+      studies: showIndicators ? [
+        "RSI@tv-basicstudies",
+        "MACD@tv-basicstudies", 
+        "EMA@tv-basicstudies"
+      ] : [],
+      container_id: widgetDiv,
+      hide_top_toolbar: false,
+      hide_legend: false,
+      hide_side_toolbar: false,
+      details: true,
+      hotlist: true,
+      calendar: true,
+      studies_overrides: {},
+      overrides: {
+        "paneProperties.background": theme === 'dark' ? "#0b0f14" : "#ffffff",
+        "paneProperties.vertGridProperties.color": theme === 'dark' ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)",
+        "paneProperties.horzGridProperties.color": theme === 'dark' ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)",
+        "symbolWatermarkProperties.transparency": 90,
+        "scalesProperties.textColor": theme === 'dark' ? "#e5e7eb" : "#111111",
+        "mainSeriesProperties.candleStyle.upColor": "#26a69a",
+        "mainSeriesProperties.candleStyle.downColor": "#ef5350",
+        "mainSeriesProperties.candleStyle.drawWick": true,
+        "mainSeriesProperties.candleStyle.drawBorder": true,
+        "mainSeriesProperties.candleStyle.borderUpColor": "#26a69a",
+        "mainSeriesProperties.candleStyle.borderDownColor": "#ef5350",
+        "mainSeriesProperties.candleStyle.wickUpColor": "#26a69a",
+        "mainSeriesProperties.candleStyle.wickDownColor": "#ef5350"
+      }
+    };
+
+    // Create script tag with configuration
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.innerHTML = `
+      new TradingView.widget(${JSON.stringify(config)});
+    `;
+
+    widgetDiv.appendChild(script);
+    widgetRef.current = widgetContainer;
+
+  }, [scriptLoaded, symbol, timeframe, height, theme, showIndicators]);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-base font-medium flex items-center gap-2">
-          <BarChart3 className="h-4 w-4" />
-          {symbol} Live Chart
+          <TrendingUp className="h-4 w-4" />
+          {symbol} Live Chart - TradingView
         </CardTitle>
         <div className="flex gap-1">
           <Button
-            variant={chartType === "candles" ? "default" : "outline"}
+            variant={showIndicators ? "default" : "outline"}
             size="sm"
-            onClick={() => setChartType("candles")}
+            onClick={() => setShowIndicators(!showIndicators)}
             className="text-xs"
           >
-            Candles  
-          </Button>
-          <Button
-            variant={chartType === "line" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setChartType("line")}
-            className="text-xs"
-          >
-            Line
-          </Button>
-          <Button
-            variant={chartType === "area" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setChartType("area")}
-            className="text-xs"
-          >
-            Area
+            Indicators
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         <div className="flex gap-1 mb-4 flex-wrap">
-          {(["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const).map((tf) => (
+          {(["1", "5", "15", "30", "60", "240", "D"] as const).map((tf) => (
             <Button
               key={tf}
               variant={timeframe === tf ? "default" : "outline"}
@@ -253,41 +155,25 @@ export default function TechnicalChart({
               onClick={() => setTimeframe(tf)}
               className="text-xs"
             >
-              {tf}
+              {tf === "1" ? "1m" : tf === "5" ? "5m" : tf === "15" ? "15m" : tf === "30" ? "30m" : tf === "60" ? "1h" : tf === "240" ? "4h" : "1D"}
             </Button>
           ))}
         </div>
 
-        <div className="flex gap-2 mb-4">
-          <Button
-            variant={showIndicators.rsi ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowIndicators(prev => ({ ...prev, rsi: !prev.rsi }))}
-            className="text-xs"
-          >
-            RSI
-          </Button>
-          <Button
-            variant={showIndicators.ema ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowIndicators(prev => ({ ...prev, ema: !prev.ema }))}
-            className="text-xs"
-          >
-            EMA
-          </Button>
-          <Button
-            variant={showIndicators.macd ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowIndicators(prev => ({ ...prev, macd: !prev.macd }))}
-            className="text-xs"
-          >
-            MACD
-          </Button>
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <div 
+            ref={containerRef} 
+            style={{ width: '100%', height: `${height}px` }}
+            className="tradingview-chart-container"
+          />
         </div>
-
-        <div className="rounded-lg border bg-card">
-          <div ref={ref} style={{ width:'100%', height }} />
-        </div>
+        
+        {!scriptLoaded && (
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="ml-2">Loading TradingView Chart...</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
