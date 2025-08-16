@@ -118,11 +118,18 @@ Return structured JSON analysis that a professional trader would find actionable
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'o4-mini-2025-04-16',
+        model: 'gpt-5-mini-2025-08-07',
         input: [
-          { role: 'system', content: system },
-          { role: 'user', content: userPrompt }
+          {
+            role: 'system',
+            content: [{ type: 'text', text: system }]
+          },
+          {
+            role: 'user',
+            content: [{ type: 'text', text: userPrompt }]
+          }
         ],
+        max_completion_tokens: 1200,
         response_format: {
           type: 'json_schema',
           json_schema: analysisSchema
