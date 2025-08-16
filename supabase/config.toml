@@ -1,5 +1,8 @@
 project_id = "ifetofkhyblyijghuwzs"
 
+[functions.ai-analyze]
+verify_jwt = false
+
 [functions.stock-analysis]
 verify_jwt = false
 
