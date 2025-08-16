@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.realtime-market-stream]
 verify_jwt = false
+
+[functions.polygon-chart-data]
+verify_jwt = false
+
+[functions.ai-chart-analysis]
+verify_jwt = false
