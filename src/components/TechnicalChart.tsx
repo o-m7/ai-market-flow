@@ -10,6 +10,16 @@ type Props = {
   theme?: 'light'|'dark';
   live?: boolean;
   onSymbolChange?: (symbol: string) => void;
+  onDataChange?: (data: LWBar[]) => void;
+};
+
+type LWBar = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
 };
 
 declare global {
@@ -24,12 +34,76 @@ export default function TechnicalChart({
   height=500, 
   theme='light', 
   live=true,
-  onSymbolChange 
+  onSymbolChange,
+  onDataChange 
 }: Props) {
   const containerRef = useRef<HTMLDivElement|null>(null);
-  
   const [timeframe, setTimeframe] = useState<'1'|'5'|'15'|'30'|'60'|'240'|'D'>(tf);
   const [showIndicators, setShowIndicators] = useState(true);
+  const [chartData, setChartData] = useState<LWBar[]>([]);
+
+  // Fetch chart data and notify parent
+  useEffect(() => {
+    const fetchChartData = async () => {
+      try {
+        // Convert timeframe for API
+        const { multiplier, timespan, from, to } = (() => {
+          const now = new Date();
+          const to = now.toISOString().slice(0, 10);
+          const d = new Date(now);
+          switch (timeframe) {
+            case '1': d.setDate(now.getDate() - 2); return { multiplier: 1, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+            case '5': d.setDate(now.getDate() - 3); return { multiplier: 5, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+            case '15': d.setDate(now.getDate() - 7); return { multiplier: 15, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+            case '30': d.setDate(now.getDate() - 14); return { multiplier: 30, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+            case '60': d.setDate(now.getDate() - 60); return { multiplier: 1, timespan: 'hour', from: d.toISOString().slice(0,10), to };
+            case '240': d.setDate(now.getDate() - 120); return { multiplier: 4, timespan: 'hour', from: d.toISOString().slice(0,10), to };
+            case 'D': d.setDate(now.getDate() - 365); return { multiplier: 1, timespan: 'day', from: d.toISOString().slice(0,10), to };
+            default: return { multiplier: 1, timespan: 'hour', from: to, to };
+          }
+        })();
+
+        const response = await fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: symbol.toUpperCase(),
+            timeframe: timeframe === 'D' ? '1d' : (timeframe === '240' ? '4h' : `${timeframe}m`),
+            multiplier,
+            timespan,
+            from,
+            to,
+            limit: 500
+          })
+        });
+
+        const data = await response.json();
+        
+        if (Array.isArray(data.candles) && data.candles.length > 0) {
+          const bars: LWBar[] = data.candles.map((c: any) => ({
+            time: Math.floor(c.t / 1000),
+            open: c.o,
+            high: c.h,
+            low: c.l,
+            close: c.c,
+            volume: c.v ?? 0
+          }));
+          
+          setChartData(bars);
+          onDataChange?.(bars);
+        } else {
+          setChartData([]);
+          onDataChange?.([]);
+        }
+      } catch (error) {
+        console.error('Error fetching chart data:', error);
+        setChartData([]);
+        onDataChange?.([]);
+      }
+    };
+
+    fetchChartData();
+  }, [symbol, timeframe, onDataChange]);
 
 
   // Initialize TradingView widget using iframe approach

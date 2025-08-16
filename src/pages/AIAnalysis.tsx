@@ -7,6 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, TrendingDown, Activity, Brain, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { collectBarsForAnalysis, type LWBar } from "@/features/ai/collectBars";
+import { analyzeWithAI } from "@/features/ai/analyze";
+import { AiResult } from "@/features/ai/Result";
 
 interface AnalysisResult {
   symbol: string;
@@ -43,112 +46,68 @@ export const AIAnalysis = () => {
   const [symbol, setSymbol] = useState("AAPL");
   const [timeframe, setTimeframe] = useState<'1'|'5'|'15'|'30'|'60'|'240'|'D'>("60");
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [chartData, setChartData] = useState<LWBar[]>([]);
+  const [aiError, setAiError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const getMarketType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
+    if (symbol.includes('USD') && symbol !== 'USDJPY') return 'CRYPTO';
+    if (['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD'].includes(symbol)) return 'FOREX';
+    return 'STOCK';
+  };
 
   const handleAnalysis = async () => {
     setLoading(true);
+    setAiError(null);
+    
     try {
-      // Start both tasks in parallel: import html2canvas and fetch candles
-      const html2canvasPromise = import('html2canvas');
-
-      const { multiplier, timespan, from, to } = (() => {
-        const now = new Date();
-        const to = now.toISOString().slice(0, 10);
-        const d = new Date(now);
-        switch (timeframe) {
-          case '1': d.setDate(now.getDate() - 2); return { multiplier: 1, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-          case '5': d.setDate(now.getDate() - 3); return { multiplier: 5, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-          case '15': d.setDate(now.getDate() - 7); return { multiplier: 15, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-          case '30': d.setDate(now.getDate() - 14); return { multiplier: 30, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-          case '60': d.setDate(now.getDate() - 60); return { multiplier: 1, timespan: 'hour', from: d.toISOString().slice(0,10), to };
-          case '240': d.setDate(now.getDate() - 120); return { multiplier: 4, timespan: 'hour', from: d.toISOString().slice(0,10), to };
-          case 'D': d.setDate(now.getDate() - 365); return { multiplier: 1, timespan: 'day', from: d.toISOString().slice(0,10), to };
-          default: return { multiplier: 1, timespan: 'hour', from: to, to };
-        }
-      })();
-
-      const candlesPromise = fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: symbol.toUpperCase(),
-          timeframe: timeframe === 'D' ? '1d' : (timeframe === '240' ? '4h' : `${timeframe}m`),
-          multiplier,
-          timespan,
-          from,
-          to,
-          limit: 500
-        })
-      })
-        .then(r => r.json())
-        .then(d => Array.isArray(d.candles) ? d.candles.map((c: any) => ({
-          time: Math.floor(c.t / 1000),
-          open: c.o,
-          high: c.h,
-          low: c.l,
-          close: c.c,
-          volume: c.v ?? 0
-        })) : [] )
-        .catch(() => [] as any[]);
-
-      // Await html2canvas import and candles together
-      const [html2canvasModule, chartData] = await Promise.all([html2canvasPromise, candlesPromise]);
-      const html2canvas = (html2canvasModule as any).default as (el: HTMLElement, opts?: any) => Promise<HTMLCanvasElement>;
-
-      // Small delay to ensure UI settled
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Capture the main content area (TradingView iframe cannot be captured due to browser security/CORS)
-      const element = (document.querySelector('.analysis-container') as HTMLElement) || document.body as HTMLElement;
-      const canvas = await html2canvas(element, {
-        height: window.innerHeight,
-        width: window.innerWidth,
-        useCORS: true,
-        allowTaint: true,
-        scale: 1,
-        backgroundColor: '#ffffff'
-      });
-
-      const imageData = canvas.toDataURL('image/png', 0.8);
-
-      // Send both visual context and quantitative chart data for accurate analysis
-      const analysisResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/ai-chart-analysis`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          symbol: symbol.toUpperCase(), 
-          timeframe,
-          analysisType: 'comprehensive',
-          pageScreenshot: imageData,
-          chartData
-        })
-      });
-
-      if (!analysisResponse.ok) {
-        const errorData = await analysisResponse.text();
-        console.error('Analysis error response:', errorData);
-        throw new Error(`Analysis failed: ${analysisResponse.status}`);
+      if (!Array.isArray(chartData) || chartData.length < 20) {
+        throw new Error('Need at least 20 candles for analysis. Please wait for chart to load more data.');
       }
 
-      const analysisData = await analysisResponse.json();
-      console.log('Analysis result:', analysisData);
+      // Collect visible candles from the chart
+      const candles = collectBarsForAnalysis(chartData, 400);
+      console.log(`Analyzing ${symbol} with ${candles.length} candles`);
 
-      setAnalysis(analysisData.result || analysisData);
+      // Determine market type and map timeframe
+      const market = getMarketType(symbol);
+      const timeframeMap: Record<string, string> = {
+        '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
+        '60': '1h', '240': '4h', 'D': '1d'
+      };
+
+      const result = await analyzeWithAI({
+        symbol: symbol.toUpperCase(),
+        timeframe: timeframeMap[timeframe] || timeframe,
+        market,
+        candles
+      });
+
+      setAnalysis(result);
       toast({
         title: 'Analysis Complete',
-        description: `AI analyzed ${symbol.toUpperCase()} (${timeframe}) using the live chart data and page context`,
+        description: `AI analyzed ${candles.length} candles for ${symbol.toUpperCase()} with ${result.confidence}% confidence`,
       });
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Analysis error:', error);
+      setAiError(error.message);
       toast({
         title: 'Analysis Failed',
-        description: error instanceof Error ? error.message : 'Unable to analyze. Please try again.',
+        description: error.message || 'Unable to analyze chart data. Please try again.',
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleChartDataChange = (data: LWBar[]) => {
+    setChartData(data);
+    // Clear previous analysis when chart data changes
+    setAnalysis(null);
+    setAiError(null);
   };
 
   const getRecommendationColor = (recommendation: string) => {
@@ -217,18 +176,18 @@ export const AIAnalysis = () => {
               
               <Button 
                 onClick={handleAnalysis} 
-                disabled={loading}
+                disabled={loading || chartData.length < 20}
                 className="min-w-[140px]"
               >
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Capturing & Analyzing...
+                    Analyzing...
                   </>
                 ) : (
                   <>
                     <Brain className="h-4 w-4 mr-2" />
-                    AI Visual Analysis
+                    AI Analysis ({chartData.length} bars)
                   </>
                 )}
               </Button>
@@ -245,154 +204,54 @@ export const AIAnalysis = () => {
               height={600}
               theme="light"
               live
+              onDataChange={handleChartDataChange}
             />
           </div>
         </div>
 
-        {/* Analysis Results */}
+        {/* AI Analysis Results */}
         {analysis && (
-          <div className="mt-8 space-y-6">
-            {/* Main Analysis Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{analysis.symbol} Analysis ({timeframe})</span>
-                  <Badge className={getRecommendationColor(analysis.recommendation)}>
-                    {getRecommendationIcon(analysis.recommendation)}
-                    <span className="ml-1 capitalize">{analysis.recommendation}</span>
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm max-w-none mb-6">
-                  <p className="text-muted-foreground leading-relaxed">
-                    {analysis.analysis}
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Recommendation</p>
-                    <p className="text-lg font-semibold capitalize">{analysis.recommendation}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Confidence</p>
-                    <p className="text-lg font-semibold">{Math.round(analysis.confidence * 100)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Risk Level</p>
-                    <p className="text-lg font-semibold capitalize">{analysis.riskAssessment.level}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">RSI</p>
-                    <p className="text-lg font-semibold">{analysis.technicalIndicators.rsi.toFixed(1)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Technical Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Key Levels */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Key Levels</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-medium text-sm mb-2 text-bull">Support Levels</h4>
-                      <div className="space-y-1">
-                        {analysis.keyLevels.support.map((level, index) => (
-                          <div key={index} className="text-sm bg-bull/10 px-2 py-1 rounded">
-                            ${level.toFixed(2)}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-sm mb-2 text-bear">Resistance Levels</h4>
-                      <div className="space-y-1">
-                        {analysis.keyLevels.resistance.map((level, index) => (
-                          <div key={index} className="text-sm bg-bear/10 px-2 py-1 rounded">
-                            ${level.toFixed(2)}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Price Targets */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Price Targets</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Bullish Target</p>
-                      <p className="text-lg font-semibold text-bull">
-                        ${analysis.priceTargets.bullish.toFixed(2)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Bearish Target</p>
-                      <p className="text-lg font-semibold text-bear">
-                        ${analysis.priceTargets.bearish.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Chart Patterns & Risk */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Patterns & Risk</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {analysis.chartPatterns.length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2">Chart Patterns</h4>
-                        <div className="flex gap-2 flex-wrap">
-                          {analysis.chartPatterns.map((pattern, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {pattern}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div>
-                      <h4 className="font-medium text-sm mb-2">Risk Factors</h4>
-                      <ul className="space-y-1">
-                        {analysis.riskAssessment.factors.map((risk, index) => (
-                          <li key={index} className="text-sm text-muted-foreground">
-                            • {risk}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          <div className="mt-8">
+            <AiResult data={analysis} />
           </div>
         )}
 
-        {!analysis && !loading && (
+        {/* Error Display */}
+        {aiError && (
+          <Card className="mt-8 border-red-200 bg-red-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-red-800">
+                <Activity className="h-4 w-4" />
+                <span className="font-medium">Analysis Error</span>
+              </div>
+              <p className="text-sm text-red-700 mt-2">{aiError}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <Card className="mt-8">
+            <CardContent className="flex flex-col items-center justify-center h-32">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+              <p className="text-sm text-muted-foreground">
+                Analyzing {chartData.length} candles for {symbol.toUpperCase()}...
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Empty State */}
+        {!analysis && !loading && !aiError && (
           <Card className="mt-8">
             <CardContent className="flex flex-col items-center justify-center h-64">
               <Brain className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center max-w-md">
-                Advanced AI visual analysis system ready. Select a symbol and timeframe above, then click "AI Analysis" to capture a screenshot of this entire page and get comprehensive analysis.
+                Professional AI technical analysis using live chart data. Select a symbol and timeframe above, 
+                then click "AI Analysis" to get structured analysis with trade ideas.
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                📸 Visual analysis powered by OpenAI GPT-4 Vision
+                📊 {chartData.length} candles loaded • Powered by GPT-4o-mini
               </p>
             </CardContent>
           </Card>
