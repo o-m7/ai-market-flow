@@ -13,6 +13,7 @@ interface ChartAnalysisRequest {
   symbol: string;
   timeframe: string;
   analysisType: 'technical' | 'pattern' | 'comprehensive';
+  pageScreenshot?: string; // Base64 encoded image
 }
 
 interface ChartAnalysisResult {
@@ -53,12 +54,15 @@ serve(async (req) => {
     }
 
     const requestData: ChartAnalysisRequest = await req.json();
-    const { symbol, timeframe, analysisType = 'comprehensive' } = requestData;
+    const { symbol, timeframe, analysisType = 'comprehensive', pageScreenshot } = requestData;
 
-    console.log(`Generating AI agent analysis for ${symbol} on ${timeframe} timeframe`);
+    console.log(`Generating AI visual analysis for ${symbol} on ${timeframe} timeframe`);
+    console.log(`Screenshot provided: ${pageScreenshot ? 'Yes' : 'No'}`);
 
-    // Generate comprehensive market analysis using AI agent
-    const analysis = await generateAIAgentAnalysis(symbol, timeframe, analysisType);
+    // Generate comprehensive visual analysis using AI agent
+    const analysis = pageScreenshot 
+      ? await generateVisualAnalysis(symbol, timeframe, analysisType, pageScreenshot)
+      : await generateAIAgentAnalysis(symbol, timeframe, analysisType);
 
     return new Response(JSON.stringify({
       success: true,
@@ -80,6 +84,172 @@ serve(async (req) => {
     });
   }
 });
+
+async function generateVisualAnalysis(
+  symbol: string,
+  timeframe: string,
+  analysisType: string,
+  pageScreenshot: string
+): Promise<ChartAnalysisResult> {
+  
+  console.log(`AI Visual Analysis for ${symbol} on ${timeframe} timeframe`);
+
+  // Convert timeframe to readable format  
+  const timeframeMap: Record<string, string> = {
+    '1': '1 minute',
+    '5': '5 minutes',
+    '15': '15 minutes', 
+    '30': '30 minutes',
+    '60': '1 hour',
+    '240': '4 hours',
+    'D': '1 day'
+  };
+  
+  const readableTimeframe = timeframeMap[timeframe] || timeframe;
+
+  // Comprehensive visual analysis prompt
+  const prompt = `
+You are an elite AI trading agent with 20+ years of institutional trading experience. You are analyzing a complete trading interface screenshot showing ${symbol} on the ${readableTimeframe} timeframe.
+
+WHAT YOU CAN SEE IN THE IMAGE:
+- Live TradingView chart with real price data, candlesticks, and volume
+- Technical indicators (RSI, MACD, EMA, moving averages, etc.)
+- Current price levels, support/resistance zones
+- Chart patterns and formations
+- Market interface with timeframe controls
+- Trading controls and analysis tools
+
+COMPREHENSIVE VISUAL ANALYSIS REQUIRED:
+
+1. CHART PATTERN RECOGNITION:
+- Identify specific chart patterns (triangles, flags, head & shoulders, etc.)
+- Analyze candlestick formations and what they indicate
+- Examine price action and trend structure
+- Look for breakouts, breakdowns, or consolidation patterns
+
+2. TECHNICAL ANALYSIS:
+- Read actual RSI levels and overbought/oversold conditions  
+- Analyze MACD crossovers and divergences
+- Examine moving average relationships and crossovers
+- Identify key support and resistance levels from the actual chart
+- Volume analysis if visible
+
+3. PRICE ACTION ANALYSIS:
+- Current trend direction and strength
+- Recent price movements and momentum
+- Key levels where price has reacted historically
+- Potential entry/exit points based on actual chart levels
+
+4. MARKET STRUCTURE:
+- Higher highs/lower lows analysis
+- Market phases (accumulation, distribution, trending)
+- Institutional levels and areas of interest
+
+5. TRADING RECOMMENDATION:
+- Specific buy/sell/hold recommendation with reasoning
+- Exact entry levels based on what you see
+- Stop loss and take profit levels
+- Risk-reward analysis
+
+Please analyze EXACTLY what you see in the screenshot and provide institutional-quality analysis with specific price levels, patterns, and actionable trading insights.
+
+CRITICAL: Base your analysis ONLY on what you can actually observe in the screenshot. Provide specific price levels, pattern names, and technical readings you can see.
+
+Respond in JSON format:
+{
+  "analysis": "detailed visual analysis based on what you actually see in the chart",
+  "recommendation": "buy/sell/hold",
+  "confidence": 0.85,
+  "keyLevels": {
+    "support": [actual_levels_from_chart],
+    "resistance": [actual_levels_from_chart]
+  },
+  "technicalIndicators": {
+    "rsi": actual_rsi_reading,
+    "trend": "bullish/bearish/neutral", 
+    "momentum": "strong/weak/neutral"
+  },
+  "chartPatterns": ["patterns_you_can_see"],
+  "priceTargets": {
+    "bullish": target_based_on_chart,
+    "bearish": target_based_on_chart
+  },
+  "riskAssessment": {
+    "level": "low/medium/high",
+    "factors": ["specific_risks_from_chart"]
+  }
+}
+`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4.1-2025-04-14', // Using vision-capable model
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an elite institutional trading agent with advanced visual analysis capabilities. You can read charts, technical indicators, and trading interfaces with expert precision. Always provide specific, actionable analysis based on exactly what you observe in the image.'
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: prompt
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: pageScreenshot,
+                  detail: 'high'
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 3000
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI Vision API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI Vision API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
+    
+    console.log(`AI Visual Analysis Response for ${symbol}:`, aiResponse);
+    
+    // Parse JSON response
+    const analysisData = JSON.parse(aiResponse);
+    
+    return {
+      symbol,
+      analysis: analysisData.analysis,
+      recommendation: analysisData.recommendation,
+      confidence: analysisData.confidence,
+      keyLevels: analysisData.keyLevels,
+      technicalIndicators: analysisData.technicalIndicators,
+      chartPatterns: analysisData.chartPatterns,
+      priceTargets: analysisData.priceTargets,
+      riskAssessment: analysisData.riskAssessment,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error(`Error in visual analysis for ${symbol}:`, error);
+    
+    // Fallback to text-based analysis if visual analysis fails
+    return await generateAIAgentAnalysis(symbol, timeframe, analysisType);
+  }
+}
 
 async function generateAIAgentAnalysis(
   symbol: string, 

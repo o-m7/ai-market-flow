@@ -49,7 +49,29 @@ export const AIAnalysis = () => {
   const handleAnalysis = async () => {
     setLoading(true);
     try {
-      // Generate AI analysis directly from symbol and timeframe
+      // Capture screenshot of the entire analysis page
+      const html2canvas = (await import('html2canvas')).default;
+      
+      // Wait a moment for the page to fully render
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Capture the main content area
+      const element = document.querySelector('.analysis-container') as HTMLElement || document.body;
+      const canvas = await html2canvas(element, {
+        height: window.innerHeight,
+        width: window.innerWidth,
+        useCORS: true,
+        allowTaint: true,
+        scale: 1,
+        backgroundColor: '#ffffff'
+      });
+
+      // Convert canvas to base64 image
+      const imageData = canvas.toDataURL('image/png', 0.8);
+      
+      console.log('Screenshot captured, sending to AI for analysis...');
+
+      // Send screenshot to AI for visual analysis
       const analysisResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/ai-chart-analysis`, {
         method: 'POST',
         headers: {
@@ -58,7 +80,8 @@ export const AIAnalysis = () => {
         body: JSON.stringify({ 
           symbol: symbol.toUpperCase(), 
           timeframe: timeframe,
-          analysisType: 'comprehensive'
+          analysisType: 'comprehensive',
+          pageScreenshot: imageData
         })
       });
 
@@ -73,14 +96,14 @@ export const AIAnalysis = () => {
       
       setAnalysis(analysisData.result || analysisData);
       toast({
-        title: "Analysis Complete",
-        description: `AI analysis for ${symbol.toUpperCase()} (${timeframe}) completed successfully`,
+        title: "Visual Analysis Complete",
+        description: `AI analyzed the entire page and chart for ${symbol.toUpperCase()} (${timeframe})`,
       });
     } catch (error) {
       console.error('Analysis error:', error);
       toast({
         title: "Analysis Failed",
-        description: error instanceof Error ? error.message : "Unable to generate chart analysis. Please try again.",
+        description: error instanceof Error ? error.message : "Unable to capture page or generate analysis. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -108,7 +131,7 @@ export const AIAnalysis = () => {
     <div className="min-h-screen bg-background">
       <Navigation />
       
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8 analysis-container">
         {/* Header with Symbol Selector */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -157,8 +180,17 @@ export const AIAnalysis = () => {
                 disabled={loading}
                 className="min-w-[140px]"
               >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {loading ? 'Analyzing...' : 'AI Analysis'}
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Capturing & Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-4 w-4 mr-2" />
+                    AI Visual Analysis
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -317,10 +349,10 @@ export const AIAnalysis = () => {
             <CardContent className="flex flex-col items-center justify-center h-64">
               <Brain className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center max-w-md">
-                Real-time TradingView charts with live market data. Select a symbol and timeframe above, then click "AI Analysis" to get comprehensive technical analysis with AI insights.
+                Advanced AI visual analysis system ready. Select a symbol and timeframe above, then click "AI Analysis" to capture a screenshot of this entire page and get comprehensive analysis.
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Live charts powered by TradingView
+                📸 Visual analysis powered by OpenAI GPT-4 Vision
               </p>
             </CardContent>
           </Card>
