@@ -118,7 +118,7 @@ Return structured JSON analysis that a professional trader would find actionable
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'o4-mini-2025-04-16',
         input: [
           { role: 'system', content: system },
           { role: 'user', content: userPrompt }
