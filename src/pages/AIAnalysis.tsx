@@ -61,35 +61,72 @@ export const AIAnalysis = () => {
       return;
     }
 
-    if (chartData.length === 0) {
-      toast({
-        title: "Error", 
-        description: "No chart data available. Please wait for the chart to load.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('ai-chart-analysis', {
-        body: { 
-          symbol: symbol.toUpperCase(), 
-          chartData: chartData.map(candle => ({
-            time: candle.time as number,
-            open: candle.open,
-            high: candle.high,
-            low: candle.low,
-            close: candle.close
-          })),
-          timeframe,
-          analysisType: 'comprehensive'
-        }
+      // Get chart data first
+      const chartDataResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symbol: symbol.toUpperCase(),
+          timeframe: timeframe,
+          multiplier: 1,
+          timespan: timeframe.includes('m') ? 'minute' : timeframe.includes('h') ? 'hour' : 'day',
+          from: new Date(Date.now() - 30*24*3600*1000).toISOString().slice(0,10),
+          to: new Date().toISOString().slice(0,10),
+          limit: 100
+        })
       });
 
-      if (error) throw error;
+      if (!chartDataResponse.ok) {
+        throw new Error('Failed to fetch chart data');
+      }
+
+      const chartData = await chartDataResponse.json();
+      console.log('Chart data for analysis:', chartData);
+
+      if (!chartData.candles || chartData.candles.length === 0) {
+        toast({
+          title: "Error", 
+          description: "No chart data available for analysis",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Now call AI analysis with the chart data
+      const analysisResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/ai-chart-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          symbol: symbol.toUpperCase(), 
+          chartData: chartData.candles.map((candle: any) => ({
+            time: candle.t,
+            open: candle.o,
+            high: candle.h,
+            low: candle.l,
+            close: candle.c,
+            volume: candle.v || 0
+          })),
+          timeframe: timeframe,
+          analysisType: 'comprehensive'
+        })
+      });
+
+      if (!analysisResponse.ok) {
+        const errorData = await analysisResponse.text();
+        console.error('Analysis error response:', errorData);
+        throw new Error(`Analysis failed: ${analysisResponse.status}`);
+      }
       
-      setAnalysis(data.result);
+      const analysisData = await analysisResponse.json();
+      console.log('Analysis result:', analysisData);
+      
+      setAnalysis(analysisData.result || analysisData);
       toast({
         title: "Analysis Complete",
         description: `AI chart analysis for ${symbol.toUpperCase()} has been generated`,
@@ -98,7 +135,7 @@ export const AIAnalysis = () => {
       console.error('Analysis error:', error);
       toast({
         title: "Analysis Failed",
-        description: "Unable to generate chart analysis. Please try again.",
+        description: error instanceof Error ? error.message : "Unable to generate chart analysis. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -189,7 +226,7 @@ export const AIAnalysis = () => {
                   <div className="flex items-end">
                     <Button 
                       onClick={handleAnalysis} 
-                      disabled={loading || chartData.length === 0}
+                      disabled={loading}
                       className="w-full"
                     >
                       {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -198,11 +235,7 @@ export const AIAnalysis = () => {
                   </div>
                 </div>
 
-                {chartData.length > 0 && (
-                  <div className="text-sm text-muted-foreground">
-                    Chart data loaded: {chartData.length} data points ready for analysis
-                  </div>
-                )}
+                {/* Remove the chart data status message since we're getting data directly from functions */}
               </CardContent>
             </Card>
           </div>
@@ -353,7 +386,7 @@ export const AIAnalysis = () => {
             <CardContent className="flex flex-col items-center justify-center h-64">
               <Brain className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center">
-                Enter a stock symbol above and click "Analyze Chart" to get AI-powered technical analysis
+                Enter a stock symbol above and click "Analyze Chart" to get AI-powered technical analysis with live market data
               </p>
             </CardContent>
           </Card>
