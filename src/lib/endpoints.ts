@@ -2,7 +2,7 @@ const v = (k: string, f = '') => (import.meta as any)?.env?.[k] ?? f;
 
 export const ENV = {
   API_URL: v('VITE_PUBLIC_API_URL', ''),                 // your Express/Railway backend
-  SUPABASE_URL: v('VITE_SUPABASE_URL', ''),              // optional
+  SUPABASE_URL: v('VITE_SUPABASE_URL', 'https://ifetofkhyblyijghuwzs.supabase.co'),              // Supabase project URL
 };
 
 export function apiUrl(path: string) {
