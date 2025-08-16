@@ -68,48 +68,42 @@ serve(async (req) => {
     console.log(`Analyzing ${symbol} (${timeframe}) with ${candles?.length || 0} candles`);
 
     if (!symbol || !Array.isArray(candles) || candles.length < 20) {
-      return new Response(JSON.stringify({ error: 'symbol and >=20 candles required' }), { 
+      return new Response(JSON.stringify({ error: 'symbol and >=20 candles required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    // Keep the payload compact to control tokens
-    const compact = candles.map(b => [b.t,b.o,b.h,b.l,b.c,b.v]);
+    // Sanitize and cap payload to avoid 400s and token bloat
+    const MAX_BARS = 400;
+    const bars = (candles ?? []).slice(-MAX_BARS)
+      .map(b => ({
+        t: Number(b.t),
+        o: Number(b.o),
+        h: Number(b.h),
+        l: Number(b.l),
+        c: Number(b.c),
+        v: Number(b.v ?? 0),
+      }))
+      .filter(b =>
+        Number.isFinite(b.t) && Number.isFinite(b.o) &&
+        Number.isFinite(b.h) && Number.isFinite(b.l) &&
+        Number.isFinite(b.c) && Number.isFinite(b.v)
+      );
 
-    const system = [
-      "You are a professional technical analyst with 15+ years of market experience.",
-      "Analyze OHLCV data using price action, support/resistance, trend analysis,",
-      "and conceptual indicators (EMA20/50/200, RSI, MACD, ATR, Bollinger Bands).",
-      "Be precise, data-driven, and provide specific price levels.",
-      "Output must strictly follow the JSON schema. No financial advice disclaimers needed."
-    ].join(' ');
+    if (bars.length < 20) {
+      return new Response(JSON.stringify({ error: '>=20 valid candles required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
-    const input = {
-      symbol,
-      timeframe,
-      market,
-      columns: ["timestamp","open","high","low","close","volume"],
-      candles: compact,
-      total_bars: candles.length,
-      latest_price: candles[candles.length - 1]?.c
-    };
-
-    const userPrompt = `
-Analyze the following OHLCV candles for ${symbol} on ${timeframe} timeframe in the ${market} market.
-
-The data represents exactly what is visible on the trader's chart. Provide:
-1. Technical summary of price action and trend
-2. Market outlook (bullish/bearish/neutral) with reasoning  
-3. Key support and resistance levels from the actual price data
-4. One actionable trade idea with specific entry, stop, and target levels
-5. Confidence score (0-100) based on signal strength
-6. Primary risks to watch
-
-Data: ${JSON.stringify(input)}
-
-Return structured JSON analysis that a professional trader would find actionable.
-`;
+    const prompt =
+      'You are a professional technical analyst. ' +
+      'Return ONLY valid JSON to the provided schema. ' +
+      'Columns: t,o,h,l,c,v (t=epoch seconds). ' +
+      `Analyze ${symbol} on ${timeframe} in ${market}. ` +
+      'Data:\n' + JSON.stringify(bars);
 
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -118,18 +112,8 @@ Return structured JSON analysis that a professional trader would find actionable
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
-        input: [
-          {
-            role: 'system',
-            content: [{ type: 'text', text: system }]
-          },
-          {
-            role: 'user',
-            content: [{ type: 'text', text: userPrompt }]
-          }
-        ],
-        max_completion_tokens: 1200,
+        model: 'gpt-4o-mini',
+        input: prompt,
         response_format: {
           type: 'json_schema',
           json_schema: analysisSchema
@@ -140,7 +124,11 @@ Return structured JSON analysis that a professional trader would find actionable
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`OpenAI API error: ${response.status} - ${errorText}`);
-      throw new Error(`OpenAI API error: ${response.status}`);
+      // Bubble up the real status/text so the frontend can see exact error
+      return new Response(JSON.stringify({ error: errorText || 'OpenAI call failed' }), {
+        status: response.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const data = await response.json();
@@ -163,24 +151,21 @@ Return structured JSON analysis that a professional trader would find actionable
       timeframe,
       json_version: "1.0.0",
       analyzed_at: new Date().toISOString(),
-      candles_analyzed: candles.length
+      candles_analyzed: bars.length
     };
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error('Error in ai-analyze function:', error);
-    
-    // Return structured error response
-    const errorResponse = {
-      error: String(error?.message || error),
-      timestamp: new Date().toISOString()
-    };
-
-    return new Response(JSON.stringify(errorResponse), {
-      status: 502,
+  } catch (e: any) {
+    const status = e?.status ?? e?.response?.status ?? 500;
+    const body = (e?.response && typeof e.response.text === 'function')
+      ? await e.response.text().catch(() => '')
+      : (e?.message || '');
+    console.error('[ai-analyze] OpenAI error', status, body);
+    return new Response(JSON.stringify({ error: body || 'OpenAI call failed' }), {
+      status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
