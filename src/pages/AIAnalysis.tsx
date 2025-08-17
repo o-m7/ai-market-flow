@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigation } from "@/components/Navigation";
-import TVLightweightChart from "@/components/TVLightweightChart";
+import TechnicalChart from "@/components/TechnicalChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -344,17 +344,14 @@ export const AIAnalysis = () => {
         <div className="grid gap-6">
           {/* Chart Section - Full Width */}
           <div className="w-full">
-            <div className="lw-chart-container rounded-lg border bg-card">
-              <TVLightweightChart 
-                symbol={symbol}
-                tf={timeframe === 'D' ? '1d' : timeframe === '240' ? '4h' : timeframe === '60' ? '1h' : (`${timeframe}m` as any)}
-                height={600}
-                theme="light"
-                series="candles"
-                live
-                onDataChange={handleChartDataChange}
-              />
-            </div>
+            <TechnicalChart 
+              symbol={symbol}
+              tf={timeframe}
+              height={600}
+              theme="light"
+              live
+              onDataChange={handleChartDataChange}
+            />
           </div>
         </div>
 
