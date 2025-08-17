@@ -109,6 +109,7 @@ export const AIAnalysis = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmZXRvZmtoeWJseWlqZ2h1d3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY0Njk1ODMsImV4cCI6MjA1MjA0NTU4M30.ddbB6iHbFT8XvGMFHy4NkDDiYJJW3hE4WpHLR6nA6A8'}`,
         },
         body: JSON.stringify({
           symbol: symbol.toUpperCase(),
