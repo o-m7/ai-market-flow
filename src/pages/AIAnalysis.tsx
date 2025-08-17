@@ -157,10 +157,23 @@ export const AIAnalysis = () => {
 
     } catch (error: any) {
       console.error('Analysis error:', error);
+      // Fallback: show a safe analysis card even on error
+      const fallback = {
+        analysis: `Analysis failed: ${error?.message || 'Unknown error'}`,
+        recommendation: 'hold',
+        confidence: 0,
+        keyLevels: { support: [], resistance: [] },
+        technicalIndicators: { rsi: 50, trend: 'neutral' as const, momentum: 'neutral' as const },
+        chartPatterns: [] as string[],
+        priceTargets: { bullish: 0, bearish: 0 },
+        riskAssessment: { level: 'medium' as const, factors: ['AI service error'] },
+        timestamp: new Date().toISOString(),
+      };
+      setAnalysis(fallback);
       setAiError(error.message);
       toast({
         title: 'Analysis Failed',
-        description: error.message || 'Unable to analyze chart data. Please try again.',
+        description: error.message || 'Unable to analyze chart data. Showing fallback summary.',
         variant: 'destructive',
       });
     } finally {

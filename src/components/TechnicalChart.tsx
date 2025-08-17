@@ -103,7 +103,9 @@ export default function TechnicalChart({
     };
 
     fetchChartData();
-  }, [symbol, timeframe, onDataChange]);
+    // Note: Intentionally exclude onDataChange to avoid re-fetch loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbol, timeframe]);
 
 
   // Initialize TradingView widget using iframe approach
