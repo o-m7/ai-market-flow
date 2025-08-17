@@ -7,6 +7,21 @@ function toSeconds(msOrSec: number) {
   return s;
 }
 
+// Normalize symbols for Polygon (stocks: AAPL, crypto: X:BTCUSD, forex: C:EURUSD)
+function getAssetType(sym: string): 'STOCK'|'CRYPTO'|'FOREX' {
+  const s = sym.toUpperCase();
+  if (['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','EURGBP','EURJPY','GBPJPY','AUDJPY','CADJPY'].includes(s)) return 'FOREX';
+  if (s.includes('BTC') || s.includes('ETH') || s.includes('ADA') || s.includes('SOL') || s.includes('DOGE') || s.includes('LTC') || s.includes('XRP') || s.includes('AVAX') || s.includes('MATIC') || s.includes('DOT') || s.includes('LINK') || s.includes('UNI') || s.includes('ATOM') || s.includes('ALGO') || (s.includes('USD') && s.length <= 6 && s !== 'USDJPY')) return 'CRYPTO';
+  return 'STOCK';
+}
+function toPolygonSymbol(sym: string) {
+  const s = sym.toUpperCase();
+  const type = getAssetType(s);
+  if (type === 'CRYPTO') return s.startsWith('X:') ? s : `X:${s}`;
+  if (type === 'FOREX') return s.startsWith('C:') ? s : `C:${s}`;
+  return s;
+}
+
 export async function fetchCandles(symbol: string, tf: '1m'|'5m'|'15m'|'30m'|'1h'|'4h'|'1d', lookback = 500): Promise<LWBar[]> {
   // Map timeframe to polygon parameters
   const map: Record<string,{mult:number; span:'minute'|'hour'|'day'; windowDays:number}> = {
@@ -31,7 +46,7 @@ export async function fetchCandles(symbol: string, tf: '1m'|'5m'|'15m'|'30m'|'1h
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        symbol: symbol.toUpperCase(),
+        symbol: toPolygonSymbol(symbol),
         timeframe: tf,
         multiplier: cfg.mult,
         timespan: cfg.span,
@@ -76,7 +91,7 @@ export async function fetchQuote(symbol: string): Promise<{ price:number|null; t
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        symbols: [symbol.toUpperCase()]
+        symbols: [toPolygonSymbol(symbol)]
       })
     });
 
@@ -90,7 +105,9 @@ export async function fetchQuote(symbol: string): Promise<{ price:number|null; t
     
     // Handle both data array format and results format
     const results = data.data || data.results || [];
-    const symbolData = results.find((r: any) => r.symbol === symbol.toUpperCase());
+    const norm = toPolygonSymbol(symbol);
+    const plain = norm.replace(/^X:|^C:/, '');
+    const symbolData = results.find((r: any) => r.symbol === norm || r.symbol === plain || r.ticker === norm || r.ticker === plain);
     
     if (!symbolData) {
       // Generate mock price if no real data

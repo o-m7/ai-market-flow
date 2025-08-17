@@ -21,13 +21,15 @@ type Props = {
   theme?: 'light'|'dark';
   series?: 'candles'|'line'|'area';
   live?: boolean;
+  onDataChange?: (data: LWBar[]) => void;
 };
 
-export default function TVLightweightChart({ symbol, tf='1m', height=420, theme='light', series='candles', live=true }: Props) {
+export default function TVLightweightChart({ symbol, tf='1m', height=420, theme='light', series='candles', live=true, onDataChange }: Props) {
   const ref = useRef<HTMLDivElement|null>(null);
   const chartRef = useRef<IChartApi|null>(null);
   const seriesRef = useRef<ISeriesApi<any> | null>(null);
   const lastBar = useRef<LWBar|undefined>();
+  const dataRef = useRef<LWBar[]>([]);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -84,6 +86,8 @@ export default function TVLightweightChart({ symbol, tf='1m', height=420, theme=
       try {
         const data = await fetchCandles(symbol, tf);
         lastBar.current = data.at(-1);
+        dataRef.current = data;
+        onDataChange?.(data);
         
         if (series === 'candles') {
           seriesRef.current.setData(data);
@@ -113,6 +117,12 @@ export default function TVLightweightChart({ symbol, tf='1m', height=420, theme=
             close: q.price
           };
           lastBar.current = patched;
+
+          // Patch last element in dataRef and notify parent
+          if (dataRef.current.length > 0) {
+            dataRef.current[dataRef.current.length - 1] = patched;
+            onDataChange?.([...dataRef.current]);
+          }
 
           if (series === 'candles') {
             seriesRef.current.update(patched);

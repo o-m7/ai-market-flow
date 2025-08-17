@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigation } from "@/components/Navigation";
-import TechnicalChart from "@/components/TechnicalChart";
+import TVLightweightChart from "@/components/TVLightweightChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -105,11 +105,12 @@ export const AIAnalysis = () => {
       // Take chart snapshot
       let snapshotBase64: string | null = null;
       try {
-        const chartContainer = document.querySelector('.tradingview-chart-container iframe') as HTMLIFrameElement;
-        if (chartContainer) {
-          // For TradingView iframe, we'll use html2canvas on the container
+        const tvIframe = document.querySelector('.tradingview-chart-container iframe') as HTMLIFrameElement | null;
+        const lwContainer = document.querySelector('.lw-chart-container') as HTMLElement | null;
+        const targetEl = lwContainer ?? tvIframe?.parentElement ?? null;
+        if (targetEl) {
           const html2canvas = (await import('html2canvas')).default;
-          const canvas = await html2canvas(chartContainer.parentElement!, {
+          const canvas = await html2canvas(targetEl, {
             allowTaint: true,
             useCORS: true,
             scale: 0.8,
@@ -343,14 +344,17 @@ export const AIAnalysis = () => {
         <div className="grid gap-6">
           {/* Chart Section - Full Width */}
           <div className="w-full">
-            <TechnicalChart 
-              symbol={symbol}
-              tf={timeframe}
-              height={600}
-              theme="light"
-              live
-              onDataChange={handleChartDataChange}
-            />
+            <div className="lw-chart-container rounded-lg border bg-card">
+              <TVLightweightChart 
+                symbol={symbol}
+                tf={timeframe === 'D' ? '1d' : timeframe === '240' ? '4h' : timeframe === '60' ? '1h' : (`${timeframe}m` as any)}
+                height={600}
+                theme="light"
+                series="candles"
+                live
+                onDataChange={handleChartDataChange}
+              />
+            </div>
           </div>
         </div>
 
