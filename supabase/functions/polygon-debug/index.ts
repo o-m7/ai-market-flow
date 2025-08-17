@@ -30,8 +30,8 @@ serve(async (req) => {
     
     console.log(`Debug comparison for ${sym}`);
 
-    const urlPrev = `https://api.polygon.io/v2/aggs/ticker/${sym}/prev?adjusted=true&apikey=${polygonApiKey}`;
-    const urlSnap = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${sym}?apikey=${polygonApiKey}`;
+    const urlPrev = `https://api.polygon.io/v2/aggs/ticker/${sym}/prev?adjusted=true&apiKey=${polygonApiKey}`;
+    const urlSnap = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${sym}?apiKey=${polygonApiKey}`;
 
     const [p, s] = await Promise.all([
       fetch(urlPrev, { headers: { "Cache-Control": "no-store" } }),

@@ -60,7 +60,7 @@ serve(async (req) => {
     const lookbackMs = span === "day" ? 30 * 24 * 3600e3 : 48 * 3600e3;
     const fromMs = nowMs - lookbackMs;
 
-    const urlMs = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/range/${mult}/${span}/${fromMs}/${nowMs}?adjusted=true&sort=asc&limit=50000&apikey=${polygonApiKey}`;
+    const urlMs = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/range/${mult}/${span}/${fromMs}/${nowMs}?adjusted=true&sort=asc&limit=50000&apiKey=${polygonApiKey}`;
 
     console.log(`Trying millisecond range: ${urlMs}`);
 
@@ -86,7 +86,7 @@ serve(async (req) => {
       const fromISO = new Date(nowMs - (span === "day" ? 30 * 24 * 3600e3 : 3 * 24 * 3600e3))
                         .toISOString().slice(0, 10);
                         
-      const urlISO = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/range/${mult}/${span}/${fromISO}/${toISO}?adjusted=true&sort=asc&limit=50000&apikey=${polygonApiKey}`;
+      const urlISO = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/range/${mult}/${span}/${fromISO}/${toISO}?adjusted=true&sort=asc&limit=50000&apiKey=${polygonApiKey}`;
       
       console.log(`Trying ISO date range: ${urlISO}`);
       
@@ -123,7 +123,7 @@ serve(async (req) => {
             },
             hint: {
               hasApiKey: Boolean(polygonApiKey),
-              exampleCurl: `curl "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/minute/2025-08-16/2025-08-17?adjusted=true&sort=asc&limit=50000&apikey=YOUR_KEY"`
+              exampleCurl: `curl "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/minute/2025-08-16/2025-08-17?adjusted=true&sort=asc&limit=50000&apiKey=YOUR_KEY"`
             }
           }
         }), {
@@ -148,6 +148,54 @@ serve(async (req) => {
       console.log(`Last bar: ${last.c} @ ${new Date(last.t).toISOString()}`);
     }
 
+    // Get additional debug info: previous close and current snapshot
+    let prevClose: number | null = null;
+    let prevTime: string | null = null;
+    let snapshotLastTrade: number | null = null;
+    let snapshotTimeUTC: string | null = null;
+
+    try {
+      // Previous close
+      const prevUrl = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/prev?adjusted=true&apiKey=${polygonApiKey}`;
+      const prevRes = await fetch(prevUrl, { headers: { "Cache-Control": "no-store" } });
+      if (prevRes.ok) {
+        const prev = await prevRes.json();
+        prevClose = prev?.results?.[0]?.c ?? null;
+        prevTime = prev?.results?.[0]?.t ? new Date(prev.results[0].t).toISOString() : null;
+      }
+
+      // Current snapshot (for stocks/forex/crypto)
+      let snapUrl = '';
+      if (asset === 'stock') {
+        snapUrl = `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${providerSymbol}?apiKey=${polygonApiKey}`;
+      } else if (asset === 'forex') {
+        snapUrl = `https://api.polygon.io/v2/snapshot/locale/global/markets/forex/tickers/${providerSymbol}?apiKey=${polygonApiKey}`;
+      } else if (asset === 'crypto') {
+        snapUrl = `https://api.polygon.io/v2/snapshot/locale/global/markets/crypto/tickers/${providerSymbol}?apiKey=${polygonApiKey}`;
+      }
+
+      if (snapUrl) {
+        const snapRes = await fetch(snapUrl, { headers: { "Cache-Control": "no-store" } });
+        if (snapRes.ok) {
+          const snap = await snapRes.json();
+          const ticker = snap?.results ?? snap?.ticker;
+          const lastTrade = ticker?.last_trade ?? ticker?.lastTrade;
+          snapshotLastTrade = lastTrade?.price ?? lastTrade?.p ?? null;
+          snapshotTimeUTC = lastTrade?.sip_timestamp 
+            ? new Date(lastTrade.sip_timestamp).toISOString()
+            : lastTrade?.t 
+            ? new Date(lastTrade.t).toISOString()
+            : null;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch additional debug info:', error);
+    }
+
+    const enrichedMeta = `${providerSymbol} • ${tf} • barLast=${last?.c ?? 'N/A'} @ ${last ? new Date(last.t).toISOString() : 'N/A'} | prevClose=${prevClose ?? 'N/A'} @ ${prevTime ?? 'N/A'} | snapshotTrade=${snapshotLastTrade ?? 'N/A'} @ ${snapshotTimeUTC ?? 'N/A'}${asset === 'stock' ? ' • (may be delayed)' : ''}`;
+
+    console.log('Enriched meta:', enrichedMeta);
+
     return new Response(JSON.stringify({
       success: true,
       candles: ohlcv,
@@ -160,8 +208,12 @@ serve(async (req) => {
       count: ohlcv.length,
       lastClose: last?.c ?? null,
       lastTimeUTC: last ? new Date(last.t).toISOString() : null,
+      prevClose,
+      prevTime,
+      snapshotLastTrade,
+      snapshotTimeUTC,
       isLikelyDelayed: asset === "stock",
-      meta: `${providerSymbol} • ${tf} • last=${last?.c ?? 'N/A'} @ ${last ? new Date(last.t).toISOString() : 'N/A'}${asset === 'stock' ? ' • (may be delayed)' : ''}`
+      meta: enrichedMeta
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -194,13 +246,25 @@ function mapFx(uiSymbol: string): string {
 
 function mapTimeframe(tf: string): { mult: number; span: string } {
   const map: Record<string, [number, string]> = {
-    "1m": [1, "minute"], "5m": [5, "minute"], "15m": [15, "minute"],
-    "30m": [30, "minute"], "1h": [1, "hour"], "4h": [4, "hour"], "1d": [1, "day"],
+    // Standard formats
+    "1m": [1, "minute"], "1min": [1, "minute"],
+    "5m": [5, "minute"], "5min": [5, "minute"],
+    "15m": [15, "minute"], "15min": [15, "minute"],
+    "30m": [30, "minute"], "30min": [30, "minute"],
+    "1h": [1, "hour"], "60m": [1, "hour"], "1hour": [1, "hour"],
+    "4h": [4, "hour"], "240m": [4, "hour"], "4hour": [4, "hour"],
+    "1d": [1, "day"], "D": [1, "day"], "1day": [1, "day"],
     // Legacy support
-    "60m": [1, "hour"], "240m": [4, "hour"], "D": [1, "day"]
+    "1": [1, "minute"],
+    "5": [5, "minute"],
+    "15": [15, "minute"],
+    "30": [30, "minute"],
+    "60": [1, "hour"],
+    "240": [4, "hour"]
   };
   
   const [mult, span] = map[tf] ?? [1, "minute"];
+  console.log(`Mapped timeframe '${tf}' to [${mult}, '${span}']`);
   return { mult, span };
 }
 

@@ -91,8 +91,13 @@ export default function TechnicalChart({
             providerSymbol: data.providerSymbol,
             asset: data.asset,
             timeframe: data.timeframe,
+            source: data.source,
             lastClose: data.lastClose,
             lastTimeUTC: data.lastTimeUTC,
+            prevClose: data.prevClose,
+            prevTime: data.prevTime,
+            snapshotLastTrade: data.snapshotLastTrade,
+            snapshotTimeUTC: data.snapshotTimeUTC,
             isDelayed: data.isLikelyDelayed,
             meta: data.meta
           });
@@ -219,13 +224,23 @@ export default function TechnicalChart({
         <div className="rounded-lg border bg-card overflow-hidden">
           {/* Data verification echo */}
           {chartMeta && (
-            <div className="px-4 py-2 bg-muted/50 border-b text-xs text-muted-foreground">
-              <span className="font-mono">{chartMeta.meta}</span>
-              {chartMeta.isDelayed && (
-                <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
-                  Delayed Data
-                </span>
-              )}
+            <div className="px-4 py-2 bg-muted/50 border-b text-xs text-muted-foreground font-mono space-y-1">
+              <div>
+                <span className="font-semibold">{chartMeta.providerSymbol}</span> • {chartMeta.timeframe} • 
+                <span className="text-green-600">barLast={chartMeta.lastClose}</span> @ {chartMeta.lastTimeUTC?.slice(0, -5)}Z
+              </div>
+              <div>
+                <span className="text-blue-600">prevClose={chartMeta.prevClose ?? 'N/A'}</span> @ {chartMeta.prevTime?.slice(0, -5)}Z • 
+                <span className="text-purple-600">snapshotTrade={chartMeta.snapshotLastTrade ?? 'N/A'}</span> @ {chartMeta.snapshotTimeUTC?.slice(0, -5)}Z
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-gray-100 px-2 py-1 rounded">source: {chartMeta.source || 'unknown'}</span>
+                {chartMeta.isDelayed && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
+                    May be delayed 15min
+                  </span>
+                )}
+              </div>
             </div>
           )}
           
