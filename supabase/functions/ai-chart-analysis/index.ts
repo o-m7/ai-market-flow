@@ -200,7 +200,7 @@ Respond in JSON format:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14', // Using vision-capable model
+        model: 'gpt-4o', // Using vision-capable model
         messages: [
           {
             role: 'system',
@@ -223,7 +223,7 @@ Respond in JSON format:
             ]
           }
         ],
-        max_completion_tokens: 3000
+        max_tokens: 2500,
       }),
     });
 
@@ -355,7 +355,7 @@ OUTPUT FORMAT (JSON only):
 
     const payload = useVision
       ? {
-          model: 'gpt-4.1-2025-04-14',
+          model: 'gpt-4o',
           messages: [
             { role: 'system', content: 'You are an institutional-grade trading agent. Analyze both quantitative data and visual patterns to provide comprehensive trading insights.' },
             { role: 'user', content: [
@@ -363,15 +363,17 @@ OUTPUT FORMAT (JSON only):
               { type: 'image_url', image_url: { url: pageScreenshot!, detail: 'high' } }
             ] }
           ],
-          max_completion_tokens: 2500
+          max_tokens: 2500,
+          temperature: 0.3
         }
       : {
-          model: 'gpt-5-2025-08-07',
+          model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: 'You are an institutional-grade trading agent. Provide comprehensive technical analysis based on quantitative market data.' },
             { role: 'user', content: basePrompt }
           ],
-          max_completion_tokens: 2500
+          max_tokens: 2500,
+          temperature: 0.3
         };
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -469,6 +471,68 @@ OUTPUT FORMAT (JSON only):
   }
 }
 
+// Enhanced function to fetch real market data from Polygon API
+async function fetchPolygonData(symbol: string, timeframe: string): Promise<Array<{ time: number; open: number; high: number; low: number; close: number; volume: number; }> | null> {
+  if (!polygonApiKey) {
+    console.warn('Polygon API key not configured, skipping real data fetch');
+    return null;
+  }
+
+  try {
+    // Convert timeframe to Polygon format
+    const timeframeMap: Record<string, { multiplier: number; timespan: string }> = {
+      '1': { multiplier: 1, timespan: 'minute' },
+      '5': { multiplier: 5, timespan: 'minute' },
+      '15': { multiplier: 15, timespan: 'minute' },
+      '30': { multiplier: 30, timespan: 'minute' },
+      '60': { multiplier: 1, timespan: 'hour' },
+      '240': { multiplier: 4, timespan: 'hour' },
+      'D': { multiplier: 1, timespan: 'day' }
+    };
+
+    const tfConfig = timeframeMap[timeframe] || { multiplier: 1, timespan: 'hour' };
+    
+    // Get data for the last 3 months for comprehensive analysis
+    const to = new Date().toISOString().split('T')[0];
+    const from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${tfConfig.multiplier}/${tfConfig.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=200&apikey=${polygonApiKey}`;
+    
+    console.log(`Fetching Polygon data for ${symbol} from ${from} to ${to}`);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error(`Polygon API error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (!data.results || data.results.length === 0) {
+      console.warn(`No Polygon data available for ${symbol}`);
+      return null;
+    }
+
+    // Convert Polygon format to our format
+    const formattedData = data.results.map((candle: any) => ({
+      time: candle.t,
+      open: candle.o,
+      high: candle.h,
+      low: candle.l,
+      close: candle.c,
+      volume: candle.v || 0
+    }));
+
+    console.log(`Successfully fetched ${formattedData.length} candles from Polygon for ${symbol}`);
+    return formattedData;
+
+  } catch (error) {
+    console.error(`Error fetching Polygon data for ${symbol}:`, error);
+    return null;
+  }
+}
+
 async function generateAIAgentAnalysis(
   symbol: string, 
   timeframe: string, 
@@ -476,6 +540,18 @@ async function generateAIAgentAnalysis(
 ): Promise<ChartAnalysisResult> {
   
   console.log(`AI Agent analyzing ${symbol} on ${timeframe} timeframe`);
+
+  // Try to fetch real market data from Polygon first
+  const polygonData = await fetchPolygonData(symbol, timeframe);
+  
+  if (polygonData && polygonData.length > 0) {
+    console.log(`Using Polygon data with ${polygonData.length} candles for enhanced analysis`);
+    // Use hybrid analysis with real Polygon data
+    return await generateHybridAnalysis(symbol, timeframe, analysisType, polygonData);
+  }
+
+  // Fallback to AI-only analysis if no Polygon data available
+  console.log(`Falling back to AI-only analysis for ${symbol}`);
 
   // Convert timeframe to readable format
   const timeframeMap: Record<string, string> = {
@@ -557,7 +633,7 @@ IMPORTANT: Respond ONLY in valid JSON format with this exact structure:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -568,7 +644,7 @@ IMPORTANT: Respond ONLY in valid JSON format with this exact structure:
             content: prompt
           }
         ],
-        max_completion_tokens: 3000
+        max_tokens: 3000
       }),
     });
 
