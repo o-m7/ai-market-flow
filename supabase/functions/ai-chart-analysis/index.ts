@@ -471,14 +471,51 @@ OUTPUT FORMAT (JSON only):
   }
 }
 
-// Enhanced function to fetch real market data from Polygon API
+// Enhanced function to fetch real market data from Polygon API with rate limiting
+const apiCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_DURATION = 60000; // 1 minute cache
+const API_DELAY = 2000; // 2 second delay between API calls
+
 async function fetchPolygonData(symbol: string, timeframe: string): Promise<Array<{ time: number; open: number; high: number; low: number; close: number; volume: number; }> | null> {
   if (!polygonApiKey) {
     console.warn('Polygon API key not configured, skipping real data fetch');
     return null;
   }
 
+  // Check cache first
+  const cacheKey = `${symbol}-${timeframe}`;
+  const cached = apiCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log(`Using cached data for ${symbol}`);
+    return cached.data;
+  }
+
   try {
+    // Detect asset type and adjust symbol format
+    const assetType = getAssetType(symbol);
+    let polygonSymbol = symbol.toUpperCase();
+    
+    // Convert symbol format for different asset types
+    switch (assetType) {
+      case 'CRYPTO':
+        // Crypto format: X:BTCUSD, X:ETHUSD
+        if (!symbol.startsWith('X:')) {
+          polygonSymbol = `X:${symbol.replace('USD', 'USD')}`;
+        }
+        break;
+      case 'FOREX':
+        // Forex format: C:EURUSD, C:GBPUSD  
+        if (!symbol.startsWith('C:')) {
+          polygonSymbol = `C:${symbol}`;
+        }
+        break;
+      case 'STOCK':
+      default:
+        // Stock format: AAPL, GOOGL (no prefix)
+        polygonSymbol = symbol.toUpperCase();
+        break;
+    }
+
     // Convert timeframe to Polygon format
     const timeframeMap: Record<string, { multiplier: number; timespan: string }> = {
       '1': { multiplier: 1, timespan: 'minute' },
@@ -492,17 +529,24 @@ async function fetchPolygonData(symbol: string, timeframe: string): Promise<Arra
 
     const tfConfig = timeframeMap[timeframe] || { multiplier: 1, timespan: 'hour' };
     
-    // Get data for the last 3 months for comprehensive analysis
+    // Get data for the last 90 days for comprehensive analysis
     const to = new Date().toISOString().split('T')[0];
     const from = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${tfConfig.multiplier}/${tfConfig.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=200&apikey=${polygonApiKey}`;
+    const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${tfConfig.multiplier}/${tfConfig.timespan}/${from}/${to}?adjusted=true&sort=asc&limit=200&apikey=${polygonApiKey}`;
     
-    console.log(`Fetching Polygon data for ${symbol} from ${from} to ${to}`);
+    console.log(`Fetching Polygon data for ${polygonSymbol} (${assetType}) from ${from} to ${to}`);
+    
+    // Add delay to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, API_DELAY));
     
     const response = await fetch(url);
     
     if (!response.ok) {
+      if (response.status === 429) {
+        console.error(`Polygon API rate limited for ${symbol}. Using fallback data.`);
+        return null;
+      }
       console.error(`Polygon API error: ${response.status}`);
       return null;
     }
@@ -524,13 +568,37 @@ async function fetchPolygonData(symbol: string, timeframe: string): Promise<Arra
       volume: candle.v || 0
     }));
 
-    console.log(`Successfully fetched ${formattedData.length} candles from Polygon for ${symbol}`);
+    // Cache the result
+    apiCache.set(cacheKey, { data: formattedData, timestamp: Date.now() });
+
+    console.log(`Successfully fetched ${formattedData.length} candles from Polygon for ${polygonSymbol}`);
     return formattedData;
 
   } catch (error) {
     console.error(`Error fetching Polygon data for ${symbol}:`, error);
     return null;
   }
+}
+
+// Function to detect asset type
+function getAssetType(symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' {
+  symbol = symbol.toUpperCase();
+  
+  // Crypto patterns
+  if (symbol.includes('BTC') || symbol.includes('ETH') || symbol.includes('ADA') || 
+      symbol.includes('SOL') || symbol.includes('DOGE') || symbol.includes('LTC') ||
+      symbol.includes('XRP') || symbol.includes('AVAX') || symbol.includes('MATIC') ||
+      (symbol.includes('USD') && symbol.length <= 6 && symbol !== 'USDJPY')) {
+    return 'CRYPTO';
+  }
+  
+  // Forex patterns  
+  if (['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY'].includes(symbol)) {
+    return 'FOREX';
+  }
+  
+  // Default to stock
+  return 'STOCK';
 }
 
 async function generateAIAgentAnalysis(
@@ -553,6 +621,9 @@ async function generateAIAgentAnalysis(
   // Fallback to AI-only analysis if no Polygon data available
   console.log(`Falling back to AI-only analysis for ${symbol}`);
 
+  // Detect asset type for tailored analysis
+  const assetType = getAssetType(symbol);
+
   // Convert timeframe to readable format
   const timeframeMap: Record<string, string> = {
     '1': '1 minute',
@@ -568,42 +639,77 @@ async function generateAIAgentAnalysis(
 
   // Comprehensive AI agent prompt for technical analysis
   const prompt = `
-You are an expert AI trading agent with access to real-time market data through TradingView. You are analyzing ${symbol} on the ${readableTimeframe} timeframe.
+You are an expert AI trading agent specializing in ${assetType} markets with access to real-time market data through TradingView and Polygon. You are analyzing ${symbol} on the ${readableTimeframe} timeframe.
 
-As a professional technical analyst and trading agent, provide a comprehensive analysis based on:
+ASSET-SPECIFIC ANALYSIS CONTEXT:
+${assetType === 'CRYPTO' ? `
+- Cryptocurrency Analysis: Focus on volatility patterns, 24/7 market dynamics, correlation with Bitcoin/Ethereum
+- Consider DeFi trends, whale movements, and regulatory sentiment
+- Analyze volume spikes and social sentiment impact
+` : assetType === 'FOREX' ? `
+- Forex Analysis: Focus on economic fundamentals, central bank policies, interest rate differentials
+- Consider geopolitical events, trade relationships, and economic data releases
+- Analyze sessions overlap (London, New York, Tokyo, Sydney) and their impact
+` : `
+- Stock Analysis: Focus on earnings cycles, institutional flow, sector rotation
+- Consider fundamental analysis, market cap dynamics, and economic indicators
+- Analyze pre/post market activity and earnings expectations
+`}
+
+COMPREHENSIVE TECHNICAL ANALYSIS FRAMEWORK:
 
 1. CURRENT MARKET CONTEXT:
-- Symbol: ${symbol}
+- Symbol: ${symbol} (${assetType})
 - Timeframe: ${readableTimeframe} 
 - Analysis Type: ${analysisType}
-- Current market conditions and sentiment
+- Live market conditions and volatility assessment
 
-2. TECHNICAL ANALYSIS FRAMEWORK:
-- Price action and trend analysis
-- Key support and resistance levels
-- Technical indicators (RSI, MACD, EMA, etc.)
-- Chart patterns and formations
-- Volume analysis where applicable
+2. ADVANCED TECHNICAL ANALYSIS:
+- Multi-timeframe trend analysis (higher and lower timeframes)
+- Dynamic support and resistance levels
+- Advanced technical indicators (RSI, MACD, EMA, Bollinger Bands, Volume Profile)
+- Chart patterns and formations (triangles, flags, head & shoulders, wedges)
+- Fibonacci retracements and extensions
+- Volume analysis and accumulation/distribution
 
-3. MARKET INTELLIGENCE:
-- Fundamental factors affecting the asset
-- Market sentiment and news impact
-- Sector/industry trends (if applicable)
-- Risk factors and market volatility
+3. ${assetType} MARKET INTELLIGENCE:
+${assetType === 'CRYPTO' ? `
+- DeFi protocol analysis and token utility
+- On-chain metrics and whale activity
+- Market sentiment and social media trends
+- Regulatory news impact assessment
+` : assetType === 'FOREX' ? `
+- Economic calendar events and data releases
+- Central bank policy and interest rate outlook  
+- Geopolitical risk assessment
+- Currency correlation analysis
+` : `
+- Earnings analysis and guidance
+- Institutional flow and options activity
+- Sector performance and rotation
+- Economic indicators impact
+`}
 
-4. TRADING STRATEGY:
-- Clear buy/sell/hold recommendation
-- Entry and exit points
-- Risk management suggestions
-- Price targets for different scenarios
+4. RISK MANAGEMENT & TRADING STRATEGY:
+- Position sizing recommendations
+- Stop-loss and take-profit levels
+- Risk-reward ratio analysis
+- Market volatility assessment
+- Entry and exit timing strategies
 
-Please provide a detailed analysis with specific price levels, confidence ratings, and actionable insights. Act as if you have real-time access to the current chart and market data.
+5. LIVE MARKET OPPORTUNITIES:
+- Immediate trading opportunities
+- Swing trading setups
+- Long-term investment thesis
+- Key levels to watch
+
+Please provide a detailed analysis with specific price levels, confidence ratings, and actionable insights. Focus on both short-term trading opportunities and longer-term market outlook.
 
 IMPORTANT: Respond ONLY in valid JSON format with this exact structure:
 {
-  "analysis": "comprehensive analysis text with specific insights and reasoning",
+  "analysis": "comprehensive analysis text with specific insights, price levels, and market context for ${assetType}",
   "recommendation": "buy/sell/hold", 
-  "confidence": 0.85,
+  "confidence": 85,
   "keyLevels": {
     "support": [price1, price2, price3],
     "resistance": [price1, price2, price3]
@@ -613,7 +719,7 @@ IMPORTANT: Respond ONLY in valid JSON format with this exact structure:
     "trend": "bullish/bearish/neutral",
     "momentum": "strong/weak/neutral"
   },
-  "chartPatterns": ["Double Bottom", "Bull Flag"],
+  "chartPatterns": ["Double Bottom", "Bull Flag", "Rising Wedge"],
   "priceTargets": {
     "bullish": target_price,
     "bearish": target_price  
@@ -621,7 +727,9 @@ IMPORTANT: Respond ONLY in valid JSON format with this exact structure:
   "riskAssessment": {
     "level": "low/medium/high",
     "factors": ["Market volatility", "Economic data releases", "Technical breakout potential"]
-  }
+  },
+  "assetSpecificInsights": "${assetType === 'CRYPTO' ? 'DeFi trends, whale activity, regulatory impact' : assetType === 'FOREX' ? 'Economic fundamentals, central bank policy, geopolitical factors' : 'Earnings outlook, institutional flow, sector dynamics'}",
+  "tradingStrategy": "detailed trading approach with entry/exit points and risk management"
 }
 `;
 

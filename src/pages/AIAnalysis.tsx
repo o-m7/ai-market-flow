@@ -37,9 +37,46 @@ interface AnalysisResult {
 }
 
 const POPULAR_SYMBOLS = [
-  'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX',
-  'BTCUSD', 'ETHUSD', 'EURUSD', 'GBPUSD', 'USDJPY'
+  // Major Stocks
+  'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'CRM',
+  'UBER', 'SHOP', 'SQ', 'PYPL', 'COIN', 'RBLX', 'SNOW', 'PLTR', 'ARKK', 'SPY',
+  
+  // Major Crypto
+  'BTCUSD', 'ETHUSD', 'ADAUSD', 'SOLUSD', 'DOGEUSD', 'LTCUSD', 'XRPUSD', 
+  'AVAXUSD', 'MATICUSD', 'DOTUSD', 'LINKUSD', 'UNIUSD', 'ATOMUSD', 'ALGOUSD',
+  
+  // Major Forex Pairs
+  'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 
+  'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY'
 ];
+
+const SYMBOL_CATEGORIES = {
+  'Stocks': ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'CRM', 'UBER', 'SHOP', 'SQ', 'PYPL', 'COIN', 'RBLX', 'SNOW', 'PLTR', 'ARKK', 'SPY'],
+  'Crypto': ['BTCUSD', 'ETHUSD', 'ADAUSD', 'SOLUSD', 'DOGEUSD', 'LTCUSD', 'XRPUSD', 'AVAXUSD', 'MATICUSD', 'DOTUSD', 'LINKUSD', 'UNIUSD', 'ATOMUSD', 'ALGOUSD'],
+  'Forex': ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY']
+};
+
+const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
+  symbol = symbol.toUpperCase();
+  
+  // Crypto patterns
+  if (symbol.includes('BTC') || symbol.includes('ETH') || symbol.includes('ADA') || 
+      symbol.includes('SOL') || symbol.includes('DOGE') || symbol.includes('LTC') ||
+      symbol.includes('XRP') || symbol.includes('AVAX') || symbol.includes('MATIC') ||
+      symbol.includes('DOT') || symbol.includes('LINK') || symbol.includes('UNI') ||
+      symbol.includes('ATOM') || symbol.includes('ALGO') ||
+      (symbol.includes('USD') && symbol.length <= 6 && symbol !== 'USDJPY')) {
+    return 'CRYPTO';
+  }
+  
+  // Forex patterns  
+  if (['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY'].includes(symbol)) {
+    return 'FOREX';
+  }
+  
+  // Default to stock
+  return 'STOCK';
+};
 
 export const AIAnalysis = () => {
   const [symbol, setSymbol] = useState("AAPL");
@@ -49,12 +86,6 @@ export const AIAnalysis = () => {
   const [chartData, setChartData] = useState<LWBar[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const getMarketType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
-    if (symbol.includes('USD') && symbol !== 'USDJPY') return 'CRYPTO';
-    if (['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD'].includes(symbol)) return 'FOREX';
-    return 'STOCK';
-  };
 
   const handleAnalysis = async () => {
     console.log('Generate Analysis button clicked');
@@ -224,18 +255,47 @@ export const AIAnalysis = () => {
             
             {/* Symbol Selector */}
             <div className="flex items-center gap-4">
-              <Select value={symbol} onValueChange={setSymbol}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select Symbol" />
-                </SelectTrigger>
-                <SelectContent>
-                  {POPULAR_SYMBOLS.map((sym) => (
-                    <SelectItem key={sym} value={sym}>
-                      {sym}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant={getAssetType(symbol) === 'STOCK' ? 'default' : 'secondary'}>
+                    {getAssetType(symbol)}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    Live Market Data
+                  </span>
+                </div>
+                <Select value={symbol} onValueChange={setSymbol}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Select Symbol" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    <div className="p-2">
+                      <div className="font-semibold text-sm mb-2 text-green-600">📈 Stocks</div>
+                      {SYMBOL_CATEGORIES.Stocks.map((sym) => (
+                        <SelectItem key={sym} value={sym} className="pl-4">
+                          {sym}
+                        </SelectItem>
+                      ))}
+                    </div>
+                    <div className="p-2">
+                      <div className="font-semibold text-sm mb-2 text-orange-600">₿ Crypto</div>
+                      {SYMBOL_CATEGORIES.Crypto.map((sym) => (
+                        <SelectItem key={sym} value={sym} className="pl-4">
+                          {sym}
+                        </SelectItem>
+                      ))}
+                    </div>
+                    <div className="p-2">
+                      <div className="font-semibold text-sm mb-2 text-blue-600">💱 Forex</div>
+                      {SYMBOL_CATEGORIES.Forex.map((sym) => (
+                        <SelectItem key={sym} value={sym} className="pl-4">
+                          {sym}
+                        </SelectItem>
+                      ))}
+                    </div>
+                  </SelectContent>
+                </Select>
+              </div>
               
               <Select value={timeframe} onValueChange={(value: any) => setTimeframe(value)}>
                 <SelectTrigger className="w-[120px]">

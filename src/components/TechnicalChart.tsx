@@ -42,32 +42,57 @@ export default function TechnicalChart({
   const [showIndicators, setShowIndicators] = useState(true);
   const [chartData, setChartData] = useState<LWBar[]>([]);
 
-  // Fetch chart data and notify parent
+  // Fetch chart data and notify parent with rate limiting
   useEffect(() => {
     const fetchChartData = async () => {
       try {
-        // Convert timeframe for API
+        // Add delay to prevent rate limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Convert timeframe for API with asset-specific adjustments
+        const assetType = getAssetType(symbol);
         const { multiplier, timespan, from, to } = (() => {
           const now = new Date();
           const to = now.toISOString().slice(0, 10);
           const d = new Date(now);
+          
+          // Adjust lookback periods based on asset type
+          const lookbackMultiplier = assetType === 'CRYPTO' ? 0.7 : assetType === 'FOREX' ? 1.2 : 1;
+          
           switch (timeframe) {
-            case '1': d.setDate(now.getDate() - 2); return { multiplier: 1, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-            case '5': d.setDate(now.getDate() - 3); return { multiplier: 5, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-            case '15': d.setDate(now.getDate() - 7); return { multiplier: 15, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-            case '30': d.setDate(now.getDate() - 14); return { multiplier: 30, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-            case '60': d.setDate(now.getDate() - 60); return { multiplier: 1, timespan: 'hour', from: d.toISOString().slice(0,10), to };
-            case '240': d.setDate(now.getDate() - 120); return { multiplier: 4, timespan: 'hour', from: d.toISOString().slice(0,10), to };
-            case 'D': d.setDate(now.getDate() - 365); return { multiplier: 1, timespan: 'day', from: d.toISOString().slice(0,10), to };
+            case '1': d.setDate(now.getDate() - Math.ceil(2 * lookbackMultiplier)); return { multiplier: 1, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+            case '5': d.setDate(now.getDate() - Math.ceil(3 * lookbackMultiplier)); return { multiplier: 5, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+            case '15': d.setDate(now.getDate() - Math.ceil(7 * lookbackMultiplier)); return { multiplier: 15, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+            case '30': d.setDate(now.getDate() - Math.ceil(14 * lookbackMultiplier)); return { multiplier: 30, timespan: 'minute', from: d.toISOString().slice(0,10), to };
+            case '60': d.setDate(now.getDate() - Math.ceil(60 * lookbackMultiplier)); return { multiplier: 1, timespan: 'hour', from: d.toISOString().slice(0,10), to };
+            case '240': d.setDate(now.getDate() - Math.ceil(120 * lookbackMultiplier)); return { multiplier: 4, timespan: 'hour', from: d.toISOString().slice(0,10), to };
+            case 'D': d.setDate(now.getDate() - Math.ceil(365 * lookbackMultiplier)); return { multiplier: 1, timespan: 'day', from: d.toISOString().slice(0,10), to };
             default: return { multiplier: 1, timespan: 'hour', from: to, to };
           }
         })();
+
+        // Optimize symbol format for Polygon API
+        let apiSymbol = symbol.toUpperCase();
+        switch (assetType) {
+          case 'CRYPTO':
+            if (!apiSymbol.startsWith('X:')) {
+              apiSymbol = `X:${apiSymbol}`;
+            }
+            break;
+          case 'FOREX':
+            if (!apiSymbol.startsWith('C:')) {
+              apiSymbol = `C:${apiSymbol}`;
+            }
+            break;
+        }
+
+        console.log(`Fetching ${assetType} data for ${apiSymbol} (${timeframe} timeframe)`);
 
         const response = await fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            symbol: symbol.toUpperCase(),
+            symbol: apiSymbol,
             timeframe: timeframe === 'D' ? '1d' : (timeframe === '240' ? '4h' : `${timeframe}m`),
             multiplier,
             timespan,
@@ -89,9 +114,11 @@ export default function TechnicalChart({
             volume: c.v ?? 0
           }));
           
+          console.log(`Loaded ${bars.length} ${assetType} candles for ${symbol}`);
           setChartData(bars);
           onDataChange?.(bars);
         } else {
+          console.warn(`No chart data available for ${symbol}`);
           setChartData([]);
           onDataChange?.([]);
         }
@@ -100,6 +127,26 @@ export default function TechnicalChart({
         setChartData([]);
         onDataChange?.([]);
       }
+    };
+
+    // Function to detect asset type
+    const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
+      symbol = symbol.toUpperCase();
+      
+      if (symbol.includes('BTC') || symbol.includes('ETH') || symbol.includes('ADA') || 
+          symbol.includes('SOL') || symbol.includes('DOGE') || symbol.includes('LTC') ||
+          symbol.includes('XRP') || symbol.includes('AVAX') || symbol.includes('MATIC') ||
+          symbol.includes('DOT') || symbol.includes('LINK') || symbol.includes('UNI') ||
+          symbol.includes('ATOM') || symbol.includes('ALGO') ||
+          (symbol.includes('USD') && symbol.length <= 6 && symbol !== 'USDJPY')) {
+        return 'CRYPTO';
+      }
+      
+      if (['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY'].includes(symbol)) {
+        return 'FOREX';
+      }
+      
+      return 'STOCK';
     };
 
     fetchChartData();
