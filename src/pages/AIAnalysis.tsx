@@ -143,6 +143,10 @@ export const AIAnalysis = () => {
         lowest: Math.min(...ohlcv.map(b => b.low)),
         highest: Math.max(...ohlcv.map(b => b.high))
       });
+      console.log('Data timestamps (first/last):', {
+        first: ohlcv[0] ? new Date(ohlcv[0].time * 1000).toISOString() : 'N/A',
+        last: ohlcv[ohlcv.length - 1] ? new Date(ohlcv[ohlcv.length - 1].time * 1000).toISOString() : 'N/A'
+      });
 
       // Map timeframe for display
       const timeframeMap: Record<string, string> = {

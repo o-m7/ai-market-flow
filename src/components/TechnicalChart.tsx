@@ -41,6 +41,7 @@ export default function TechnicalChart({
   const [timeframe, setTimeframe] = useState<'1'|'5'|'15'|'30'|'60'|'240'|'D'>(tf);
   const [showIndicators, setShowIndicators] = useState(true);
   const [chartData, setChartData] = useState<LWBar[]>([]);
+  const [chartMeta, setChartMeta] = useState<any>(null);
 
   // Fetch chart data and notify parent with rate limiting
   useEffect(() => {
@@ -51,53 +52,16 @@ export default function TechnicalChart({
         
         // Convert timeframe for API with asset-specific adjustments
         const assetType = getAssetType(symbol);
-        const { multiplier, timespan, from, to } = (() => {
-          const now = new Date();
-          const to = now.toISOString().slice(0, 10);
-          const d = new Date(now);
-          
-          // Adjust lookback periods based on asset type
-          const lookbackMultiplier = assetType === 'CRYPTO' ? 0.7 : assetType === 'FOREX' ? 1.2 : 1;
-          
-          switch (timeframe) {
-            case '1': d.setDate(now.getDate() - Math.ceil(2 * lookbackMultiplier)); return { multiplier: 1, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-            case '5': d.setDate(now.getDate() - Math.ceil(3 * lookbackMultiplier)); return { multiplier: 5, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-            case '15': d.setDate(now.getDate() - Math.ceil(7 * lookbackMultiplier)); return { multiplier: 15, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-            case '30': d.setDate(now.getDate() - Math.ceil(14 * lookbackMultiplier)); return { multiplier: 30, timespan: 'minute', from: d.toISOString().slice(0,10), to };
-            case '60': d.setDate(now.getDate() - Math.ceil(60 * lookbackMultiplier)); return { multiplier: 1, timespan: 'hour', from: d.toISOString().slice(0,10), to };
-            case '240': d.setDate(now.getDate() - Math.ceil(120 * lookbackMultiplier)); return { multiplier: 4, timespan: 'hour', from: d.toISOString().slice(0,10), to };
-            case 'D': d.setDate(now.getDate() - Math.ceil(365 * lookbackMultiplier)); return { multiplier: 1, timespan: 'day', from: d.toISOString().slice(0,10), to };
-            default: return { multiplier: 1, timespan: 'hour', from: to, to };
-          }
-        })();
-
-        // Optimize symbol format for Polygon API
-        let apiSymbol = symbol.toUpperCase();
-        switch (assetType) {
-          case 'CRYPTO':
-            if (!apiSymbol.startsWith('X:')) {
-              apiSymbol = `X:${apiSymbol}`;
-            }
-            break;
-          case 'FOREX':
-            if (!apiSymbol.startsWith('C:')) {
-              apiSymbol = `C:${apiSymbol}`;
-            }
-            break;
-        }
-
-        console.log(`Fetching ${assetType} data for ${apiSymbol} (${timeframe} timeframe)`);
-
+        
+        console.log(`Fetching ${assetType} data for ${symbol} (${timeframe} timeframe)`);
+        
         const response = await fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            symbol: apiSymbol,
+            symbol: symbol,
             timeframe: timeframe === 'D' ? '1d' : (timeframe === '240' ? '4h' : `${timeframe}m`),
-            multiplier,
-            timespan,
-            from,
-            to,
+            asset: assetType.toLowerCase(),
             limit: 500
           })
         });
@@ -115,12 +79,28 @@ export default function TechnicalChart({
           }));
           
           console.log(`Loaded ${bars.length} ${assetType} candles for ${symbol}`);
+          console.log(`Data meta: ${data.meta || 'N/A'}`);
+          console.log(`Last price: ${data.lastClose} @ ${data.lastTimeUTC}`);
+          
           setChartData(bars);
           onDataChange?.(bars);
+          
+          // Store metadata for data verification
+          setChartMeta({
+            provider: data.provider,
+            providerSymbol: data.providerSymbol,
+            asset: data.asset,
+            timeframe: data.timeframe,
+            lastClose: data.lastClose,
+            lastTimeUTC: data.lastTimeUTC,
+            isDelayed: data.isLikelyDelayed,
+            meta: data.meta
+          });
         } else {
           console.warn(`No chart data available for ${symbol}`);
           setChartData([]);
           onDataChange?.([]);
+          setChartMeta(null);
         }
       } catch (error) {
         console.error('Error fetching chart data:', error);
@@ -237,6 +217,18 @@ export default function TechnicalChart({
         </div>
 
         <div className="rounded-lg border bg-card overflow-hidden">
+          {/* Data verification echo */}
+          {chartMeta && (
+            <div className="px-4 py-2 bg-muted/50 border-b text-xs text-muted-foreground">
+              <span className="font-mono">{chartMeta.meta}</span>
+              {chartMeta.isDelayed && (
+                <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
+                  Delayed Data
+                </span>
+              )}
+            </div>
+          )}
+          
           <div 
             ref={containerRef} 
             style={{ width: '100%', height: `${height}px`, minHeight: `${height}px` }}
