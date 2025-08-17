@@ -85,10 +85,11 @@ serve(async (req) => {
       "Data:\n" + JSON.stringify(bars);
 
     const r = await client.responses.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4.1-mini-2025-04-14",
       input: prompt,
+      max_completion_tokens: 1200,
 
-      // ✅ NEW PARAM (replaces deprecated response_format)
+      // ✅ JSON Schema output (replaces deprecated response_format)
       text_format: {
         type: "json_schema",
         json_schema: analysisSchema
