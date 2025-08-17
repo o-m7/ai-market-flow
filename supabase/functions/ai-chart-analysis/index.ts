@@ -68,12 +68,10 @@ serve(async (req) => {
     console.log(`Screenshot provided: ${pageScreenshot ? 'Yes' : 'No'}`);
     console.log(`Chart data points: ${Array.isArray(chartData) ? chartData.length : 0}`);
 
-    // Choose the best analysis mode based on available inputs
+    // ALWAYS use the chart data provided from frontend - this ensures price consistency
     const analysis = (chartData && chartData.length > 0)
       ? await generateHybridAnalysis(symbol, timeframe, analysisType, chartData, pageScreenshot)
-      : pageScreenshot 
-        ? await generateVisualAnalysis(symbol, timeframe, analysisType, pageScreenshot)
-        : await generateAIAgentAnalysis(symbol, timeframe, analysisType);
+      : await generateAIAgentAnalysis(symbol, timeframe, analysisType);
 
     return new Response(JSON.stringify({
       success: true,
@@ -285,9 +283,10 @@ async function generateHybridAnalysis(
   chartData: Array<{ time: number; open: number; high: number; low: number; close: number; volume?: number; }>,
   pageScreenshot?: string
 ): Promise<ChartAnalysisResult> {
-  console.log(`Hybrid analysis for ${symbol} with ${chartData.length} candles`);
+  console.log(`Hybrid analysis for ${symbol} with ${chartData.length} candles - using EXACT chart data`);
 
-  // Compute technical summary from chart data
+  // Use ONLY the chart data provided - no additional API calls
+  // This ensures the AI sees exactly what the user sees on the chart
   const prices = chartData.map(d => d.close);
   const highs = chartData.map(d => d.high);
   const lows = chartData.map(d => d.low);
@@ -299,57 +298,76 @@ async function generateHybridAnalysis(
   const resistanceLevels = findResistanceLevels(highs);
   const volatility = calculateVolatility(prices);
 
+  // Create comprehensive summary using EXACT chart data
   const summary = {
     symbol,
     timeframe,
     dataPoints: chartData.length,
-    currentPrice,
+    currentPrice: Number(currentPrice.toFixed(6)),
     priceChange: Number(priceChange.toFixed(2)),
-    highestPrice: Math.max(...highs),
-    lowestPrice: Math.min(...lows),
-    averagePrice: prices.reduce((a, b) => a + b, 0) / prices.length,
+    highestPrice: Number(Math.max(...highs).toFixed(6)),
+    lowestPrice: Number(Math.min(...lows).toFixed(6)),
+    averagePrice: Number((prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(6)),
     rsi: Number(rsi.toFixed(1)),
-    supportLevels,
-    resistanceLevels,
-    volatility: Number(volatility.toFixed(2))
+    supportLevels: supportLevels.map(s => Number(s.toFixed(6))),
+    resistanceLevels: resistanceLevels.map(r => Number(r.toFixed(6))),
+    volatility: Number(volatility.toFixed(2)),
+    dataSource: 'EXACT_CHART_DATA'
   };
 
-  const recentBarsCsv = chartData.slice(-100).map(b => `${b.time},${b.open},${b.high},${b.low},${b.close},${b.volume || 0}`).join('\n');
-  const recentBarsCount = Math.min(chartData.length, 100);
+  // Include the exact OHLCV data that's on the chart
+  const recentBars = chartData.slice(-50).map(b => ({
+    time: b.time,
+    open: Number(b.open.toFixed(6)),
+    high: Number(b.high.toFixed(6)), 
+    low: Number(b.low.toFixed(6)),
+    close: Number(b.close.toFixed(6)),
+    volume: b.volume || 0
+  }));
+
+  console.log(`Chart data summary for ${symbol}:`, {
+    currentPrice,
+    priceRange: `${Math.min(...lows).toFixed(6)} - ${Math.max(...highs).toFixed(6)}`,
+    dataPoints: chartData.length,
+    lastBar: recentBars[recentBars.length - 1]
+  });
 
   const basePrompt = `You are an elite trading agent performing comprehensive technical analysis. 
 
-QUANTITATIVE DATA (Ground Truth):
+CRITICAL: Use ONLY the data provided below. These are the EXACT values from the user's chart.
+
+CHART DATA SUMMARY:
 ${JSON.stringify(summary, null, 2)}
 
-RECENT OHLCV CSV (t,o,h,l,c,v) - last ${recentBarsCount} bars:
-${recentBarsCsv}
+EXACT RECENT OHLCV BARS (last 50 bars from chart):
+${recentBars.map(b => `Time: ${b.time}, O: ${b.open}, H: ${b.high}, L: ${b.low}, C: ${b.close}, V: ${b.volume}`).join('\n')}
 
 ANALYSIS REQUIREMENTS:
-- Use the OHLCV CSV as the numeric ground truth. All price levels and targets must align with these values.
-- Base your analysis primarily on the QUANTITATIVE DATA provided above
-- If a chart IMAGE is provided, use it to identify visual patterns, confirm indicator signals, and validate price levels
-- Provide actionable trading insights with specific entry/exit levels
-- Consider market context and risk management
+- Use ONLY the price levels from the data above
+- Current price is ${currentPrice.toFixed(6)}
+- Price range is ${Math.min(...lows).toFixed(6)} to ${Math.max(...highs).toFixed(6)}
+- All support/resistance levels must be within this range
+- All price targets must be realistic based on recent highs/lows
+- Base analysis on the ${chartData.length} candles provided
 
 OUTPUT FORMAT (JSON only):
 {
-  "analysis": "Detailed technical analysis paragraph",
+  "analysis": "Technical analysis using exact chart values - current price ${currentPrice.toFixed(6)}",
   "recommendation": "buy|sell|hold",
-  "confidence": 0.85,
+  "confidence": 85,
   "keyLevels": {
-    "support": [number array],
-    "resistance": [number array]
+    "support": [levels within ${Math.min(...lows).toFixed(6)} to ${currentPrice.toFixed(6)} range],
+    "resistance": [levels within ${currentPrice.toFixed(6)} to ${Math.max(...highs).toFixed(6)} range]
   },
   "technicalIndicators": {
-    "rsi": number,
+    "rsi": ${rsi.toFixed(1)},
     "trend": "bullish|bearish|neutral", 
     "momentum": "strong|weak|neutral"
   },
   "chartPatterns": ["pattern names"],
   "priceTargets": {
-    "bullish": number,
-    "bearish": number
+    "bullish": target_within_reasonable_range,
+    "bearish": target_within_reasonable_range
   },
   "riskAssessment": {
     "level": "low|medium|high",
@@ -614,25 +632,14 @@ async function generateAIAgentAnalysis(
   analysisType: string
 ): Promise<ChartAnalysisResult> {
   
-  console.log(`AI Agent analyzing ${symbol} on ${timeframe} timeframe`);
+  console.log(`AI Agent fallback analysis for ${symbol} on ${timeframe} timeframe - NO chart data available`);
 
-  // Try to fetch real market data from Polygon first
-  const polygonData = await fetchPolygonData(symbol, timeframe);
-  
-  if (polygonData && polygonData.length > 0) {
-    console.log(`Using Polygon data with ${polygonData.length} candles for enhanced analysis`);
-    // Use hybrid analysis with real Polygon data
-    return await generateHybridAnalysis(symbol, timeframe, analysisType, polygonData);
-  }
-
-  // Fallback to AI-only analysis if no Polygon data available
-  console.log(`Falling back to AI-only analysis for ${symbol}`);
-
+  // This is only called when NO chart data is available
   // Detect asset type for tailored analysis
   const assetType = getAssetType(symbol);
 
   // Convert timeframe to readable format
-  const timeframeMap: Record<string, string> = {
+  const readableTimeframe = {
     '1': '1 minute',
     '5': '5 minutes', 
     '15': '15 minutes',
@@ -640,9 +647,7 @@ async function generateAIAgentAnalysis(
     '60': '1 hour',
     '240': '4 hours',
     'D': '1 day'
-  };
-  
-  const readableTimeframe = timeframeMap[timeframe] || timeframe;
+  }[timeframe] || timeframe;
 
   // Comprehensive AI agent prompt for technical analysis
   const prompt = `

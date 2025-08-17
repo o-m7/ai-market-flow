@@ -134,7 +134,14 @@ export const AIAnalysis = () => {
         volume: bar.volume || 0
       }));
 
-      console.log(`Analyzing ${symbol} with ${ohlcv.length} candles and ${snapshotBase64 ? 'chart snapshot' : 'no snapshot'}`);
+      console.log(`Analyzing ${symbol} with ${ohlcv.length} candles`);
+      console.log('Chart data sample (first 3 bars):', ohlcv.slice(0, 3));
+      console.log('Chart data sample (last 3 bars):', ohlcv.slice(-3));
+      console.log('Current price from chart data:', ohlcv[ohlcv.length - 1]?.close);
+      console.log('Price range from chart data:', {
+        lowest: Math.min(...ohlcv.map(b => b.low)),
+        highest: Math.max(...ohlcv.map(b => b.high))
+      });
 
       // Map timeframe for display
       const timeframeMap: Record<string, string> = {
