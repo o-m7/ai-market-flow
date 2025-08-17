@@ -57,6 +57,11 @@ export const AIAnalysis = () => {
   };
 
   const handleAnalysis = async () => {
+    console.log('Generate Analysis button clicked');
+    console.log('Chart data length:', chartData.length);
+    console.log('Symbol:', symbol);
+    console.log('Timeframe:', timeframe);
+    
     setLoading(true);
     setAiError(null);
     
@@ -65,6 +70,7 @@ export const AIAnalysis = () => {
         throw new Error('Need at least 20 candles for analysis. Please wait for chart to load more data.');
       }
 
+      console.log('Starting chart snapshot capture...');
       // Take chart snapshot
       let snapshotBase64: string | null = null;
       try {
@@ -80,6 +86,7 @@ export const AIAnalysis = () => {
             height: 400
           });
           snapshotBase64 = canvas.toDataURL("image/webp", 0.8);
+          console.log('Chart snapshot captured successfully');
         }
       } catch (error) {
         console.warn('Failed to capture chart snapshot:', error);
@@ -104,6 +111,17 @@ export const AIAnalysis = () => {
         '60': '1h', '240': '4h', 'D': '1d'
       };
 
+      const requestBody = {
+        symbol: symbol.toUpperCase(),
+        timeframe: timeframeMap[timeframe] || timeframe,
+        analysisType: 'comprehensive',
+        pageScreenshot: snapshotBase64,
+        chartData: ohlcv
+      };
+
+      console.log('Sending request to AI analysis API...');
+      console.log('Request body:', { ...requestBody, pageScreenshot: snapshotBase64 ? 'screenshot_present' : 'no_screenshot' });
+
       // Call ai-chart-analysis function with both data and screenshot
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://ifetofkhyblyijghuwzs.supabase.co'}/functions/v1/ai-chart-analysis`, {
         method: 'POST',
@@ -111,25 +129,26 @@ export const AIAnalysis = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmZXRvZmtoeWJseWlqZ2h1d3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY0Njk1ODMsImV4cCI6MjA1MjA0NTU4M30.ddbB6iHbFT8XvGMFHy4NkDDiYJJW3hE4WpHLR6nA6A8'}`,
         },
-        body: JSON.stringify({
-          symbol: symbol.toUpperCase(),
-          timeframe: timeframeMap[timeframe] || timeframe,
-          analysisType: 'comprehensive',
-          pageScreenshot: snapshotBase64,
-          chartData: ohlcv
-        })
+        body: JSON.stringify(requestBody)
       });
+
+      console.log('API Response status:', response.status);
+      console.log('API Response headers:', response.headers);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('API Error response:', errorData);
         throw new Error(errorData.error || `Analysis failed with status ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('API Response data:', data);
+      
       if (!data.success) {
         throw new Error(data.error || 'Analysis failed');
       }
 
+      console.log('Analysis result:', data.result);
       setAnalysis(data.result);
       toast({
         title: 'Analysis Complete',
