@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Navigation } from "@/components/Navigation";
 import TechnicalChart from "@/components/TechnicalChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Loader2, TrendingUp, TrendingDown, Activity, Brain, BarChart3 } from "l
 import { useToast } from "@/hooks/use-toast";
 import { type LWBar } from "@/features/ai/collectBars";
 import { AiResult } from "@/features/ai/Result";
+import { onGenerateAnalysis } from "@/features/ai/onGenerateAnalysis";
 
 interface AnalysisResult {
   symbol: string;
@@ -85,129 +86,91 @@ export const AIAnalysis = () => {
   const [analysis, setAnalysis] = useState<any>(null);
   const [chartData, setChartData] = useState<LWBar[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
+  const chartRef = useRef<any>(null);
   const { toast } = useToast();
 
   const handleAnalysis = async () => {
-    console.log('Generate Analysis button clicked');
-    console.log('Chart data length:', chartData.length);
-    console.log('Symbol:', symbol);
-    console.log('Timeframe:', timeframe);
-    
+    if (chartData.length < 30) {
+      toast({
+        title: 'Insufficient Data',
+        description: 'Need at least 30 candles for analysis. Please wait for chart to load.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     setAiError(null);
     
     try {
-      // Always proceed with analysis - use screenshot + any available data
-      console.log('Starting comprehensive analysis...');
-      
-      // Take chart screenshot - capture the entire chart area
-      let snapshotBase64: string | null = null;
-      try {
-        console.log('Capturing chart screenshot...');
-        const chartContainer = document.querySelector('.tradingview-chart-container') as HTMLElement;
-        if (chartContainer) {
-          const html2canvas = (await import('html2canvas')).default;
-          const canvas = await html2canvas(chartContainer, {
-            allowTaint: true,
-            useCORS: true,
-            scale: 0.8,
-            width: 800,
-            height: 600,
-            backgroundColor: '#ffffff'
-          });
-          snapshotBase64 = canvas.toDataURL("image/webp", 0.8);
-          console.log('Chart screenshot captured successfully');
-        } else {
-          console.warn('Chart container not found for screenshot');
-        }
-      } catch (error) {
-        console.warn('Screenshot capture failed, proceeding without:', error);
-      }
-
-      // Use available chart data (from Polygon) - even if minimal
-      const ohlcv = chartData.length > 0 ? chartData.slice(-100).map(bar => ({
-        time: bar.time,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-        volume: bar.volume || 0
-      })) : [];
-
-      console.log(`Sending analysis request with ${ohlcv.length} bars and ${snapshotBase64 ? 'screenshot' : 'no screenshot'}`);
-      
-      if (ohlcv.length > 0) {
-        console.log('Chart data sample (last 3 bars):', ohlcv.slice(-3));
-        console.log('Current price from chart data:', ohlcv[ohlcv.length - 1]?.close);
-        console.log('Data timestamps (first/last):', {
-          first: ohlcv[0] ? new Date(ohlcv[0].time * 1000).toISOString() : 'N/A',
-          last: ohlcv[ohlcv.length - 1] ? new Date(ohlcv[ohlcv.length - 1].time * 1000).toISOString() : 'N/A'
-        });
-      }
-
-      // Map timeframe for display
-      const timeframeMap: Record<string, string> = {
+      // Map timeframe format for API
+      const timeframeMap: Record<string, "1m"|"5m"|"15m"|"30m"|"1h"|"4h"|"1d"> = {
         '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
         '60': '1h', '240': '4h', 'D': '1d'
       };
 
-      const requestBody = {
+      // Convert chart data to proper format
+      const seriesData = chartData.map(bar => ({
+        t: bar.time * 1000, // Convert to milliseconds
+        o: bar.open,
+        h: bar.high,
+        l: bar.low,
+        c: bar.close,
+        v: bar.volume || 0
+      }));
+
+      // Use the new analysis function
+      const result = await onGenerateAnalysis({
+        chart: chartRef.current,
+        seriesData,
         symbol: symbol.toUpperCase(),
-        timeframe: timeframeMap[timeframe] || timeframe,
-        analysisType: 'comprehensive',
-        pageScreenshot: snapshotBase64,
-        chartData: ohlcv
-      };
-
-      console.log('Sending request to AI analysis API...');
-
-      // Call ai-chart-analysis function
-      const response = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/ai-chart-analysis`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmZXRvZmtoeWJseWlqZ2h1d3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyNTIyNTEsImV4cCI6MjA2OTgyODI1MX0.nOzUHck9fqOxvOHPOY8FE2YzmVAX1cohmb64wS9J5MQ`,
-        },
-        body: JSON.stringify(requestBody)
+        assetClass: getAssetType(symbol).toLowerCase() as "crypto" | "stock" | "forex",
+        timeframe: timeframeMap[timeframe]
       });
 
-      console.log('API Response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('API Error response:', errorData);
-        throw new Error(errorData.error || `Analysis failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('API Response data:', data);
+      console.log('Analysis result:', result);
       
-      if (!data.success) {
-        throw new Error(data.error || 'Analysis failed');
+      // Handle the new JSON schema response
+      if (result.status === "insufficient_data") {
+        setAiError(result.risk_note || "Insufficient data for analysis");
+        toast({
+          title: 'Analysis Failed',
+          description: result.risk_note || 'Not enough data to analyze',
+          variant: 'destructive',
+        });
+        return;
       }
 
-      console.log('Analysis result:', data.result);
-      setAnalysis(data.result);
+      // Convert to the format expected by AiResult component
+      const analysisForDisplay = {
+        symbol: symbol.toUpperCase(),
+        analysis: result.succinct_plan || result.trend || 'Analysis completed successfully',
+        recommendation: result.direction === 'bullish' ? 'buy' : 
+                       result.direction === 'bearish' ? 'sell' : 'hold',
+        confidence: result.confidence || 0.5,
+        keyLevels: result.key_levels || { support: [], resistance: [] },
+        technicalIndicators: {
+          rsi: 50, // Would need to calculate this from data
+          trend: result.direction || 'neutral',
+          momentum: result.momentum || 'neutral'
+        },
+        chartPatterns: result.pattern_candidates || [],
+        priceTargets: { bullish: 0, bearish: 0 }, // Not in new schema
+        riskAssessment: {
+          level: 'medium' as const,
+          factors: result.risk_note ? [result.risk_note] : []
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      setAnalysis(analysisForDisplay);
       toast({
         title: 'Analysis Complete',
-        description: `AI analyzed ${symbol.toUpperCase()} with ${snapshotBase64 ? 'visual chart and' : ''} ${ohlcv.length} data points`,
+        description: `AI analyzed ${symbol.toUpperCase()} with ${seriesData.length} data points`,
       });
 
     } catch (error: any) {
       console.error('Analysis error:', error);
-      // Create fallback analysis
-      const fallback = {
-        analysis: `Analysis failed: ${error?.message || 'Unknown error'}. Please try again.`,
-        recommendation: 'hold',
-        confidence: 0,
-        keyLevels: { support: [], resistance: [] },
-        technicalIndicators: { rsi: 50, trend: 'neutral' as const, momentum: 'neutral' as const },
-        chartPatterns: [] as string[],
-        priceTargets: { bullish: 0, bearish: 0 },
-        riskAssessment: { level: 'medium' as const, factors: ['Analysis service error'] },
-        timestamp: new Date().toISOString(),
-      };
-      setAnalysis(fallback);
       setAiError(error.message);
       toast({
         title: 'Analysis Failed',
@@ -226,22 +189,6 @@ export const AIAnalysis = () => {
     setAiError(null);
   };
 
-  const getRecommendationColor = (recommendation: string) => {
-    switch (recommendation) {
-      case 'buy': return 'bg-bull text-bull-foreground';
-      case 'sell': return 'bg-bear text-bear-foreground';
-      default: return 'bg-neutral text-neutral-foreground';
-    }
-  };
-
-  const getRecommendationIcon = (recommendation: string) => {
-    switch (recommendation) {
-      case 'buy': return <TrendingUp className="h-4 w-4" />;
-      case 'sell': return <TrendingDown className="h-4 w-4" />;
-      default: return <Activity className="h-4 w-4" />;
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -256,7 +203,7 @@ export const AIAnalysis = () => {
                 AI Technical Analysis
               </h1>
               <p className="text-muted-foreground">
-                Real-time technical analysis with indicators and AI insights
+                Professional analysis with live data, chart snapshots, and strict JSON validation
               </p>
             </div>
             
@@ -321,7 +268,7 @@ export const AIAnalysis = () => {
               
               <Button 
                 onClick={handleAnalysis} 
-                disabled={loading}
+                disabled={loading || chartData.length < 30}
                 className="min-w-[140px]"
               >
                 {loading ? (
@@ -332,12 +279,19 @@ export const AIAnalysis = () => {
                   ) : (
                     <>
                       <Brain className="h-4 w-4 mr-2" />
-                      Generate Analysis ({chartData.length} bars)
+                      Generate Analysis
                     </>
                   )}
               </Button>
             </div>
           </div>
+          
+          {/* Data Echo */}
+          {chartData.length > 0 && (
+            <div className="text-xs text-muted-foreground mb-4 font-mono">
+              📊 {chartData.length} candles loaded • One source of truth: Chart data → AI analysis
+            </div>
+          )}
         </div>
 
         <div className="grid gap-6">
@@ -392,11 +346,11 @@ export const AIAnalysis = () => {
             <CardContent className="flex flex-col items-center justify-center h-64">
               <Brain className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center max-w-md">
-                Professional AI technical analysis using live chart data and visual analysis. Select a symbol and timeframe above, 
-                then click "Generate Analysis" to get comprehensive analysis with trade ideas.
+                Professional AI analysis using live Polygon data and chart snapshots. 
+                No mock data - if Polygon fails, you'll see an error.
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                📊 {chartData.length} candles loaded • 📸 Chart snapshot • Powered by GPT-4
+                📊 {chartData.length} candles loaded • 📸 Chart snapshot • OpenAI + strict JSON schema
               </p>
             </CardContent>
           </Card>

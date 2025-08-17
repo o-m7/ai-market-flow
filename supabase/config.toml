@@ -3,29 +3,38 @@ project_id = "ifetofkhyblyijghuwzs"
 [functions.ai-analyze]
 verify_jwt = false
 
-[functions.stock-analysis]
+[functions.ai-chart-analysis]
+verify_jwt = false
+
+[functions.ai-generate-analysis]
 verify_jwt = false
 
 [functions.binance-data]
-verify_jwt = false
-
-[functions.polygon-market-data]
-verify_jwt = false
-
-[functions.ai-market-analysis]
-verify_jwt = false
-
-[functions.realtime-market-stream]
-verify_jwt = false
-
-[functions.polygon-chart-data]
-verify_jwt = false
-
-[functions.ai-chart-analysis]
 verify_jwt = false
 
 [functions.news-fetch]
 verify_jwt = false
 
 [functions.news-insights]
+verify_jwt = false
+
+[functions.polygon-candles]
+verify_jwt = false
+
+[functions.polygon-chart-data]
+verify_jwt = false
+
+[functions.polygon-debug]
+verify_jwt = false
+
+[functions.polygon-market-data]
+verify_jwt = false
+
+[functions.realtime-market-stream]
+verify_jwt = false
+
+[functions.stock-analysis]
+verify_jwt = false
+
+[functions.ai-market-analysis]
 verify_jwt = false
