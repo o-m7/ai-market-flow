@@ -76,93 +76,53 @@ serve(async (req) => {
     const { symbols } = await req.json();
     console.log('Fetching data for symbols:', symbols);
 
-    // Popular symbols to fetch if none provided
     const defaultSymbols = ['AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'];
-    const symbolsToFetch = symbols || defaultSymbols;
+    const symbolsToFetch: string[] = (symbols && Array.isArray(symbols) && symbols.length > 0) ? symbols : defaultSymbols;
 
-    const marketData = [];
+    const normalize = (s: string) => {
+      const U = (s || '').toUpperCase();
+      const isForex = ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','EURGBP','EURJPY','GBPJPY','AUDJPY','CADJPY'].includes(U);
+      const isCrypto = U.includes('BTC') || U.includes('ETH') || U.includes('ADA') || U.includes('SOL') || U.includes('DOGE') || U.includes('LTC') || U.includes('XRP') || U.includes('AVAX') || U.includes('MATIC') || U.includes('DOT') || U.includes('LINK') || U.includes('UNI') || U.includes('ATOM') || U.includes('ALGO') || (U.includes('USD') && U.length <= 6 && U !== 'USDJPY');
+      if (isForex) return U.startsWith('C:') ? U : `C:${U}`;
+      if (isCrypto) return U.startsWith('X:') ? U : `X:${U}`;
+      return U; // stock
+    };
 
-    for (const symbol of symbolsToFetch.slice(0, 10)) { // Limit to 10 symbols to avoid rate limits
+    const getMarketPath = (norm: string) => {
+      if (norm.startsWith('X:')) return { locale: 'global', market: 'crypto' } as const;
+      if (norm.startsWith('C:')) return { locale: 'global', market: 'forex' } as const;
+      return { locale: 'us', market: 'stocks' } as const;
+    };
+
+    const marketData: Array<{ symbol: string; price: number; timestamp?: number }> = [];
+
+    for (const raw of symbolsToFetch.slice(0, 10)) {
       try {
-        // Get current quote data
-        const quoteResponse = await fetch(
-          `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${symbol}?apikey=${polygonApiKey}`
-        );
-
-        if (!quoteResponse.ok) {
-          console.error(`Failed to fetch quote for ${symbol}:`, quoteResponse.status);
+        const norm = normalize(raw);
+        const { locale, market } = getMarketPath(norm);
+        const url = `https://api.polygon.io/v2/snapshot/locale/${locale}/markets/${market}/tickers/${norm}?apikey=${polygonApiKey}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          console.error(`Failed snapshot for ${norm}:`, res.status, res.statusText);
           continue;
         }
-
-        const quoteData = await quoteResponse.json();
-        const ticker = quoteData.results;
-
-        if (!ticker) {
-          console.error(`No ticker data for ${symbol}`);
+        const body = await res.json();
+        const obj: any = body.results || body || {};
+        // Price extraction: support multiple shapes
+        const price = obj.last_trade?.price ?? obj.last_trade?.p ?? obj.lastTrade?.price ?? obj.lastTrade?.p ?? obj.min?.c ?? obj.prevDay?.c ?? null;
+        const ts = obj.last_trade?.sip_timestamp ?? obj.last_trade?.t ?? obj.lastTrade?.t ?? obj.min?.t ?? obj.prevDay?.t ?? Date.now();
+        if (price == null) {
+          console.warn(`No price found for ${norm}`);
           continue;
         }
-
-        // Get company name
-        let companyName = symbol;
-        try {
-          const detailsResponse = await fetch(
-            `https://api.polygon.io/v3/reference/tickers/${symbol}?apikey=${polygonApiKey}`
-          );
-          
-          if (detailsResponse.ok) {
-            const detailsData = await detailsResponse.json();
-            companyName = detailsData.results?.name || symbol;
-          }
-        } catch (error) {
-          console.error(`Failed to fetch company name for ${symbol}:`, error);
-        }
-
-        // Calculate metrics
-        const currentPrice = ticker.last_trade?.price || ticker.prevDay?.c || 0;
-        const previousClose = ticker.prevDay?.c || currentPrice;
-        const change = currentPrice - previousClose;
-        const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
-        const volume = ticker.prevDay?.v || 0;
-
-        // Generate mock RSI (in real implementation, you'd calculate this from historical data)
-        const rsi = Math.floor(Math.random() * 40) + 30; // 30-70 range
-
-        // Determine AI sentiment based on price movement
-        let aiSentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
-        let aiSummary = '';
-
-        if (changePercent > 2) {
-          aiSentiment = 'bullish';
-          aiSummary = `Strong upward momentum with ${changePercent.toFixed(2)}% gain. Watch for resistance at $${(currentPrice * 1.05).toFixed(2)}.`;
-        } else if (changePercent < -2) {
-          aiSentiment = 'bearish';
-          aiSummary = `Significant downward pressure with ${Math.abs(changePercent).toFixed(2)}% decline. Support may be found at $${(currentPrice * 0.95).toFixed(2)}.`;
-        } else {
-          aiSummary = `Trading within normal range. Key level to watch is $${previousClose.toFixed(2)}.`;
-        }
-
-        marketData.push({
-          symbol,
-          name: companyName,
-          price: currentPrice,
-          change,
-          changePercent,
-          volume: volume > 1000000 ? `${(volume / 1000000).toFixed(1)}M` : `${Math.floor(volume / 1000)}K`,
-          rsi,
-          aiSentiment,
-          aiSummary,
-        });
-
-        // Add delay to respect rate limits
-        await new Promise(resolve => setTimeout(resolve, 200));
-
+        marketData.push({ symbol: norm, price: Number(price), timestamp: typeof ts === 'number' ? ts : Date.parse(ts) });
+        await new Promise((r) => setTimeout(r, 120));
       } catch (error) {
-        console.error(`Error fetching data for ${symbol}:`, error);
+        console.error(`Error fetching data for symbol:`, raw, error);
       }
     }
 
-    console.log(`Successfully fetched data for ${marketData.length} symbols`);
-
+    console.log(`Successfully fetched quotes for ${marketData.length} symbols`);
     return new Response(JSON.stringify({ 
       data: marketData,
       timestamp: new Date().toISOString(),
