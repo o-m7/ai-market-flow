@@ -97,8 +97,8 @@ export const AIAnalysis = () => {
     setAiError(null);
     
     try {
-      if (!Array.isArray(chartData) || chartData.length < 20) {
-        throw new Error('Need at least 20 candles for analysis. Please wait for chart to load more data.');
+      if (!Array.isArray(chartData) || chartData.length < 5) {
+        throw new Error('Need at least 5 candles for analysis. Please wait for chart to load more data.');
       }
 
       console.log('Starting chart snapshot capture...');
@@ -321,7 +321,7 @@ export const AIAnalysis = () => {
               
               <Button 
                 onClick={handleAnalysis} 
-                disabled={loading || chartData.length < 20}
+                disabled={loading || chartData.length < 5}
                 className="min-w-[140px]"
               >
                 {loading ? (
