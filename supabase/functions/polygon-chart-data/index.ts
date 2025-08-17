@@ -3,6 +3,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const polygonApiKey = Deno.env.get('POLYGON_API_KEY');
 
+if (!polygonApiKey) {
+  console.warn("[WARN] POLYGON_API_KEY is not set in Supabase edge function environment.");
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -11,12 +15,8 @@ const corsHeaders = {
 interface ChartDataRequest {
   symbol: string;
   timeframe: string;
-  multiplier?: number;
-  timespan?: string;
-  from?: string;
-  to?: string;
-  limit?: number;
   asset?: 'stock' | 'crypto' | 'forex';
+  limit?: number;
 }
 
 serve(async (req) => {
@@ -27,104 +27,141 @@ serve(async (req) => {
 
   try {
     if (!polygonApiKey) {
-      console.error('Polygon API key not configured');
-      const fallbackData = generateFallbackChartData('AAPL', '2024-01-01', '2024-12-31');
-      
       return new Response(JSON.stringify({
-        success: true,
-        candles: fallbackData,
-        source: 'fallback'
+        success: false,
+        error: 'POLYGON_API_KEY not configured',
+        hint: 'Please add your Polygon API key to Supabase secrets'
       }), {
+        status: 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const requestData: ChartDataRequest = await req.json();
-    const { symbol: uiSymbol, timeframe: tf, limit = 300, asset } = requestData;
+    const { 
+      symbol: uiSymbol = "AAPL", 
+      timeframe: tf = "1h", 
+      asset = "stock",
+      limit = 300 
+    } = requestData;
 
-    console.log(`Fetching live chart data for ${uiSymbol} (${tf}) with asset type: ${asset || 'auto-detect'}`);
+    console.log(`Fetching ${asset} data for ${uiSymbol} (${tf}) with limit ${limit}`);
 
-    // Detect asset type if not provided
-    const detectedAsset = asset || detectAssetType(uiSymbol);
-    
     // Map UI symbol to Polygon provider symbol
-    const providerSymbol = mapSymbolForProvider(uiSymbol, detectedAsset);
-    
-    // Map timeframe to Polygon format
+    const providerSymbol = 
+      asset === "crypto" ? mapCrypto(uiSymbol)
+      : asset === "forex" ? mapFx(uiSymbol)
+      : uiSymbol.toUpperCase();
+
     const { mult, span } = mapTimeframe(tf);
 
-    // Use millisecond timestamps to include "right now" in UTC
+    // --- Try ms range first (includes "now" in UTC) ---
     const nowMs = Date.now();
-    const lookbackMs = span === 'day' ? 30 * 24 * 3600e3 : 48 * 3600e3; // 30d for 1d bars, 48h for intraday
+    const lookbackMs = span === "day" ? 30 * 24 * 3600e3 : 48 * 3600e3;
     const fromMs = nowMs - lookbackMs;
 
-    console.log(`Fetching ${providerSymbol} from ${new Date(fromMs).toISOString()} to ${new Date(nowMs).toISOString()}`);
+    const urlMs = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/range/${mult}/${span}/${fromMs}/${nowMs}?adjusted=true&sort=asc&limit=50000&apikey=${polygonApiKey}`;
 
-    const url = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/range/${mult}/${span}/${fromMs}/${nowMs}?adjusted=true&sort=asc&limit=50000&apikey=${polygonApiKey}`;
-    
-    const response = await fetch(url, { 
+    console.log(`Trying millisecond range: ${urlMs}`);
+
+    const r1 = await fetch(urlMs, { 
       headers: { "Cache-Control": "no-store" } 
     });
-
-    if (!response.ok) {
-      console.error(`Polygon API error: ${response.status} ${response.statusText}`);
-      const fallbackData = generateFallbackChartData(uiSymbol, new Date(fromMs).toISOString().slice(0,10), new Date(nowMs).toISOString().slice(0,10));
-      return new Response(JSON.stringify({
-        success: true,
-        candles: fallbackData,
-        source: 'fallback',
-        error: `Polygon API error: ${response.status}`
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const data = await response.json();
-    console.log('Polygon response status:', data.status);
-
-    if (!data.results || data.results.length === 0) {
-      console.log('No results from Polygon API, using fallback data');
-      const fallbackData = generateFallbackChartData(uiSymbol, new Date(fromMs).toISOString().slice(0,10), new Date(nowMs).toISOString().slice(0,10));
-      
-      return new Response(JSON.stringify({
-        success: true,
-        candles: fallbackData,
-        source: 'fallback',
-        message: 'No data from Polygon, using fallback'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Get last N bars
-    const ohlcv = data.results.slice(-limit).map((b: any) => ({
-      t: b.t,
-      o: b.o,
-      h: b.h,
-      l: b.l,
-      c: b.c,
-      v: b.v
-    }));
-
-    const lastBar = ohlcv[ohlcv.length - 1];
     
-    console.log(`Successfully fetched ${ohlcv.length} live data points for ${providerSymbol}`);
-    console.log(`Last bar: ${lastBar?.c} @ ${lastBar ? new Date(lastBar.t).toISOString() : 'N/A'}`);
+    let j1: any = {};
+    try {
+      j1 = await r1.json();
+    } catch (e) {
+      console.error("Failed to parse first response as JSON:", e);
+    }
+
+    // Fallback: try ISO date strings if ms returned no results
+    let data = j1;
+    let source = "ms";
+    
+    if (!r1.ok || !j1?.results?.length) {
+      console.log(`Millisecond range failed (${r1.status}), trying ISO date range...`);
+      
+      const toISO = new Date(nowMs).toISOString().slice(0, 10);
+      const fromISO = new Date(nowMs - (span === "day" ? 30 * 24 * 3600e3 : 3 * 24 * 3600e3))
+                        .toISOString().slice(0, 10);
+                        
+      const urlISO = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/range/${mult}/${span}/${fromISO}/${toISO}?adjusted=true&sort=asc&limit=50000&apikey=${polygonApiKey}`;
+      
+      console.log(`Trying ISO date range: ${urlISO}`);
+      
+      const r2 = await fetch(urlISO, { 
+        headers: { "Cache-Control": "no-store" } 
+      });
+      
+      let j2: any = {};
+      try {
+        j2 = await r2.json();
+      } catch (e) {
+        console.error("Failed to parse second response as JSON:", e);
+      }
+      
+      if (r2.ok && j2?.results?.length) {
+        data = j2;
+        source = "date";
+        console.log(`ISO date range succeeded with ${j2.results.length} results`);
+      } else {
+        // Return detailed error so you can see exactly what Polygon said
+        console.error("Both API attempts failed:", { r1: r1.status, j1, r2: r2.status, j2 });
+        
+        return new Response(JSON.stringify({
+          success: false,
+          error: "polygon_no_results",
+          details: {
+            providerSymbol, 
+            timeframe: tf, 
+            attempted: { 
+              urlMs: urlMs.replace(polygonApiKey, '[API_KEY]'), 
+              msResponse: j1, 
+              urlISO: urlISO.replace(polygonApiKey, '[API_KEY]'), 
+              isoResponse: j2 
+            },
+            hint: {
+              hasApiKey: Boolean(polygonApiKey),
+              exampleCurl: `curl "https://api.polygon.io/v2/aggs/ticker/AAPL/range/1/minute/2025-08-16/2025-08-17?adjusted=true&sort=asc&limit=50000&apikey=YOUR_KEY"`
+            }
+          }
+        }), {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      console.log(`Millisecond range succeeded with ${j1.results.length} results`);
+    }
+
+    const results = data.results.slice(-limit);
+    const ohlcv = results.map((b: any) => ({
+      t: b.t, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v
+    }));
+    
+    const last = ohlcv[ohlcv.length - 1];
+
+    console.log(`Successfully processed ${ohlcv.length} bars for ${providerSymbol} (source: ${source})`);
+    
+    if (last) {
+      console.log(`Last bar: ${last.c} @ ${new Date(last.t).toISOString()}`);
+    }
 
     return new Response(JSON.stringify({
       success: true,
       candles: ohlcv,
-      provider: 'polygon',
+      provider: "polygon",
       providerSymbol,
       symbol: uiSymbol,
-      asset: detectedAsset,
+      asset,
       timeframe: tf,
-      source: 'polygon',
+      source,  // "ms" or "date" (which range worked)
       count: ohlcv.length,
-      lastClose: lastBar?.c,
-      lastTimeUTC: lastBar ? new Date(lastBar.t).toISOString() : null,
-      isLikelyDelayed: detectedAsset === 'stock', // Stock data is often delayed
-      meta: `${providerSymbol} • ${tf} • last=${lastBar?.c} @ ${lastBar ? new Date(lastBar.t).toISOString() : 'N/A'}${detectedAsset === 'stock' ? ' • (may be delayed)' : ''}`
+      lastClose: last?.c ?? null,
+      lastTimeUTC: last ? new Date(last.t).toISOString() : null,
+      isLikelyDelayed: asset === "stock",
+      meta: `${providerSymbol} • ${tf} • last=${last?.c ?? 'N/A'} @ ${last ? new Date(last.t).toISOString() : 'N/A'}${asset === 'stock' ? ' • (may be delayed)' : ''}`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -132,75 +169,38 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in polygon-chart-data function:', error);
     
-    const fallbackData = generateFallbackChartData('AAPL', '2024-01-01', '2024-12-31');
-    
     return new Response(JSON.stringify({
-      success: true,
-      candles: fallbackData,
-      source: 'fallback',
-      error: error.message
+      success: false,
+      error: error.message || "polygon_failed",
+      candles: [],
+      source: 'error'
     }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
 
-function detectAssetType(symbol: string): 'stock' | 'crypto' | 'forex' {
-  const s = symbol.toUpperCase();
-  
-  // Forex patterns
-  if (['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY'].includes(s)) {
-    return 'forex';
-  }
-  
-  // Crypto patterns
-  if (s.includes('BTC') || s.includes('ETH') || s.includes('ADA') || s.includes('SOL') || s.includes('DOGE') || s.includes('LTC') || s.includes('XRP') || s.includes('AVAX') || s.includes('MATIC') || s.includes('DOT') || s.includes('LINK') || s.includes('UNI') || s.includes('ATOM') || s.includes('ALGO') || (s.includes('USD') && s.length <= 6 && s !== 'USDJPY')) {
-    return 'crypto';
-  }
-  
-  return 'stock';
+// ---- Helper functions ----
+function mapCrypto(uiSymbol: string): string {
+  const [base, quote] = uiSymbol.replace(/\s+/g, "").split("/");
+  return `X:${(base || "BTC").toUpperCase()}${(quote || "USD").toUpperCase()}`;
 }
 
-function mapSymbolForProvider(uiSymbol: string, asset: 'stock' | 'crypto' | 'forex'): string {
-  const s = uiSymbol.toUpperCase();
-  
-  switch (asset) {
-    case 'crypto':
-      if (s.startsWith('X:')) return s;
-      // Handle formats like BTC/USD, BTCUSD
-      const parts = s.includes('/') ? s.split('/') : [s.replace('USD', ''), 'USD'];
-      const base = parts[0] || 'BTC';
-      const quote = parts[1] || 'USD';
-      return `X:${base}${quote}`;
-      
-    case 'forex':
-      if (s.startsWith('C:')) return s;
-      // Handle formats like EUR/USD, EURUSD
-      const fxParts = s.includes('/') ? s.split('/') : [s.slice(0, 3), s.slice(3)];
-      const baseFx = fxParts[0] || 'EUR';
-      const quoteFx = fxParts[1] || 'USD';
-      return `C:${baseFx}${quoteFx}`;
-      
-    default:
-      return s; // Stocks use plain symbols
-  }
+function mapFx(uiSymbol: string): string {
+  const [base, quote] = uiSymbol.replace(/\s+/g, "").split("/");
+  return `C:${(base || "EUR").toUpperCase()}${(quote || "USD").toUpperCase()}`;
 }
 
 function mapTimeframe(tf: string): { mult: number; span: string } {
   const map: Record<string, [number, string]> = {
-    '1m': [1, 'minute'],
-    '5m': [5, 'minute'],
-    '15m': [15, 'minute'],
-    '30m': [30, 'minute'],
-    '1h': [1, 'hour'],
-    '4h': [4, 'hour'],
-    '1d': [1, 'day'],
-    '60m': [1, 'hour'],
-    '240m': [4, 'hour'],
-    'D': [1, 'day']
+    "1m": [1, "minute"], "5m": [5, "minute"], "15m": [15, "minute"],
+    "30m": [30, "minute"], "1h": [1, "hour"], "4h": [4, "hour"], "1d": [1, "day"],
+    // Legacy support
+    "60m": [1, "hour"], "240m": [4, "hour"], "D": [1, "day"]
   };
   
-  const [mult, span] = map[tf] ?? [1, 'minute'];
+  const [mult, span] = map[tf] ?? [1, "minute"];
   return { mult, span };
 }
 
