@@ -7,8 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, TrendingDown, Activity, Brain, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { collectBarsForAnalysis, type LWBar } from "@/features/ai/collectBars";
-import { analyzeWithAI } from "@/features/ai/analyze";
+import { type LWBar } from "@/features/ai/collectBars";
 import { AiResult } from "@/features/ai/Result";
 
 interface AnalysisResult {
@@ -66,28 +65,74 @@ export const AIAnalysis = () => {
         throw new Error('Need at least 20 candles for analysis. Please wait for chart to load more data.');
       }
 
-      // Collect visible candles from the chart
-      const candles = collectBarsForAnalysis(chartData, 400);
-      console.log(`Analyzing ${symbol} with ${candles.length} candles`);
+      // Take chart snapshot
+      let snapshotBase64: string | null = null;
+      try {
+        const chartContainer = document.querySelector('.tradingview-chart-container iframe') as HTMLIFrameElement;
+        if (chartContainer) {
+          // For TradingView iframe, we'll use html2canvas on the container
+          const html2canvas = (await import('html2canvas')).default;
+          const canvas = await html2canvas(chartContainer.parentElement!, {
+            allowTaint: true,
+            useCORS: true,
+            scale: 0.8,
+            width: 800,
+            height: 400
+          });
+          snapshotBase64 = canvas.toDataURL("image/webp", 0.8);
+        }
+      } catch (error) {
+        console.warn('Failed to capture chart snapshot:', error);
+        snapshotBase64 = null;
+      }
 
-      // Determine market type and map timeframe
-      const market = getMarketType(symbol);
+      // Collect last ~100 OHLCV bars from chart
+      const ohlcv = chartData.slice(-100).map(bar => ({
+        time: bar.time,
+        open: bar.open,
+        high: bar.high,
+        low: bar.low,
+        close: bar.close,
+        volume: bar.volume || 0
+      }));
+
+      console.log(`Analyzing ${symbol} with ${ohlcv.length} candles and ${snapshotBase64 ? 'chart snapshot' : 'no snapshot'}`);
+
+      // Map timeframe for display
       const timeframeMap: Record<string, string> = {
         '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
         '60': '1h', '240': '4h', 'D': '1d'
       };
 
-      const result = await analyzeWithAI({
-        symbol: symbol.toUpperCase(),
-        timeframe: timeframeMap[timeframe] || timeframe,
-        market,
-        candles
+      // Call ai-chart-analysis function with both data and screenshot
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://ifetofkhyblyijghuwzs.supabase.co'}/functions/v1/ai-chart-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symbol: symbol.toUpperCase(),
+          timeframe: timeframeMap[timeframe] || timeframe,
+          analysisType: 'comprehensive',
+          pageScreenshot: snapshotBase64,
+          chartData: ohlcv
+        })
       });
 
-      setAnalysis(result);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Analysis failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Analysis failed');
+      }
+
+      setAnalysis(data.result);
       toast({
         title: 'Analysis Complete',
-        description: `AI analyzed ${candles.length} candles for ${symbol.toUpperCase()} with ${result.confidence}% confidence`,
+        description: `AI analyzed ${ohlcv.length} candles for ${symbol.toUpperCase()} with ${snapshotBase64 ? 'visual and' : ''} data analysis`,
       });
 
     } catch (error: any) {
@@ -184,12 +229,12 @@ export const AIAnalysis = () => {
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     Analyzing...
                   </>
-                ) : (
-                  <>
-                    <Brain className="h-4 w-4 mr-2" />
-                    AI Analysis ({chartData.length} bars)
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <Brain className="h-4 w-4 mr-2" />
+                      Generate Analysis ({chartData.length} bars)
+                    </>
+                  )}
               </Button>
             </div>
           </div>
@@ -247,11 +292,11 @@ export const AIAnalysis = () => {
             <CardContent className="flex flex-col items-center justify-center h-64">
               <Brain className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center max-w-md">
-                Professional AI technical analysis using live chart data. Select a symbol and timeframe above, 
-                then click "AI Analysis" to get structured analysis with trade ideas.
+                Professional AI technical analysis using live chart data and visual analysis. Select a symbol and timeframe above, 
+                then click "Generate Analysis" to get comprehensive analysis with trade ideas.
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                📊 {chartData.length} candles loaded • Powered by GPT-4o-mini
+                📊 {chartData.length} candles loaded • 📸 Chart snapshot • Powered by GPT-4
               </p>
             </CardContent>
           </Card>

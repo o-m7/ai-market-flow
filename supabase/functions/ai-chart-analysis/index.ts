@@ -223,7 +223,7 @@ Respond in JSON format:
             ]
           }
         ],
-        max_tokens: 3000
+        max_completion_tokens: 3000
       }),
     });
 
@@ -298,15 +298,41 @@ async function generateHybridAnalysis(
     volatility: Number(volatility.toFixed(2))
   };
 
-  const basePrompt = `You are an elite trading agent. Use the QUANT DATA provided to ground your analysis; if an IMAGE is provided, use it to validate patterns and indicator readings.
+  const basePrompt = `You are an elite trading agent performing comprehensive technical analysis. 
 
-QUANT DATA:
+QUANTITATIVE DATA (Ground Truth):
 ${JSON.stringify(summary, null, 2)}
 
-REQUIREMENTS:
-- Provide precise technical analysis grounded in the QUANT DATA.
-- If IMAGE is provided, cross-check patterns, indicator readings (RSI/MACD/EMA), and price levels.
-- Output ONLY valid JSON in the exact schema: analysis, recommendation, confidence, keyLevels.support/resistance, technicalIndicators.rsi/trend/momentum, chartPatterns[], priceTargets.bullish/bearish, riskAssessment.level/factors.`;
+ANALYSIS REQUIREMENTS:
+- Base your analysis primarily on the QUANTITATIVE DATA provided above
+- If a chart IMAGE is provided, use it to identify visual patterns, confirm indicator signals, and validate price levels
+- Provide actionable trading insights with specific entry/exit levels
+- Consider market context and risk management
+
+OUTPUT FORMAT (JSON only):
+{
+  "analysis": "Detailed technical analysis paragraph",
+  "recommendation": "buy|sell|hold",
+  "confidence": 0.85,
+  "keyLevels": {
+    "support": [number array],
+    "resistance": [number array]
+  },
+  "technicalIndicators": {
+    "rsi": number,
+    "trend": "bullish|bearish|neutral", 
+    "momentum": "strong|weak|neutral"
+  },
+  "chartPatterns": ["pattern names"],
+  "priceTargets": {
+    "bullish": number,
+    "bearish": number
+  },
+  "riskAssessment": {
+    "level": "low|medium|high",
+    "factors": ["risk factor strings"]
+  }
+}`;
 
   try {
     const useVision = Boolean(pageScreenshot);
@@ -315,18 +341,18 @@ REQUIREMENTS:
       ? {
           model: 'gpt-4.1-2025-04-14',
           messages: [
-            { role: 'system', content: 'You are an institutional-grade trading agent producing grounded, JSON-only outputs.' },
+            { role: 'system', content: 'You are an institutional-grade trading agent. Analyze both quantitative data and visual patterns to provide comprehensive trading insights.' },
             { role: 'user', content: [
               { type: 'text', text: basePrompt },
               { type: 'image_url', image_url: { url: pageScreenshot!, detail: 'high' } }
             ] }
           ],
-          max_tokens: 2500
+          max_completion_tokens: 2500
         }
       : {
           model: 'gpt-5-2025-08-07',
           messages: [
-            { role: 'system', content: 'You are an institutional-grade trading agent producing grounded, JSON-only outputs.' },
+            { role: 'system', content: 'You are an institutional-grade trading agent. Provide comprehensive technical analysis based on quantitative market data.' },
             { role: 'user', content: basePrompt }
           ],
           max_completion_tokens: 2500
