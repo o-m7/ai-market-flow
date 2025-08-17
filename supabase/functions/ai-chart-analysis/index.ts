@@ -314,12 +314,19 @@ async function generateHybridAnalysis(
     volatility: Number(volatility.toFixed(2))
   };
 
+  const recentBarsCsv = chartData.slice(-100).map(b => `${b.time},${b.open},${b.high},${b.low},${b.close},${b.volume || 0}`).join('\n');
+  const recentBarsCount = Math.min(chartData.length, 100);
+
   const basePrompt = `You are an elite trading agent performing comprehensive technical analysis. 
 
 QUANTITATIVE DATA (Ground Truth):
 ${JSON.stringify(summary, null, 2)}
 
+RECENT OHLCV CSV (t,o,h,l,c,v) - last ${recentBarsCount} bars:
+${recentBarsCsv}
+
 ANALYSIS REQUIREMENTS:
+- Use the OHLCV CSV as the numeric ground truth. All price levels and targets must align with these values.
 - Base your analysis primarily on the QUANTITATIVE DATA provided above
 - If a chart IMAGE is provided, use it to identify visual patterns, confirm indicator signals, and validate price levels
 - Provide actionable trading insights with specific entry/exit levels
