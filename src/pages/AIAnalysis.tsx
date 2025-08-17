@@ -97,56 +97,53 @@ export const AIAnalysis = () => {
     setAiError(null);
     
     try {
-      if (!Array.isArray(chartData) || chartData.length < 5) {
-        throw new Error('Need at least 5 candles for analysis. Please wait for chart to load more data.');
-      }
-
-      console.log('Starting chart snapshot capture...');
-      // Take chart snapshot
+      // Always proceed with analysis - use screenshot + any available data
+      console.log('Starting comprehensive analysis...');
+      
+      // Take chart screenshot - capture the entire chart area
       let snapshotBase64: string | null = null;
       try {
-        const tvIframe = document.querySelector('.tradingview-chart-container iframe') as HTMLIFrameElement | null;
-        const lwContainer = document.querySelector('.lw-chart-container') as HTMLElement | null;
-        const targetEl = lwContainer ?? tvIframe?.parentElement ?? null;
-        if (targetEl) {
+        console.log('Capturing chart screenshot...');
+        const chartContainer = document.querySelector('.tradingview-chart-container') as HTMLElement;
+        if (chartContainer) {
           const html2canvas = (await import('html2canvas')).default;
-          const canvas = await html2canvas(targetEl, {
+          const canvas = await html2canvas(chartContainer, {
             allowTaint: true,
             useCORS: true,
             scale: 0.8,
             width: 800,
-            height: 400
+            height: 600,
+            backgroundColor: '#ffffff'
           });
           snapshotBase64 = canvas.toDataURL("image/webp", 0.8);
-          console.log('Chart snapshot captured successfully');
+          console.log('Chart screenshot captured successfully');
+        } else {
+          console.warn('Chart container not found for screenshot');
         }
       } catch (error) {
-        console.warn('Failed to capture chart snapshot:', error);
-        snapshotBase64 = null;
+        console.warn('Screenshot capture failed, proceeding without:', error);
       }
 
-      // Collect last ~100 OHLCV bars from chart
-      const ohlcv = chartData.slice(-100).map(bar => ({
+      // Use available chart data (from Polygon) - even if minimal
+      const ohlcv = chartData.length > 0 ? chartData.slice(-100).map(bar => ({
         time: bar.time,
         open: bar.open,
         high: bar.high,
         low: bar.low,
         close: bar.close,
         volume: bar.volume || 0
-      }));
+      })) : [];
 
-      console.log(`Analyzing ${symbol} with ${ohlcv.length} candles`);
-      console.log('Chart data sample (first 3 bars):', ohlcv.slice(0, 3));
-      console.log('Chart data sample (last 3 bars):', ohlcv.slice(-3));
-      console.log('Current price from chart data:', ohlcv[ohlcv.length - 1]?.close);
-      console.log('Price range from chart data:', {
-        lowest: Math.min(...ohlcv.map(b => b.low)),
-        highest: Math.max(...ohlcv.map(b => b.high))
-      });
-      console.log('Data timestamps (first/last):', {
-        first: ohlcv[0] ? new Date(ohlcv[0].time * 1000).toISOString() : 'N/A',
-        last: ohlcv[ohlcv.length - 1] ? new Date(ohlcv[ohlcv.length - 1].time * 1000).toISOString() : 'N/A'
-      });
+      console.log(`Sending analysis request with ${ohlcv.length} bars and ${snapshotBase64 ? 'screenshot' : 'no screenshot'}`);
+      
+      if (ohlcv.length > 0) {
+        console.log('Chart data sample (last 3 bars):', ohlcv.slice(-3));
+        console.log('Current price from chart data:', ohlcv[ohlcv.length - 1]?.close);
+        console.log('Data timestamps (first/last):', {
+          first: ohlcv[0] ? new Date(ohlcv[0].time * 1000).toISOString() : 'N/A',
+          last: ohlcv[ohlcv.length - 1] ? new Date(ohlcv[ohlcv.length - 1].time * 1000).toISOString() : 'N/A'
+        });
+      }
 
       // Map timeframe for display
       const timeframeMap: Record<string, string> = {
@@ -163,20 +160,18 @@ export const AIAnalysis = () => {
       };
 
       console.log('Sending request to AI analysis API...');
-      console.log('Request body:', { ...requestBody, pageScreenshot: snapshotBase64 ? 'screenshot_present' : 'no_screenshot' });
 
-      // Call ai-chart-analysis function with both data and screenshot
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://ifetofkhyblyijghuwzs.supabase.co'}/functions/v1/ai-chart-analysis`, {
+      // Call ai-chart-analysis function
+      const response = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/ai-chart-analysis`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmZXRvZmtoeWJseWlqZ2h1d3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY0Njk1ODMsImV4cCI6MjA1MjA0NTU4M30.ddbB6iHbFT8XvGMFHy4NkDDiYJJW3hE4WpHLR6nA6A8'}`,
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmZXRvZmtoeWJseWlqZ2h1d3pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQyNTIyNTEsImV4cCI6MjA2OTgyODI1MX0.nOzUHck9fqOxvOHPOY8FE2YzmVAX1cohmb64wS9J5MQ`,
         },
         body: JSON.stringify(requestBody)
       });
 
       console.log('API Response status:', response.status);
-      console.log('API Response headers:', response.headers);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -195,28 +190,28 @@ export const AIAnalysis = () => {
       setAnalysis(data.result);
       toast({
         title: 'Analysis Complete',
-        description: `AI analyzed ${ohlcv.length} candles for ${symbol.toUpperCase()} with ${snapshotBase64 ? 'visual and' : ''} data analysis`,
+        description: `AI analyzed ${symbol.toUpperCase()} with ${snapshotBase64 ? 'visual chart and' : ''} ${ohlcv.length} data points`,
       });
 
     } catch (error: any) {
       console.error('Analysis error:', error);
-      // Fallback: show a safe analysis card even on error
+      // Create fallback analysis
       const fallback = {
-        analysis: `Analysis failed: ${error?.message || 'Unknown error'}`,
+        analysis: `Analysis failed: ${error?.message || 'Unknown error'}. Please try again.`,
         recommendation: 'hold',
         confidence: 0,
         keyLevels: { support: [], resistance: [] },
         technicalIndicators: { rsi: 50, trend: 'neutral' as const, momentum: 'neutral' as const },
         chartPatterns: [] as string[],
         priceTargets: { bullish: 0, bearish: 0 },
-        riskAssessment: { level: 'medium' as const, factors: ['AI service error'] },
+        riskAssessment: { level: 'medium' as const, factors: ['Analysis service error'] },
         timestamp: new Date().toISOString(),
       };
       setAnalysis(fallback);
       setAiError(error.message);
       toast({
         title: 'Analysis Failed',
-        description: error.message || 'Unable to analyze chart data. Showing fallback summary.',
+        description: error.message || 'Unable to analyze chart. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -326,7 +321,7 @@ export const AIAnalysis = () => {
               
               <Button 
                 onClick={handleAnalysis} 
-                disabled={loading || chartData.length < 5}
+                disabled={loading}
                 className="min-w-[140px]"
               >
                 {loading ? (
