@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Star, TrendingUp, TrendingDown, Trash2, Plus, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -256,9 +257,9 @@ export const Watchlist = () => {
                       {/* Actions */}
                       <div className="flex space-x-2">
                         <Button variant="outline" size="sm" asChild className="border-border hover:border-primary">
-                          <a href={`/markets/${item.type}/${item.symbol.toLowerCase()}`}>
+                          <Link to={`/ai-analysis?symbol=${item.symbol}&type=${item.type}`}>
                             View
-                          </a>
+                          </Link>
                         </Button>
                         <Button
                           variant="ghost"

@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import TechnicalChart from "@/components/TechnicalChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,7 +81,25 @@ const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
 };
 
 export const AIAnalysis = () => {
-  const [symbol, setSymbol] = useState("AAPL");
+  const [searchParams] = useSearchParams();
+  
+  // Convert symbol format from watchlist to AI Analysis format
+  const convertSymbolFormat = (symbol: string, type?: string) => {
+    if (type === 'crypto') {
+      return symbol.replace('-', ''); // BTC-USD -> BTCUSD
+    }
+    if (type === 'forex') {
+      return symbol.replace('/', ''); // EUR/USD -> EURUSD
+    }
+    return symbol; // Stock symbols remain the same
+  };
+
+  // Get initial symbol from URL params or default
+  const urlSymbol = searchParams.get('symbol');
+  const urlType = searchParams.get('type');
+  const initialSymbol = urlSymbol ? convertSymbolFormat(urlSymbol, urlType) : "AAPL";
+  
+  const [symbol, setSymbol] = useState(initialSymbol);
   const [timeframe, setTimeframe] = useState<'1'|'5'|'15'|'30'|'60'|'240'|'D'>("60");
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
