@@ -1,8 +1,11 @@
 import { ArrowRight, BarChart3, Brain, TrendingUp, Shield, Zap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const LandingPage = () => {
+  const { user, subscription } = useAuth();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
       {/* Navigation */}
