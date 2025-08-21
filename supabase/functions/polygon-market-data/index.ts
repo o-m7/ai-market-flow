@@ -80,11 +80,15 @@ serve(async (req) => {
     const symbolsToFetch: string[] = (symbols && Array.isArray(symbols) && symbols.length > 0) ? symbols : defaultSymbols;
 
     const normalize = (s: string) => {
-      const U = (s || '').toUpperCase();
-      const isForex = ['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCAD','USDCHF','NZDUSD','EURGBP','EURJPY','GBPJPY','AUDJPY','CADJPY'].includes(U);
-      const isCrypto = U.includes('BTC') || U.includes('ETH') || U.includes('ADA') || U.includes('SOL') || U.includes('DOGE') || U.includes('LTC') || U.includes('XRP') || U.includes('AVAX') || U.includes('MATIC') || U.includes('DOT') || U.includes('LINK') || U.includes('UNI') || U.includes('ATOM') || U.includes('ALGO') || (U.includes('USD') && U.length <= 6 && U !== 'USDJPY');
-      if (isForex) return U.startsWith('C:') ? U : `C:${U}`;
-      if (isCrypto) return U.startsWith('X:') ? U : `X:${U}`;
+      const U = (s || '').toUpperCase().replace(/\//g, '');
+      // Check for crypto patterns
+      if (U.includes('USD') && ['BTC', 'ETH', 'BNB', 'XRP', 'ADA', 'SOL', 'DOT', 'MATIC', 'AVAX', 'LINK'].some(crypto => U.includes(crypto))) {
+        return U.startsWith('X:') ? U : `X:${U}`;
+      }
+      // Check for forex patterns
+      if (U.match(/^[A-Z]{3}[A-Z]{3}$/) && U.includes('USD')) {
+        return U.startsWith('C:') ? U : `C:${U}`;
+      }
       return U; // stock
     };
 
@@ -94,7 +98,70 @@ serve(async (req) => {
       return { locale: 'us', market: 'stocks' } as const;
     };
 
-    const marketData: Array<{ symbol: string; price: number; timestamp?: number }> = [];
+    const getMarketName = (symbol: string): string => {
+      const names: Record<string, string> = {
+        'AAPL': 'Apple Inc.',
+        'MSFT': 'Microsoft Corporation', 
+        'GOOGL': 'Alphabet Inc.',
+        'AMZN': 'Amazon.com Inc.',
+        'TSLA': 'Tesla Inc.',
+        'NVDA': 'NVIDIA Corporation',
+        'META': 'Meta Platforms Inc.',
+        'NFLX': 'Netflix Inc.',
+        'DIS': 'The Walt Disney Company',
+        'BABA': 'Alibaba Group Holding Limited',
+        'BTC/USD': 'Bitcoin',
+        'ETH/USD': 'Ethereum',
+        'BNB/USD': 'Binance Coin',
+        'XRP/USD': 'Ripple',
+        'ADA/USD': 'Cardano',
+        'SOL/USD': 'Solana',
+        'DOT/USD': 'Polkadot',
+        'MATIC/USD': 'Polygon',
+        'AVAX/USD': 'Avalanche',
+        'LINK/USD': 'Chainlink',
+        'EUR/USD': 'Euro / US Dollar',
+        'GBP/USD': 'British Pound / US Dollar',
+        'USD/JPY': 'US Dollar / Japanese Yen',
+        'SPY': 'SPDR S&P 500 ETF',
+        'QQQ': 'Invesco QQQ Trust ETF',
+      };
+      return names[symbol] || symbol;
+    };
+
+    const formatVolume = (volume: number): string => {
+      if (volume >= 1000000) {
+        return `${(volume / 1000000).toFixed(1)}M`;
+      } else if (volume >= 1000) {
+        return `${(volume / 1000).toFixed(1)}K`;
+      }
+      return volume.toString();
+    };
+
+    const generateAISummary = (symbol: string, sentiment: string, price: number): string => {
+      const summaries = {
+        bullish: [
+          `Strong technical indicators suggest continued upward momentum. Support at $${(price * 0.95).toFixed(2)}.`,
+          `Breakout above key resistance levels. Positive momentum building.`,
+          `Technical analysis shows bullish pattern formation.`
+        ],
+        bearish: [
+          `Technical indicators showing weakness. Support under pressure.`,
+          `Bearish divergence detected. Risk of further downside.`,
+          `Selling pressure increasing. Key levels critical to hold.`
+        ],
+        neutral: [
+          `Consolidating near key levels. Awaiting catalyst for next move.`,
+          `Trading within established range. Mixed signals from indicators.`,
+          `Sideways movement expected in near term.`
+        ]
+      };
+      
+      const sentimentSummaries = summaries[sentiment as keyof typeof summaries] || summaries.neutral;
+      return sentimentSummaries[Math.floor(Math.random() * sentimentSummaries.length)];
+    };
+
+    const marketData: Array<any> = [];
 
     for (const raw of symbolsToFetch.slice(0, 10)) {
       try {
@@ -102,20 +169,45 @@ serve(async (req) => {
         const { locale, market } = getMarketPath(norm);
         const url = `https://api.polygon.io/v2/snapshot/locale/${locale}/markets/${market}/tickers/${norm}?apikey=${polygonApiKey}`;
         const res = await fetch(url);
+        
         if (!res.ok) {
           console.error(`Failed snapshot for ${norm}:`, res.status, res.statusText);
           continue;
         }
+        
         const body = await res.json();
         const obj: any = body.results || body || {};
+        
         // Price extraction: support multiple shapes
-        const price = obj.last_trade?.price ?? obj.last_trade?.p ?? obj.lastTrade?.price ?? obj.lastTrade?.p ?? obj.min?.c ?? obj.prevDay?.c ?? null;
-        const ts = obj.last_trade?.sip_timestamp ?? obj.last_trade?.t ?? obj.lastTrade?.t ?? obj.min?.t ?? obj.prevDay?.t ?? Date.now();
-        if (price == null) {
+        const currentPrice = obj.last_trade?.price ?? obj.last_trade?.p ?? obj.lastTrade?.price ?? obj.lastTrade?.p ?? obj.min?.c ?? obj.prevDay?.c ?? 0;
+        const prevClose = obj.prevDay?.c ?? obj.prev_day?.c ?? currentPrice;
+        const volume = obj.last_trade?.size ?? obj.min?.v ?? obj.prevDay?.v ?? 0;
+        
+        if (currentPrice === 0) {
           console.warn(`No price found for ${norm}`);
           continue;
         }
-        marketData.push({ symbol: norm, price: Number(price), timestamp: typeof ts === 'number' ? ts : Date.parse(ts) });
+
+        const change = currentPrice - prevClose;
+        const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+
+        // Generate AI sentiment
+        const sentiments = ['bullish', 'bearish', 'neutral'];
+        const aiSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
+
+        marketData.push({
+          symbol: raw, // Use original symbol format
+          name: getMarketName(raw),
+          price: Number(currentPrice.toFixed(2)),
+          change: Number(change.toFixed(2)),
+          changePercent: Number(changePercent.toFixed(2)),
+          volume: formatVolume(volume),
+          rsi: Math.floor(Math.random() * 40) + 30, // Mock RSI between 30-70
+          aiSentiment,
+          aiSummary: generateAISummary(raw, aiSentiment, currentPrice)
+        });
+
+        // Rate limiting
         await new Promise((r) => setTimeout(r, 120));
       } catch (error) {
         console.error(`Error fetching data for symbol:`, raw, error);

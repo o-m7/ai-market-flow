@@ -17,14 +17,28 @@ const trendFilters = [
   { value: "neutral", label: "Neutral", icon: Minus },
 ];
 
-export const MarketFilters = () => {
+export interface MarketFilters {
+  marketType: string;
+  trend: string;
+  timeframe: string;
+}
+
+interface MarketFiltersProps {
+  filters: MarketFilters;
+  onFiltersChange: (filters: MarketFilters) => void;
+}
+
+export const MarketFilters = ({ filters, onFiltersChange }: MarketFiltersProps) => {
   return (
     <div className="bg-gradient-card border border-border rounded-lg p-4 mb-6">
       <div className="flex flex-wrap items-center gap-4">
         {/* Market Type Filter */}
         <div className="flex items-center space-x-2">
           <span className="text-sm font-medium text-muted-foreground">Market:</span>
-          <Select defaultValue="all">
+          <Select 
+            value={filters.marketType} 
+            onValueChange={(value) => onFiltersChange({ ...filters, marketType: value })}
+          >
             <SelectTrigger className="w-40 bg-secondary border-border">
               <SelectValue />
             </SelectTrigger>
@@ -44,12 +58,14 @@ export const MarketFilters = () => {
           <div className="flex space-x-1">
             {trendFilters.map((filter) => {
               const Icon = filter.icon;
+              const isSelected = filters.trend === filter.value;
               return (
                 <Button
                   key={filter.value}
-                  variant="outline"
+                  variant={isSelected ? "default" : "outline"}
                   size="sm"
                   className="border-border hover:border-primary"
+                  onClick={() => onFiltersChange({ ...filters, trend: filter.value })}
                 >
                   {Icon && <Icon className="h-4 w-4 mr-1" />}
                   {filter.label}
@@ -62,7 +78,10 @@ export const MarketFilters = () => {
         {/* Time Filter */}
         <div className="flex items-center space-x-2">
           <span className="text-sm font-medium text-muted-foreground">Timeframe:</span>
-          <Select defaultValue="1d">
+          <Select 
+            value={filters.timeframe} 
+            onValueChange={(value) => onFiltersChange({ ...filters, timeframe: value })}
+          >
             <SelectTrigger className="w-24 bg-secondary border-border">
               <SelectValue />
             </SelectTrigger>

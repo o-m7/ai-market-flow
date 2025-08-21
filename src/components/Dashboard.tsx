@@ -1,22 +1,39 @@
 import { Navigation } from "./Navigation";
-import { MarketFilters } from "./MarketFilters";
+import { MarketFilters, type MarketFilters as MarketFiltersType } from "./MarketFilters";
 import { SymbolCard } from "./SymbolCard";
 import { AIAssistant } from "./AIAssistant";
 import { RealtimeStatus } from "./RealtimeStatus";
 import { usePolygonData } from "@/hooks/usePolygonData";
+import { getSymbolsByMarketType } from "@/lib/marketSymbols";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
+import { useState, useMemo } from "react";
 
 export const Dashboard = () => {
-  const { data: marketData, loading, error, lastUpdated, refetch } = usePolygonData();
+  const [filters, setFilters] = useState<MarketFiltersType>({
+    marketType: 'all',
+    trend: 'all',
+    timeframe: '1d'
+  });
+
+  // Get symbols based on selected market type
+  const symbols = useMemo(() => getSymbolsByMarketType(filters.marketType), [filters.marketType]);
+  
+  const { data: marketData, loading, error, lastUpdated, refetch } = usePolygonData(symbols);
+  
+  // Filter data based on trend filter
+  const filteredData = useMemo(() => {
+    if (filters.trend === 'all') return marketData;
+    return marketData.filter(symbol => symbol.aiSentiment === filters.trend);
+  }, [marketData, filters.trend]);
   
   console.log("Dashboard component is rendering");
   
-  // Calculate dynamic stats based on real data
-  const bullishCount = marketData.filter(s => s.aiSentiment === 'bullish').length;
-  const bearishCount = marketData.filter(s => s.aiSentiment === 'bearish').length;
-  const totalCount = marketData.length;
+  // Calculate dynamic stats based on filtered data
+  const bullishCount = filteredData.filter(s => s.aiSentiment === 'bullish').length;
+  const bearishCount = filteredData.filter(s => s.aiSentiment === 'bearish').length;
+  const totalCount = filteredData.length;
   const bullishPercent = totalCount > 0 ? ((bullishCount / totalCount) * 100).toFixed(1) : '0.0';
   const bearishPercent = totalCount > 0 ? ((bearishCount / totalCount) * 100).toFixed(1) : '0.0';
   
@@ -44,7 +61,7 @@ export const Dashboard = () => {
           </Button>
         </div>
 
-        <MarketFilters />
+        <MarketFilters filters={filters} onFiltersChange={setFilters} />
 
         {/* Real-time Status */}
         <div className="mb-6">
@@ -77,7 +94,7 @@ export const Dashboard = () => {
               </div>
             ))
           ) : (
-            marketData.map((symbol) => (
+            filteredData.map((symbol) => (
               <SymbolCard key={symbol.symbol} {...symbol} />
             ))
           )}
