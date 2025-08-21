@@ -59,7 +59,13 @@ serve(async (req) => {
 
     // --- Try ms range first (includes "now" in UTC) ---
     const nowMs = Date.now();
-    const lookbackMs = span === "day" ? 30 * 24 * 3600e3 : 48 * 3600e3;
+
+    // Compute dynamic lookback based on requested limit and timeframe
+    const unitMs = span === "minute" ? 60_000 : span === "hour" ? 3_600_000 : 86_400_000;
+    const desiredBars = Math.max(limit ?? 300, 150);
+    const marketBuffer = asset === "stock" ? 3 : 2; // account for market closures/low-liquidity
+    const lookbackMs = desiredBars * mult * unitMs * marketBuffer;
+
     const fromMs = nowMs - lookbackMs;
 
     const urlMs = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/range/${mult}/${span}/${fromMs}/${nowMs}?adjusted=true&sort=asc&limit=50000&apiKey=${polygonApiKey}`;
@@ -85,9 +91,8 @@ serve(async (req) => {
       console.log(`Millisecond range failed (${r1.status}), trying ISO date range...`);
       
       const toISO = new Date(nowMs).toISOString().slice(0, 10);
-      const fromISO = new Date(nowMs - (span === "day" ? 30 * 24 * 3600e3 : 3 * 24 * 3600e3))
-                        .toISOString().slice(0, 10);
-                        
+      const fromISO = new Date(nowMs - lookbackMs).toISOString().slice(0, 10);
+      
       const urlISO = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/range/${mult}/${span}/${fromISO}/${toISO}?adjusted=true&sort=asc&limit=50000&apiKey=${polygonApiKey}`;
       
       console.log(`Trying ISO date range: ${urlISO}`);
