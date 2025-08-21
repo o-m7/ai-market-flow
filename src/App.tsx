@@ -11,7 +11,7 @@ import { Watchlist } from "./pages/Watchlist";
 import { Alerts } from "./pages/Alerts";
 import { Settings } from "./pages/Settings";
 import Portfolio from "./pages/Portfolio";
-import { AIAnalysis } from "./pages/AIAnalysis";
+import AIAnalysis from "./pages/AIAnalysis";
 import News from "./pages/News";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
