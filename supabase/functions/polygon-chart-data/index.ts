@@ -4,7 +4,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const polygonApiKey = Deno.env.get('POLYGON_API_KEY');
 
 if (!polygonApiKey) {
-  console.warn("[WARN] POLYGON_API_KEY is not set in Supabase edge function environment.");
+  console.error("[ERROR] POLYGON_API_KEY is not set in Supabase edge function environment.");
+} else {
+  console.log("[INFO] POLYGON_API_KEY is configured and ready.");
 }
 
 const corsHeaders = {
