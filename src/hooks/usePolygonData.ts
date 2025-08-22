@@ -52,7 +52,7 @@ export const usePolygonData = (symbols: string[], refreshInterval = 60000) => {
         setLastUpdated(result.timestamp);
       } else {
         // Fallback to mock data if no real data available
-        setData(getMockData());
+        setData(getMockData(symbols));
         setLastUpdated(new Date().toISOString());
       }
     } catch (err) {
@@ -60,7 +60,7 @@ export const usePolygonData = (symbols: string[], refreshInterval = 60000) => {
       setError(err instanceof Error ? err.message : 'Failed to fetch market data');
       
       // Fallback to mock data on error
-      setData(getMockData());
+      setData(getMockData(symbols));
       setLastUpdated(new Date().toISOString());
     } finally {
       setLoading(false);
@@ -89,71 +89,68 @@ export const usePolygonData = (symbols: string[], refreshInterval = 60000) => {
 };
 
 // Fallback mock data
-const getMockData = (): MarketSymbol[] => [
-  {
-    symbol: "AAPL",
-    name: "Apple Inc.",
-    price: 185.25,
-    change: 3.45,
-    changePercent: 1.89,
-    volume: "45.2M",
-    rsi: 68,
-    aiSentiment: "bullish" as const,
-    aiSummary: "Strong technical indicators suggest continued upward momentum. Support at $180, resistance at $190.",
-  },
-  {
-    symbol: "TSLA",
-    name: "Tesla Inc.",
-    price: 238.50,
-    change: 12.75,
-    changePercent: 5.65,
-    volume: "89.3M",
-    rsi: 78,
-    aiSentiment: "bullish" as const,
-    aiSummary: "Breakout above $230 resistance. Overbought conditions suggest potential consolidation ahead.",
-  },
-  {
-    symbol: "MSFT",
-    name: "Microsoft Corporation",
-    price: 378.90,
-    change: -2.15,
-    changePercent: -0.56,
-    volume: "23.8M",
-    rsi: 52,
-    aiSentiment: "neutral" as const,
-    aiSummary: "Consolidating near key support levels. Awaiting catalyst for next directional move.",
-  },
-  {
-    symbol: "GOOGL",
-    name: "Alphabet Inc.",
-    price: 142.80,
-    change: 1.85,
-    changePercent: 1.31,
-    volume: "31.4M",
-    rsi: 61,
-    aiSentiment: "bullish" as const,
-    aiSummary: "Positive momentum building. Key resistance at $145 to watch for breakout.",
-  },
-  {
-    symbol: "AMZN",
-    name: "Amazon.com Inc.",
-    price: 145.60,
-    change: -1.40,
-    changePercent: -0.95,
-    volume: "42.7M",
-    rsi: 45,
-    aiSentiment: "neutral" as const,
-    aiSummary: "Trading within established range. Support at $140, resistance at $150.",
-  },
-  {
-    symbol: "NVDA",
-    name: "NVIDIA Corporation",
-    price: 875.30,
-    change: 18.90,
-    changePercent: 2.21,
-    volume: "38.9M",
-    rsi: 72,
-    aiSentiment: "bullish" as const,
-    aiSummary: "AI momentum continues. Watch for profit-taking near $900 resistance level.",
-  }
-];
+const formatVolume = (volume: number): string => {
+  if (volume >= 1_000_000_000) return `${(volume / 1_000_000_000).toFixed(1)}B`;
+  if (volume >= 1_000_000) return `${(volume / 1_000_000).toFixed(1)}M`;
+  if (volume >= 1_000) return `${(volume / 1_000).toFixed(1)}K`;
+  return String(volume);
+};
+
+const getMarketName = (symbol: string): string => {
+  const map: Record<string, string> = {
+    AAPL: 'Apple Inc.', MSFT: 'Microsoft Corporation', GOOGL: 'Alphabet Inc.',
+    AMZN: 'Amazon.com Inc.', TSLA: 'Tesla Inc.', NVDA: 'NVIDIA Corporation',
+    META: 'Meta Platforms Inc.', NFLX: 'Netflix Inc.', DIS: 'The Walt Disney Company',
+    BABA: 'Alibaba Group Holding Limited',
+    'BTC/USD': 'Bitcoin', 'ETH/USD': 'Ethereum', 'BNB/USD': 'Binance Coin', 'XRP/USD': 'Ripple',
+    'ADA/USD': 'Cardano', 'SOL/USD': 'Solana', 'DOT/USD': 'Polkadot', 'MATIC/USD': 'Polygon',
+    'AVAX/USD': 'Avalanche', 'LINK/USD': 'Chainlink',
+    'EUR/USD': 'Euro / US Dollar', 'GBP/USD': 'British Pound / US Dollar', 'USD/JPY': 'US Dollar / Japanese Yen',
+    SPY: 'SPDR S&P 500 ETF', QQQ: 'Invesco QQQ Trust ETF', DIA: 'SPDR Dow Jones Industrial Average ETF',
+    IWM: 'iShares Russell 2000 ETF', VTI: 'Vanguard Total Stock Market ETF', GLD: 'SPDR Gold Shares', SLV: 'iShares Silver Trust', USO: 'United States Oil Fund'
+  };
+  return map[symbol] || symbol;
+};
+
+const getMockData = (symbols?: string[]): MarketSymbol[] => {
+  const baseSymbols = symbols && symbols.length > 0
+    ? symbols
+    : ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA'];
+
+  const sentiments: MarketSymbol['aiSentiment'][] = ['bullish', 'bearish', 'neutral'];
+
+  return baseSymbols.slice(0, 10).map((sym) => {
+    const u = sym.toUpperCase();
+    let base = 100;
+    if (u.includes('BTC')) base = 60000;
+    else if (u.includes('ETH')) base = 3000;
+    else if (u.includes('USD') && sym.includes('/')) base = 1.1; // forex pair
+    else if (u.startsWith('X:')) base = 100; // generic crypto
+    else if (u.startsWith('C:')) base = 1.1; // generic forex
+    else base = 100 + Math.random() * 900; // stock/etf
+
+    const changePct = (Math.random() - 0.5) * 6; // -3%..+3%
+    const prevClose = Number(base.toFixed(2));
+    const price = Number((base * (1 + changePct / 100)).toFixed(2));
+    const change = Number((price - prevClose).toFixed(2));
+    const volumeNum = Math.floor(Math.random() * 50_000_000) + 1_000_000; // 1M - 51M
+    const aiSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
+
+    return {
+      symbol: sym,
+      name: getMarketName(sym),
+      price,
+      change,
+      changePercent: Number((((price - prevClose) / Math.max(prevClose, 0.01)) * 100).toFixed(2)),
+      volume: formatVolume(volumeNum),
+      rsi: Math.floor(30 + Math.random() * 40),
+      aiSentiment,
+      aiSummary:
+        aiSentiment === 'bullish'
+          ? 'Positive momentum building. Watch resistance levels.'
+          : aiSentiment === 'bearish'
+          ? 'Weakness emerging; watch support levels.'
+          : 'Range-bound; awaiting catalyst.'
+    };
+  });
+};
