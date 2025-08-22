@@ -20,7 +20,7 @@ interface PolygonDataResponse {
   error?: string;
 }
 
-export const usePolygonData = (symbols?: string[], refreshInterval = 60000) => {
+export const usePolygonData = (symbols: string[], refreshInterval = 60000) => {
   const [data, setData] = useState<MarketSymbol[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,14 +68,16 @@ export const usePolygonData = (symbols?: string[], refreshInterval = 60000) => {
   };
 
   useEffect(() => {
-    // Initial fetch
-    fetchMarketData();
+    if (symbols && symbols.length > 0) {
+      // Initial fetch
+      fetchMarketData();
 
-    // Set up refresh interval
-    const interval = setInterval(fetchMarketData, refreshInterval);
+      // Set up refresh interval
+      const interval = setInterval(fetchMarketData, refreshInterval);
 
-    return () => clearInterval(interval);
-  }, [symbols, refreshInterval]);
+      return () => clearInterval(interval);
+    }
+  }, [symbols?.join(','), refreshInterval]);
 
   return {
     data,

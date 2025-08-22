@@ -2,7 +2,6 @@ import { Navigation } from "./Navigation";
 import { MarketFilters, type MarketFilters as MarketFiltersType } from "./MarketFilters";
 import { SymbolCard } from "./SymbolCard";
 import { AIAssistant } from "./AIAssistant";
-import { RealtimeStatus } from "./RealtimeStatus";
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -62,11 +61,6 @@ export const Dashboard = () => {
         </div>
 
         <MarketFilters filters={filters} onFiltersChange={setFilters} />
-
-        {/* Real-time Status */}
-        <div className="mb-6">
-          <RealtimeStatus />
-        </div>
 
         {/* Error State */}
         {error && (
