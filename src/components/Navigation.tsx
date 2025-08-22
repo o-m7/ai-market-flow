@@ -1,7 +1,7 @@
-import { Search, Bell, User, BarChart3, Star, Settings, LogOut, Settings2, Brain } from "lucide-react";
+import { Bell, User, BarChart3, Star, Settings, LogOut, Settings2, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { SearchBar } from "@/components/SearchBar";
 
 export const Navigation = () => {
 
@@ -43,15 +43,7 @@ export const Navigation = () => {
         </div>
 
         {/* Search Bar */}
-        <div className="flex-1 max-w-md mx-8">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Search symbols (e.g., AAPL, BTC, EUR/USD)"
-              className="pl-10 bg-secondary border-border focus:border-primary"
-            />
-          </div>
-        </div>
+        <SearchBar />
 
         {/* Actions */}
         <div className="flex items-center space-x-4">

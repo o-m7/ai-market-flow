@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Search, Filter, TrendingUp, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,11 +69,47 @@ export const SearchResults = () => {
   const [filterType, setFilterType] = useState("all");
   const [sortBy, setSortBy] = useState("relevance");
 
-  const filteredResults = mockSearchResults.filter(result => {
-    const matchesQuery = result.symbol.toLowerCase().includes(query.toLowerCase()) ||
-                        result.name.toLowerCase().includes(query.toLowerCase());
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const searchSymbols = async (searchQuery: string) => {
+    if (!searchQuery) return;
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('polygon-search', {
+        body: { query: searchQuery }
+      });
+
+      if (error) {
+        console.error('Search error:', error);
+        setResults(mockSearchResults.filter(result => 
+          result.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          result.name.toLowerCase().includes(searchQuery.toLowerCase())
+        ));
+      } else {
+        setResults(data.results || []);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setResults(mockSearchResults.filter(result => 
+        result.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        result.name.toLowerCase().includes(searchQuery.toLowerCase())
+      ));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (query) {
+      searchSymbols(query);
+    }
+  }, [query]);
+
+  const filteredResults = results.filter(result => {
     const matchesType = filterType === "all" || result.type === filterType;
-    return matchesQuery && matchesType;
+    return matchesType;
   });
 
   const getTypeColor = (type: string) => {

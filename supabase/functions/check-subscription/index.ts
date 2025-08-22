@@ -56,17 +56,42 @@ serve(async (req) => {
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     
     if (customers.data.length === 0) {
-      logStep("No customer found, updating unsubscribed state");
+      logStep("No customer found, checking if user needs trial");
+      
+      // Check if user already has a record
+      const { data: existingUser } = await supabaseClient
+        .from("subscribers")
+        .select("*")
+        .eq("email", user.email)
+        .single();
+
+      let trialStart = null;
+      let trialEnd = null;
+      
+      // If new user, give them a 7-day trial
+      if (!existingUser) {
+        trialStart = new Date().toISOString();
+        trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days from now
+        logStep("New user, granting 7-day trial", { trialStart, trialEnd });
+      }
+
       await supabaseClient.from("subscribers").upsert({
         email: user.email,
         user_id: user.id,
         stripe_customer_id: null,
         subscribed: false,
         subscription_tier: null,
-        subscription_end: null,
+        subscription_end: trialEnd,
+        trial_start: trialStart,
+        trial_end: trialEnd,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'email' });
-      return new Response(JSON.stringify({ subscribed: false }), {
+      
+      return new Response(JSON.stringify({ 
+        subscribed: false, 
+        subscription_tier: null,
+        subscription_end: trialEnd 
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
