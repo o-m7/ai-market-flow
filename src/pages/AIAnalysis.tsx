@@ -310,7 +310,7 @@ export const AIAnalysis = () => {
               
               <Button 
                 onClick={handleAnalysis} 
-                disabled={loading || chartData.length < 30 || (!isSubscribed && !user) || (!isSubscribed && usage.remainingAnalyses === 0)}
+                disabled={loading || chartData.length < 30}
                 className="min-w-[140px]"
               >
                 {loading ? (
