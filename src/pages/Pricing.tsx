@@ -13,6 +13,7 @@ const plans = [
   {
     name: 'Free',
     price: '$0',
+    period: 'month',
     priceId: null,
     description: 'Perfect for getting started',
     features: [
@@ -25,9 +26,10 @@ const plans = [
     popular: false,
   },
   {
-    name: 'Premium',
-    price: '$19',
-    priceId: 'price_1RzLbJRfOhymzkuWMJ5kKyiF', // Replace with your actual Stripe price ID
+    name: 'Premium Monthly',
+    price: '$29.99',
+    period: 'month',
+    priceId: 'price_monthly_2999', // Replace with your actual Stripe price ID
     description: 'For serious traders and analysts',
     features: [
       'Unlimited AI analyses',
@@ -37,9 +39,33 @@ const plans = [
       'Priority support',
       'Portfolio tracking',
       'Custom strategies',
+      'Advanced backtesting',
     ],
     icon: Crown,
     popular: true,
+  },
+  {
+    name: 'Premium Yearly',
+    price: '$287.90',
+    originalPrice: '$359.88',
+    period: 'year',
+    priceId: 'price_yearly_28790', // Replace with your actual Stripe price ID
+    description: 'Best value - Save 20%!',
+    features: [
+      'Everything in Premium Monthly',
+      'Unlimited AI analyses',
+      'Unlimited symbols',
+      'Advanced technical indicators',
+      'Real-time alerts',
+      'Priority support',
+      'Portfolio tracking',
+      'Custom strategies',
+      'Advanced backtesting',
+      '2 months free',
+    ],
+    icon: Crown,
+    popular: false,
+    discount: '20% OFF',
   },
 ];
 
@@ -75,8 +101,8 @@ export default function Pricing() {
 
       if (error) throw error;
       
-      // Open Stripe checkout in a new tab
-      window.open(data.url, '_blank');
+      // Redirect to checkout page for better UX, then to Stripe
+      navigate(`/checkout?price=${plan.priceId}`);
     } catch (error: any) {
       toast({
         title: 'Checkout Failed',
@@ -188,7 +214,7 @@ export default function Pricing() {
         )}
 
         {/* Pricing Plans */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan) => (
             <Card
               key={plan.name}
@@ -203,6 +229,11 @@ export default function Pricing() {
                   Most Popular
                 </Badge>
               )}
+              {plan.discount && (
+                <Badge variant="secondary" className="absolute -top-3 right-4 bg-green-500 text-white">
+                  {plan.discount}
+                </Badge>
+              )}
               
               <CardHeader className="text-center pb-6">
                 <div className="flex justify-center mb-4">
@@ -215,8 +246,13 @@ export default function Pricing() {
                 <CardTitle className="text-2xl">{plan.name}</CardTitle>
                 <div className="text-4xl font-bold">
                   {plan.price}
-                  <span className="text-lg font-normal text-muted-foreground">/month</span>
+                  <span className="text-lg font-normal text-muted-foreground">/{plan.period}</span>
                 </div>
+                {plan.originalPrice && (
+                  <div className="text-sm text-muted-foreground line-through">
+                    Was {plan.originalPrice}/{plan.period}
+                  </div>
+                )}
                 <CardDescription className="text-base mt-2">
                   {plan.description}
                 </CardDescription>
@@ -276,7 +312,7 @@ export default function Pricing() {
             All plans include a 7-day free trial. Cancel anytime.
           </p>
           <p className="text-sm text-muted-foreground">
-            Need help choosing? Contact us at support@flowdesk.com
+            Need help choosing? Contact us at support@alphaedge.com
           </p>
         </div>
       </div>

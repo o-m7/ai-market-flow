@@ -4,9 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { User, Mail, Lock } from "lucide-react";
+import { User, Mail, Lock, Chrome } from "lucide-react";
 
 interface LoginDialogProps {
   children: React.ReactNode;
@@ -15,7 +15,8 @@ interface LoginDialogProps {
 export const LoginDialog = ({ children }: LoginDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { signIn, signUp, signInWithGoogle } = useAuth();
 
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [signupForm, setSignupForm] = useState({ email: "", password: "", confirmPassword: "" });
@@ -42,6 +43,17 @@ export const LoginDialog = ({ children }: LoginDialogProps) => {
     }
     
     setLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    
+    if (!error) {
+      setIsOpen(false);
+    }
+    
+    setGoogleLoading(false);
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -86,7 +98,7 @@ export const LoginDialog = ({ children }: LoginDialogProps) => {
       <DialogContent className="sm:max-w-[400px] bg-gradient-card border-border">
         <DialogHeader>
           <DialogTitle className="text-center text-xl font-bold">
-            Welcome to FlowDesk Markets
+            Welcome to Alphaedge
           </DialogTitle>
         </DialogHeader>
         
@@ -132,6 +144,32 @@ export const LoginDialog = ({ children }: LoginDialogProps) => {
               
               <Button type="submit" className="w-full bg-gradient-primary" disabled={loading}>
                 {loading ? "Logging in..." : "Login"}
+              </Button>
+              
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading}
+              >
+                {googleLoading ? (
+                  "Connecting..."
+                ) : (
+                  <>
+                    <Chrome className="mr-2 h-4 w-4" />
+                    Google
+                  </>
+                )}
               </Button>
             </form>
           </TabsContent>
@@ -188,6 +226,32 @@ export const LoginDialog = ({ children }: LoginDialogProps) => {
               
               <Button type="submit" className="w-full bg-gradient-primary" disabled={loading}>
                 {loading ? "Creating Account..." : "Create Account"}
+              </Button>
+              
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full" 
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading}
+              >
+                {googleLoading ? (
+                  "Connecting..."
+                ) : (
+                  <>
+                    <Chrome className="mr-2 h-4 w-4" />
+                    Google
+                  </>
+                )}
               </Button>
             </form>
           </TabsContent>
