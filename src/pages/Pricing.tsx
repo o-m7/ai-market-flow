@@ -29,7 +29,7 @@ const plans = [
     name: 'Premium Monthly',
     price: '$29.99',
     period: 'month',
-    priceId: 'price_monthly_2999', // Replace with your actual Stripe price ID
+    priceId: 'price_1Rz3y4RfOhymzkuWcmxmkf4t',
     description: 'For serious traders and analysts',
     features: [
       'Unlimited AI analyses',
@@ -49,7 +49,7 @@ const plans = [
     price: '$287.90',
     originalPrice: '$359.88',
     period: 'year',
-    priceId: 'price_yearly_28790', // Replace with your actual Stripe price ID
+    priceId: 'price_1RzMlSRfOhymzkuW1ChrMgT8',
     description: 'Best value - Save 20%!',
     features: [
       'Everything in Premium Monthly',
