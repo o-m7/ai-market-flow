@@ -101,8 +101,8 @@ export default function Pricing() {
 
       if (error) throw error;
       
-      // Redirect to checkout page for better UX, then to Stripe
-      navigate(`/checkout?price=${plan.priceId}`);
+      // Open Stripe checkout in a new tab
+      window.open(data.url, '_blank');
     } catch (error: any) {
       toast({
         title: 'Checkout Failed',
