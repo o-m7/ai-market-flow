@@ -107,11 +107,35 @@ serve(async (req) => {
       model: "gpt-4o",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
-      max_tokens: 800
+      max_tokens: 800,
+      response_format: { type: "json_object" }
     });
 
-    const out = r.choices[0].message.content;
-    const parsed = typeof out === "string" ? JSON.parse(out) : out;
+    const out = r.choices?.[0]?.message?.content || "";
+    let parsed: any = null;
+    try {
+      parsed = typeof out === "string" ? JSON.parse(out) : out;
+    } catch (_e) {
+      const start = out.indexOf('{');
+      const end = out.lastIndexOf('}');
+      if (start !== -1 && end !== -1 && end > start) {
+        try {
+          parsed = JSON.parse(out.slice(start, end + 1));
+        } catch (e2) {
+          console.error("[ai-analyze] JSON parse failed slice:", out.slice(0, 200));
+          return new Response(JSON.stringify({ error: "Model did not return valid JSON" }), {
+            status: 502,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      } else {
+        console.error("[ai-analyze] No JSON in response:", out);
+        return new Response(JSON.stringify({ error: "Model did not return JSON" }), {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
     
     const result = { 
       ...parsed, 

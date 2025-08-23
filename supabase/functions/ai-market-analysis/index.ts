@@ -11,6 +11,7 @@ const polygonApiKey = Deno.env.get('POLYGON_API_KEY');
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-openai-api-key, x-openai-key',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 interface MarketAnalysisRequest {
@@ -394,7 +395,8 @@ Respond in JSON format with the following structure:
           }
         ],
         temperature: 0.3,
-        max_tokens: 1200
+        max_tokens: 1200,
+        response_format: { type: 'json_object' }
       }),
     });
 
@@ -405,11 +407,37 @@ Respond in JSON format with the following structure:
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
-    
-    // Parse JSON response
-    const analysisData = JSON.parse(aiResponse);
-    
+    const aiResponse: string = data.choices?.[0]?.message?.content || '';
+
+    // Parse JSON response robustly
+    let analysisData: any = null;
+    try {
+      analysisData = JSON.parse(aiResponse);
+    } catch (_e) {
+      const s = aiResponse.indexOf('{');
+      const e = aiResponse.lastIndexOf('}');
+      if (s !== -1 && e !== -1 && e > s) {
+        try {
+          analysisData = JSON.parse(aiResponse.slice(s, e + 1));
+        } catch (e2) {
+          console.error('ai-market-analysis JSON parse failed slice:', aiResponse.slice(0, 200));
+          analysisData = null;
+        }
+      }
+    }
+
+    if (!analysisData) {
+      return {
+        symbol,
+        analysis: `Unable to parse AI response. Providing heuristic levels for ${symbol}.`,
+        sentiment: 'neutral',
+        confidence: 0.4,
+        keyLevels: { support: [currentPrice * 0.97], resistance: [currentPrice * 1.03] },
+        tradingSignals: { action: 'hold', reasoning: 'AI output not JSON', riskLevel: 'medium' },
+        chartPatterns: [],
+        timestamp: new Date().toISOString()
+      } as AnalysisResult;
+    }
     return {
       symbol,
       analysis: analysisData.analysis,
