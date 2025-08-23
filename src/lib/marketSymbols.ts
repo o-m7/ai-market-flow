@@ -52,21 +52,20 @@ export const MARKET_SYMBOLS = {
 
 export function getSymbolsByMarketType(marketType: string): string[] {
   switch (marketType) {
-    case 'stocks':
-      return MARKET_SYMBOLS.stocks;
     case 'crypto':
-      return MARKET_SYMBOLS.crypto;
+      return MARKET_SYMBOLS.crypto.slice(0, 5);
     case 'forex':
-      return MARKET_SYMBOLS.forex;
+      return MARKET_SYMBOLS.forex.slice(0, 5);
+    case 'stocks':
     case 'indices':
-      return MARKET_SYMBOLS.indices;
+      // Temporarily disabled
+      return [];
     case 'all':
     default:
+      // Focus on crypto + forex only
       return [
-        ...MARKET_SYMBOLS.stocks.slice(0, 3),
         ...MARKET_SYMBOLS.crypto.slice(0, 3),
-        ...MARKET_SYMBOLS.forex.slice(0, 2),
-        ...MARKET_SYMBOLS.indices.slice(0, 2)
+        ...MARKET_SYMBOLS.forex.slice(0, 2)
       ];
   }
 }

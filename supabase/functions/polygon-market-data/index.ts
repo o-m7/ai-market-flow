@@ -70,7 +70,7 @@ serve(async (req) => {
     const { symbols } = await req.json();
     console.log('Fetching data for symbols:', symbols);
 
-    const defaultSymbols = ['AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'];
+    const defaultSymbols = ['BTC/USD', 'ETH/USD', 'XRP/USD', 'EUR/USD', 'GBP/USD'];
     const symbolsToFetch: string[] = (symbols && Array.isArray(symbols) && symbols.length > 0) ? symbols : defaultSymbols;
 
     // Correct symbol mapping for different asset types
@@ -196,15 +196,20 @@ serve(async (req) => {
     const marketData: Array<any> = [];
     let usedFallback = false;
 
-    // Process symbols in batches to avoid rate limits
-    for (const rawSymbol of symbolsToFetch.slice(0, 10)) {
+    // Process symbols (limit to 5) and focus on crypto + forex only
+    for (const rawSymbol of symbolsToFetch.slice(0, 5)) {
       try {
         const { polygon: polygonSymbol, type } = getPolygonSymbol(rawSymbol);
         console.log(`Processing ${rawSymbol} -> ${polygonSymbol} (${type})`);
-        
-        // Helpers for fallbacks
+
+        // Skip stocks/indices for now
+        if (type === 'stocks') {
+          console.log(`Skipping stocks symbol ${rawSymbol}`);
+          continue;
+        }
+
         const toBinanceSymbol = (s: string) => s.replace('/', '').replace('USD', 'USDT').replace(/:/g, '');
-        const toYMD = (d: Date) => d.toISOString().slice(0,10);
+        const toYMD = (d: Date) => d.toISOString().slice(0, 10);
 
         const pushRecord = (price: number, prevClose: number, volumeNum: number) => {
           const change = price - prevClose;
@@ -216,8 +221,8 @@ serve(async (req) => {
           marketData.push({
             symbol: rawSymbol,
             name: getMarketName(rawSymbol),
-            price: Number(price.toFixed(2)),
-            change: Number(change.toFixed(2)),
+            price: Number(price.toFixed(4)),
+            change: Number(change.toFixed(4)),
             changePercent: Number(changePercent.toFixed(2)),
             volume: formatVolume(volumeNum),
             rsi: Math.floor(Math.random() * 40) + 30,
@@ -226,152 +231,87 @@ serve(async (req) => {
           });
         };
 
-        // Primary: Polygon prev aggs
-        const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
-        console.log(`Fetching: ${url}`);
-        const res = await fetch(url);
-
-        if (!res.ok) {
-          console.error(`Failed to fetch ${polygonSymbol}:`, res.status, res.statusText);
-
-          // Type-specific fallbacks
-          if (type === 'stocks') {
-            // Daily open-close fallback (yesterday)
-            const y = new Date(Date.now() - 24*60*60*1000);
-            const fallbackUrl = `https://api.polygon.io/v1/open-close/${polygonSymbol}/${toYMD(y)}?adjusted=true&apikey=${polygonApiKey}`;
-            const fallbackRes = await fetch(fallbackUrl);
-            if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json();
-              if (fallbackData.close && fallbackData.open) {
-                usedFallback = true;
-                pushRecord(fallbackData.close, fallbackData.open, fallbackData.volume || 0);
-                console.log(`Stocks fallback success for ${rawSymbol}`);
-              }
+        if (type === 'crypto') {
+          // Primary: Binance live ticker
+          try {
+            const sym = toBinanceSymbol(rawSymbol);
+            const bRes = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`);
+            if (bRes.ok) {
+              const b = await bRes.json();
+              const last = parseFloat(b.lastPrice);
+              const prev = parseFloat(b.prevClosePrice) || (last / (1 + (parseFloat(b.priceChangePercent) || 0) / 100));
+              usedFallback = true; // mark non-polygon source
+              pushRecord(last, prev, Math.floor(parseFloat(b.volume) || 0));
+              console.log(`Crypto live (Binance) success for ${rawSymbol}`);
+              await new Promise((r) => setTimeout(r, 150));
+              continue;
+            } else {
+              console.error(`Binance ticker failed for ${rawSymbol}:`, bRes.status, bRes.statusText);
             }
-          } else if (type === 'crypto') {
-            try {
-              const sym = toBinanceSymbol(rawSymbol);
-              const bRes = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`);
-              if (bRes.ok) {
-                const b = await bRes.json();
-                const last = parseFloat(b.lastPrice);
-                const prev = parseFloat(b.prevClosePrice) || (last / (1 + (parseFloat(b.priceChangePercent)||0)/100));
-                usedFallback = true;
-                pushRecord(last, prev, Math.floor(parseFloat(b.volume) || 0));
-                console.log(`Crypto fallback (Binance) success for ${rawSymbol}`);
-              }
-            } catch (e) {
-              console.error(`Binance fallback failed for ${rawSymbol}:`, e);
-            }
-          } else {
-            try {
-              const [base, quote] = rawSymbol.split('/');
-              const y = new Date(Date.now() - 24*60*60*1000);
-              const latestRes = await fetch(`https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`);
-              if (latestRes.ok) {
-                const latest = await latestRes.json();
-                const rate = latest?.rates?.[quote];
-                if (rate) {
-                  let prev = rate;
-                  const histRes = await fetch(`https://api.exchangerate.host/${toYMD(y)}?base=${base}&symbols=${quote}`);
-                  if (histRes.ok) {
-                    const hist = await histRes.json();
-                    prev = hist?.rates?.[quote] ?? prev;
-                  }
-                  usedFallback = true;
-                  pushRecord(rate, prev, 0);
-                  console.log(`Forex fallback success for ${rawSymbol}`);
-                }
-              }
-            } catch (e) {
-              console.error(`Forex fallback failed for ${rawSymbol}:`, e);
+          } catch (e) {
+            console.error(`Binance error for ${rawSymbol}:`, e);
+          }
+          // Fallback to Polygon previous aggs if Binance fails
+          const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            const result = data.results?.[0];
+            if (result) {
+              pushRecord(result.c ?? result.close ?? 0, result.o ?? result.open ?? (result.c ?? 0), result.v ?? 0);
+              await new Promise((r) => setTimeout(r, 150));
+              continue;
             }
           }
-          // proceed to next symbol
-          await new Promise((r)=>setTimeout(r,150));
+          console.warn(`No valid crypto price for ${rawSymbol}`);
+          await new Promise((r) => setTimeout(r, 150));
           continue;
         }
 
-        const data = await res.json();
-        console.log(`Response for ${polygonSymbol}:`, JSON.stringify(data, null, 2));
-        
-        let currentPrice = 0;
-        let prevClose = 0;
-        let volume = 0;
-        
-        if (data.results && data.results.length > 0) {
-          const result = data.results[0];
-          currentPrice = result.c ?? result.close ?? 0;
-          prevClose = result.o ?? result.open ?? currentPrice;
-          volume = result.v ?? result.volume ?? 0;
-        } else if (data.close !== undefined) {
-          currentPrice = data.close;
-          prevClose = data.open ?? currentPrice;
-          volume = data.volume ?? 0;
-        }
-
-        if (currentPrice === 0) {
-          console.warn(`No valid price data for ${polygonSymbol}, attempting fallback...`);
-          if (type === 'stocks') {
-            const y = new Date(Date.now() - 24*60*60*1000);
-            const fallbackUrl = `https://api.polygon.io/v1/open-close/${polygonSymbol}/${toYMD(y)}?adjusted=true&apikey=${polygonApiKey}`;
-            const fallbackRes = await fetch(fallbackUrl);
-            if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json();
-              if (fallbackData.close && fallbackData.open) {
-                usedFallback = true;
-                pushRecord(fallbackData.close, fallbackData.open, fallbackData.volume || 0);
-                console.log(`Stocks fallback success for ${rawSymbol}`);
-              }
-            }
-          } else if (type === 'crypto') {
-            try {
-              const sym = toBinanceSymbol(rawSymbol);
-              const bRes = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`);
-              if (bRes.ok) {
-                const b = await bRes.json();
-                const last = parseFloat(b.lastPrice);
-                const prev = parseFloat(b.prevClosePrice) || (last / (1 + (parseFloat(b.priceChangePercent)||0)/100));
-                usedFallback = true;
-                pushRecord(last, prev, Math.floor(parseFloat(b.volume) || 0));
-                console.log(`Crypto fallback (Binance) success for ${rawSymbol}`);
-              }
-            } catch (e) {
-              console.error(`Binance fallback failed for ${rawSymbol}:`, e);
-            }
-          } else {
-            try {
-              const [base, quote] = rawSymbol.split('/');
-              const y = new Date(Date.now() - 24*60*60*1000);
-              const latestRes = await fetch(`https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`);
-              if (latestRes.ok) {
-                const latest = await latestRes.json();
-                const rate = latest?.rates?.[quote];
-                if (rate) {
-                  let prev = rate;
-                  const histRes = await fetch(`https://api.exchangerate.host/${toYMD(y)}?base=${base}&symbols=${quote}`);
-                  if (histRes.ok) {
-                    const hist = await histRes.json();
-                    prev = hist?.rates?.[quote] ?? prev;
-                  }
-                  usedFallback = true;
-                  pushRecord(rate, prev, 0);
-                  console.log(`Forex fallback success for ${rawSymbol}`);
+        if (type === 'forex') {
+          // Primary: exchangerate.host latest
+          try {
+            const [base, quote] = rawSymbol.split('/');
+            const y = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const latestRes = await fetch(`https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`);
+            if (latestRes.ok) {
+              const latest = await latestRes.json();
+              const rate = latest?.rates?.[quote];
+              if (rate) {
+                let prev = rate;
+                const histRes = await fetch(`https://api.exchangerate.host/${toYMD(y)}?base=${base}&symbols=${quote}`);
+                if (histRes.ok) {
+                  const hist = await histRes.json();
+                  prev = hist?.rates?.[quote] ?? prev;
                 }
+                usedFallback = true; // mark non-polygon source
+                pushRecord(rate, prev, 0);
+                console.log(`Forex live success for ${rawSymbol}`);
+                await new Promise((r) => setTimeout(r, 150));
+                continue;
               }
-            } catch (e) {
-              console.error(`Forex fallback failed for ${rawSymbol}:`, e);
+            } else {
+              console.error(`exchangerate.host failed for ${rawSymbol}:`, latestRes.status, latestRes.statusText);
+            }
+          } catch (e) {
+            console.error(`Forex provider error for ${rawSymbol}:`, e);
+          }
+          // Fallback to Polygon previous aggs if provider fails
+          const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            const result = data.results?.[0];
+            if (result) {
+              pushRecord(result.c ?? result.close ?? 0, result.o ?? result.open ?? (result.c ?? 0), result.v ?? 0);
+              await new Promise((r) => setTimeout(r, 150));
+              continue;
             }
           }
-          await new Promise((r)=>setTimeout(r,150));
+          console.warn(`No valid forex price for ${rawSymbol}`);
+          await new Promise((r) => setTimeout(r, 150));
           continue;
         }
-
-        // Push polygon data
-        pushRecord(currentPrice, prevClose, volume);
-        console.log(`Successfully processed ${rawSymbol}: $${currentPrice} (${((currentPrice - prevClose) / (prevClose || currentPrice) * 100).toFixed(2)}%)`);
-        
-        await new Promise((r) => setTimeout(r, 150));
       } catch (error) {
         console.error(`Error processing ${rawSymbol}:`, error);
       }

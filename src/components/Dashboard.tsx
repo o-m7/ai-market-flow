@@ -14,7 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export const Dashboard = () => {
   const [filters, setFilters] = useState<MarketFiltersType>({
-    marketType: 'all',
+    marketType: 'crypto',
     trend: 'all',
     timeframe: '1d'
   });
@@ -131,7 +131,7 @@ export const Dashboard = () => {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => setFilters({ marketType: 'all', trend: 'all', timeframe: '1d' })}
+                onClick={() => setFilters({ marketType: 'crypto', trend: 'all', timeframe: '1d' })}
               >
                 Clear All
               </Button>
