@@ -2,6 +2,7 @@ import { Bell, User, BarChart3, Star, Settings, LogOut, Settings2, Brain } from 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SearchBar } from "@/components/SearchBar";
+import { Link } from "react-router-dom";
 
 export const Navigation = () => {
 
@@ -10,35 +11,31 @@ export const Navigation = () => {
       <div className="flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-8">
-          <a href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
+          <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
             <BarChart3 className="h-8 w-8 text-primary" />
             <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              FlowDesk Markets
+              AlphaEdge
             </h1>
-          </a>
+          </Link>
           
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center space-x-6">
-            <a href="/portfolio" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/portfolio" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
               <BarChart3 className="h-4 w-4" />
               <span>Portfolio</span>
-            </a>
-            <a href="/ai-analysis" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
+            </Link>
+            <Link to="/ai-analysis" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
               <Brain className="h-4 w-4" />
               <span>AI Analysis</span>
-            </a>
-            <a href="/watchlist" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
-              <Star className="h-4 w-4" />
-              <span>Watchlist</span>
-            </a>
-            <a href="/news" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
+            </Link>
+            <Link to="/news" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
               <Bell className="h-4 w-4" />
               <span>News</span>
-            </a>
-            <a href="/alerts" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
+            </Link>
+            <Link to="/alerts" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
               <Bell className="h-4 w-4" />
               <span>Alerts</span>
-            </a>
+            </Link>
           </nav>
         </div>
 
@@ -48,9 +45,9 @@ export const Navigation = () => {
         {/* Actions */}
         <div className="flex items-center space-x-4">
           <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" asChild>
-            <a href="/alerts">
+            <Link to="/alerts">
               <Bell className="h-5 w-5" />
-            </a>
+            </Link>
           </Button>
           
           <DropdownMenu>
@@ -61,10 +58,10 @@ export const Navigation = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-popover border-border">
               <DropdownMenuItem asChild>
-                <a href="/settings" className="flex items-center">
+                <Link to="/settings" className="flex items-center">
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
-                </a>
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

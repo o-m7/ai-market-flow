@@ -7,7 +7,6 @@ import { Dashboard } from "./components/Dashboard";
 import Index from "./pages/Index";
 import { SymbolDetail } from "./pages/SymbolDetail";
 import { SearchResults } from "./pages/SearchResults";
-import { Watchlist } from "./pages/Watchlist";
 import { Alerts } from "./pages/Alerts";
 import { Settings } from "./pages/Settings";
 import Portfolio from "./pages/Portfolio";
@@ -38,7 +37,6 @@ const App = () => (
             <Route path="/payment-canceled" element={<PaymentCanceled />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/search" element={<SearchResults />} />
-            <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/ai-analysis" element={
