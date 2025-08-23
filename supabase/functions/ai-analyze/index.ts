@@ -65,7 +65,10 @@ serve(async (req) => {
 
   try {
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    console.log('OpenAI API Key available:', !!openaiApiKey);
+    
     if (!openaiApiKey) {
+      console.error('OpenAI API key not found in environment variables');
       return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
