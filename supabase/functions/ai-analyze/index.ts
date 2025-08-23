@@ -45,7 +45,7 @@ const analysisSchema = {
   strict: true
 };
 
-function sanitizeCandles(raw: any[], max = 400) {
+function sanitizeCandles(raw: any[], max = 200) {
   const bars = (raw ?? []).slice(-max).map((b) => ({
     t: Number(b.t), o: Number(b.o), h: Number(b.h),
     l: Number(b.l), c: Number(b.c), v: Number(b.v ?? 0)
@@ -93,12 +93,12 @@ serve(async (req) => {
       "Use price action plus EMA20/50/200, RSI, MACD, ATR, Bollinger conceptually. " +
       "Be concise and numeric. Return ONLY valid JSON to the schema.\n" +
       "Columns: t,o,h,l,c,v (t=epoch seconds).\n" +
-      "Data:\n" + JSON.stringify(bars);
+      "Data:\n" + JSON.stringify(bars.slice(-100)); // Use less data for faster processing
 
     const r = await client.chat.completions.create({
       model: "gpt-4.1-mini-2025-04-14",
       messages: [{ role: "user", content: prompt }],
-      max_completion_tokens: 1200,
+      max_completion_tokens: 800, // Reduced for faster response
       response_format: {
         type: "json_schema",
         json_schema: analysisSchema

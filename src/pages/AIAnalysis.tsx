@@ -152,6 +152,12 @@ export const AIAnalysis = () => {
     setLoading(true);
     setAiError(null);
     
+    // Show progress feedback
+    toast({
+      title: "Starting Analysis",
+      description: "Processing chart data...",
+    });
+    
     try {
       // Track usage for non-subscribed users
       if (!isSubscribed) {
@@ -160,6 +166,12 @@ export const AIAnalysis = () => {
           throw new Error('Failed to track usage');
         }
       }
+
+      // Show next step
+      toast({
+        title: "Analyzing Market Data",
+        description: "Running AI technical analysis...",
+      });
 
       // Map timeframe format for API
       const timeframeMap: Record<string, "1m"|"5m"|"15m"|"30m"|"1h"|"4h"|"1d"> = {
@@ -212,7 +224,7 @@ export const AIAnalysis = () => {
 
       setAnalysis(analysisForDisplay);
       toast({
-        title: 'Analysis Complete',
+        title: 'Analysis Complete ✅',
         description: `AI analyzed ${symbol.toUpperCase()} with ${seriesData.length} data points`,
       });
 
