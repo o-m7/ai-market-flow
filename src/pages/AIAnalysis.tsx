@@ -61,24 +61,32 @@ const SYMBOL_CATEGORIES = {
 };
 
 const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
-  symbol = symbol.toUpperCase();
-  
-  // Crypto patterns
-  if (symbol.includes('BTC') || symbol.includes('ETH') || symbol.includes('ADA') || 
-      symbol.includes('SOL') || symbol.includes('DOGE') || symbol.includes('LTC') ||
-      symbol.includes('XRP') || symbol.includes('AVAX') || symbol.includes('MATIC') ||
-      symbol.includes('DOT') || symbol.includes('LINK') || symbol.includes('UNI') ||
-      symbol.includes('ATOM') || symbol.includes('ALGO') ||
-      (symbol.includes('USD') && symbol.length <= 6 && symbol !== 'USDJPY')) {
-    return 'CRYPTO';
-  }
-  
-  // Forex patterns  
-  if (['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY'].includes(symbol)) {
-    return 'FOREX';
-  }
-  
-  // Default to stock
+  const s = symbol.toUpperCase();
+
+  // Known forex pairs (expanded)
+  const FOREX_SET = new Set([
+    'EURUSD','GBPUSD','USDJPY','USDCHF','AUDUSD','USDCAD','NZDUSD',
+    'EURGBP','EURJPY','GBPJPY','AUDJPY','EURCHF','GBPCHF','CHFJPY',
+    'CADJPY','EURAUD','GBPAUD','AUDCHF','NZDJPY','EURCAD','GBPCAD',
+    'AUDCAD','EURNZD','GBPNZD','USDSEK','USDNOK','USDDKK','EURSEK',
+    'EURNOK','GBPSEK'
+  ]);
+
+  if (FOREX_SET.has(s)) return 'FOREX';
+
+  // Common crypto tickers
+  const isCrypto = (
+    s.includes('BTC') || s.includes('ETH') || s.includes('BNB') || s.includes('XRP') ||
+    s.includes('ADA') || s.includes('SOL') || s.includes('DOT') || s.includes('MATIC') ||
+    s.includes('AVAX') || s.includes('LINK') || s.includes('UNI') || s.includes('ATOM') ||
+    s.includes('ALGO') || s.includes('VET') || s.includes('ICP') || s.includes('FIL') ||
+    s.includes('THETA') || s.includes('TRX') || s.includes('ETC') || s.includes('XMR') ||
+    s.includes('BCH') || s.includes('LTC') || s.includes('DOGE') || s.includes('SHIB') ||
+    s.includes('NEAR') || s.includes('FTM') || s.includes('SAND') || s.includes('MANA') ||
+    s.includes('CRV') || s.includes('AAVE')
+  );
+  if (isCrypto) return 'CRYPTO';
+
   return 'STOCK';
 };
 
