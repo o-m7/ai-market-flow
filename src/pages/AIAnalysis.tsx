@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, TrendingDown, Activity, Brain, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
+import { useAuth } from "@/contexts/AuthContext";
 import { type LWBar } from "@/features/ai/collectBars";
 import { AiResult } from "@/features/ai/Result";
 import { onGenerateAnalysis } from "@/features/ai/onGenerateAnalysis";
@@ -82,6 +84,8 @@ const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
 
 export const AIAnalysis = () => {
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const { usage, loading: usageLoading, trackAnalysis, isSubscribed } = useUsageTracking();
   
   // Convert symbol format from watchlist to AI Analysis format
   const convertSymbolFormat = (symbol: string, type?: string) => {
@@ -109,6 +113,25 @@ export const AIAnalysis = () => {
   const { toast } = useToast();
 
   const handleAnalysis = async () => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please sign in to use AI analysis features.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check usage limits for non-subscribed users
+    if (!isSubscribed && !usage.canAnalyzeSymbol(symbol)) {
+      toast({
+        title: 'Usage Limit Reached',
+        description: `You've reached your daily limit of 5 analyses. Upgrade to Premium for unlimited access.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (chartData.length < 30) {
       toast({
         title: 'Insufficient Data',
@@ -122,6 +145,14 @@ export const AIAnalysis = () => {
     setAiError(null);
     
     try {
+      // Track usage for non-subscribed users
+      if (!isSubscribed) {
+        const trackingResult = await trackAnalysis(symbol);
+        if (!trackingResult) {
+          throw new Error('Failed to track usage');
+        }
+      }
+
       // Map timeframe format for API
       const timeframeMap: Record<string, "1m"|"5m"|"15m"|"30m"|"1h"|"4h"|"1d"> = {
         '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
@@ -138,9 +169,9 @@ export const AIAnalysis = () => {
         v: bar.volume || 0
       }));
 
-      // Use the new analysis function
+      // Use the new analysis function (chart snapshot not available)
       const result = await onGenerateAnalysis({
-        chart: chartRef.current,
+        chart: null, // Chart ref not available
         seriesData,
         symbol: symbol.toUpperCase(),
         assetClass: getAssetType(symbol).toLowerCase() as "crypto" | "stock" | "forex",
@@ -279,7 +310,7 @@ export const AIAnalysis = () => {
               
               <Button 
                 onClick={handleAnalysis} 
-                disabled={loading || chartData.length < 30}
+                disabled={loading || chartData.length < 30 || (!isSubscribed && !user) || (!isSubscribed && usage.remainingAnalyses === 0)}
                 className="min-w-[140px]"
               >
                 {loading ? (
@@ -295,6 +326,13 @@ export const AIAnalysis = () => {
                   )}
               </Button>
             </div>
+            
+            {/* Usage indicator for non-subscribed users */}
+            {user && !isSubscribed && !usageLoading && (
+              <div className="text-xs text-muted-foreground mb-2">
+                {usage.remainingAnalyses}/5 free analyses remaining today
+              </div>
+            )}
           </div>
           
           {/* Data Echo */}
