@@ -30,15 +30,8 @@ serve(async (req) => {
     logStep("Function started");
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) {
-      logStep("No Stripe key configured, returning unsubscribed");
-      return new Response(JSON.stringify({ subscribed: false }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-    logStep("Stripe key verified");
 
+    // Authenticate request and get user first (needed for DB fallback)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
     logStep("Authorization header found");
@@ -52,41 +45,74 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    // Fetch existing subscriber record for fallback logic
+    const { data: existingSub } = await supabaseClient
+      .from("subscribers")
+      .select("*")
+      .eq("email", user.email)
+      .maybeSingle();
+
+    if (!stripeKey) {
+      logStep("No Stripe key configured, using DB subscription state");
+      return new Response(JSON.stringify({
+        subscribed: existingSub?.subscribed ?? false,
+        subscription_tier: existingSub?.subscription_tier ?? null,
+        subscription_end: existingSub?.subscription_end ?? null
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+    logStep("Stripe key verified");
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     
     if (customers.data.length === 0) {
-      logStep("No customer found, checking if user needs trial");
-      
-      // Check if user already has a record
-      const { data: existingUser } = await supabaseClient
-        .from("subscribers")
-        .select("*")
-        .eq("email", user.email)
-        .single();
+      logStep("No customer found in Stripe; using DB record or trial if new user");
 
-      let trialStart = null;
-      let trialEnd = null;
-      
-      // If new user, give them a 7-day trial
-      if (!existingUser) {
-        trialStart = new Date().toISOString();
-        trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days from now
-        logStep("New user, granting 7-day trial", { trialStart, trialEnd });
+      // Respect existing DB premium overrides
+      if (existingSub?.subscribed) {
+        logStep("Existing DB marks user subscribed, respecting override");
+        return new Response(JSON.stringify({
+          subscribed: true,
+          subscription_tier: existingSub.subscription_tier ?? "Premium",
+          subscription_end: existingSub.subscription_end ?? null,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
       }
 
-      await supabaseClient.from("subscribers").upsert({
-        email: user.email,
-        user_id: user.id,
-        stripe_customer_id: null,
-        subscribed: false,
-        subscription_tier: null,
-        subscription_end: trialEnd,
-        trial_start: trialStart,
-        trial_end: trialEnd,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'email' });
-      
+      let trialStart: string | null = null;
+      let trialEnd: string | null = null;
+
+      // If no record exists, grant a 7-day trial
+      if (!existingSub) {
+        trialStart = new Date().toISOString();
+        trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        logStep("New user, granting 7-day trial", { trialStart, trialEnd });
+        await supabaseClient.from("subscribers").upsert({
+          email: user.email,
+          user_id: user.id,
+          stripe_customer_id: null,
+          subscribed: false,
+          subscription_tier: null,
+          subscription_end: trialEnd,
+          trial_start: trialStart,
+          trial_end: trialEnd,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'email' });
+      } else {
+        // Maintain current DB state; just ensure linkage to user_id
+        await supabaseClient.from("subscribers").upsert({
+          email: user.email,
+          user_id: user.id,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'email' });
+        trialEnd = (existingSub.subscription_end as string) ?? (existingSub.trial_end as string) ?? null;
+      }
+
       return new Response(JSON.stringify({ 
         subscribed: false, 
         subscription_tier: null,
