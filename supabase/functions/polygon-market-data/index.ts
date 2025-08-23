@@ -70,7 +70,7 @@ serve(async (req) => {
     const { symbols } = await req.json();
     console.log('Fetching data for symbols:', symbols);
 
-    const defaultSymbols = ['BTC/USD', 'ETH/USD', 'XRP/USD', 'EUR/USD', 'GBP/USD'];
+    const defaultSymbols = ['AAPL', 'TSLA', 'MSFT', 'BTC/USD', 'ETH/USD', 'EUR/USD', 'SPY', 'QQQ', 'GLD', 'NVDA'];
     const symbolsToFetch: string[] = (symbols && Array.isArray(symbols) && symbols.length > 0) ? symbols : defaultSymbols;
 
     // Correct symbol mapping for different asset types
@@ -196,17 +196,11 @@ serve(async (req) => {
     const marketData: Array<any> = [];
     let usedFallback = false;
 
-    // Process symbols (limit to 5) and focus on crypto + forex only
-    for (const rawSymbol of symbolsToFetch.slice(0, 5)) {
+    // Process all symbol types (limit to 10 for performance)
+    for (const rawSymbol of symbolsToFetch.slice(0, 10)) {
       try {
         const { polygon: polygonSymbol, type } = getPolygonSymbol(rawSymbol);
         console.log(`Processing ${rawSymbol} -> ${polygonSymbol} (${type})`);
-
-        // Skip stocks/indices for now
-        if (type === 'stocks') {
-          console.log(`Skipping stocks symbol ${rawSymbol}`);
-          continue;
-        }
 
         const toBinanceSymbol = (s: string) => s.replace('/', '').replace('USD', 'USDT').replace(/:/g, '');
         const toYMD = (d: Date) => d.toISOString().slice(0, 10);
@@ -231,7 +225,33 @@ serve(async (req) => {
           });
         };
 
-        if (type === 'crypto') {
+        if (type === 'stocks') {
+          // Primary: Polygon previous day aggregates for stocks
+          const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            const result = data.results?.[0];
+            if (result) {
+              pushRecord(result.c ?? result.close ?? 0, result.o ?? result.open ?? (result.c ?? 0), result.v ?? 0);
+              console.log(`Stock success for ${rawSymbol}`);
+              await new Promise((r) => setTimeout(r, 150));
+              continue;
+            }
+          }
+          // Fallback: Daily open-close (yesterday)
+          const y = new Date(Date.now() - 24*60*60*1000);
+          const fallbackUrl = `https://api.polygon.io/v1/open-close/${polygonSymbol}/${toYMD(y)}?adjusted=true&apikey=${polygonApiKey}`;
+          const fallbackRes = await fetch(fallbackUrl);
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            if (fallbackData.close && fallbackData.open) {
+              usedFallback = true;
+              pushRecord(fallbackData.close, fallbackData.open, fallbackData.volume || 0);
+              console.log(`Stock fallback success for ${rawSymbol}`);
+            }
+          }
+        } else if (type === 'crypto') {
           // Primary: Binance live ticker
           try {
             const sym = toBinanceSymbol(rawSymbol);
@@ -266,10 +286,8 @@ serve(async (req) => {
           console.warn(`No valid crypto price for ${rawSymbol}`);
           await new Promise((r) => setTimeout(r, 150));
           continue;
-        }
-
-        if (type === 'forex') {
-          // Primary: exchangerate.host latest
+        } else if (type === 'forex') {
+          // Primary: exchangerate.host latest for forex
           try {
             const [base, quote] = rawSymbol.split('/');
             const y = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -309,9 +327,10 @@ serve(async (req) => {
             }
           }
           console.warn(`No valid forex price for ${rawSymbol}`);
-          await new Promise((r) => setTimeout(r, 150));
-          continue;
         }
+
+        console.warn(`Unknown symbol type or no data for ${rawSymbol}`);
+        await new Promise((r) => setTimeout(r, 150));
       } catch (error) {
         console.error(`Error processing ${rawSymbol}:`, error);
       }
@@ -322,7 +341,7 @@ serve(async (req) => {
     // If no real data, return mock data to ensure UI works
     if (marketData.length === 0) {
       console.log("No live data available, generating mock data");
-      for (const symbol of symbolsToFetch.slice(0, 6)) {
+      for (const symbol of symbolsToFetch.slice(0, 10)) {
         const basePrice = Math.random() * 200 + 50;
         const changePercent = (Math.random() - 0.5) * 6; // -3% to +3%
         const change = (basePrice * changePercent) / 100;
@@ -356,7 +375,7 @@ serve(async (req) => {
     
     // Return mock data on error to ensure UI functionality
     const mockData = [];
-    const defaultSymbols = ['AAPL', 'TSLA', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'];
+    const defaultSymbols = ['AAPL', 'TSLA', 'BTC/USD', 'ETH/USD', 'EUR/USD', 'SPY'];
     
     for (const symbol of defaultSymbols) {
       const basePrice = Math.random() * 200 + 50;
