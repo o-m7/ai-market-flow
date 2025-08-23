@@ -1,8 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const client = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")! });
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -66,6 +64,16 @@ serve(async (req) => {
   }
 
   try {
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const client = new OpenAI({ apiKey: openaiApiKey });
+
     const { symbol, timeframe, market, candles } = await req.json();
     const bars = sanitizeCandles(candles);
     if (!symbol || bars.length < 20) {
