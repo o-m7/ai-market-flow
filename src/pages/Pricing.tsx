@@ -273,7 +273,6 @@ export default function Pricing() {
                   onClick={() => handleSubscribe(plan)}
                   disabled={
                     loading === plan.name || 
-                    !user || 
                     (subscription?.subscription_tier === plan.name) ||
                     (plan.name === 'Free' && !subscription?.subscribed)
                   }
