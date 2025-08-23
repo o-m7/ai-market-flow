@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Filter, TrendingUp, TrendingDown } from "lucide-react";
+import { Search, Filter, TrendingUp, TrendingDown, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -217,7 +217,8 @@ export const SearchResults = () => {
                         </a>
                       </Button>
                       <Button variant="outline" size="sm" className="border-border hover:border-primary">
-                        Add to Watchlist
+                        <Brain className="h-4 w-4 mr-1" />
+                        AI Analysis
                       </Button>
                     </div>
                   </div>

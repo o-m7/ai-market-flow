@@ -85,8 +85,8 @@ export const MarketDataPanel = ({ symbol }: MarketDataPanelProps) => {
   useEffect(() => {
     fetchMarketData();
     
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchMarketData, 30000);
+    // Auto-refresh every 10 seconds for real-time data
+    const interval = setInterval(fetchMarketData, 10000);
     return () => clearInterval(interval);
   }, [symbol]);
 

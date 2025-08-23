@@ -109,6 +109,158 @@ serve(async (req) => {
 
 async function fetchMarketData(symbol: string, timeframe: string) {
   try {
+    const isCrypto = symbol.includes('USD') && symbol.includes('/');
+    const isForex = symbol.includes('/') && !symbol.includes('USD/');
+    
+    if (isCrypto) {
+      return await fetchCryptoData(symbol, timeframe);
+    } else if (isForex) {
+      return await fetchForexData(symbol, timeframe);
+    } else {
+      // Stocks - use Polygon
+      return await fetchStockData(symbol, timeframe);
+    }
+  } catch (error) {
+    console.error(`Error fetching market data for ${symbol}:`, error);
+    throw error;
+  }
+}
+
+async function fetchCryptoData(symbol: string, timeframe: string) {
+  try {
+    // Convert to Binance format
+    const binanceSymbol = symbol.replace('/', '').replace('USD', 'USDT');
+    
+    // Get current price data
+    const tickerResponse = await fetch(
+      `https://api.binance.com/api/v3/ticker/24hr?symbol=${binanceSymbol}`
+    );
+    
+    if (!tickerResponse.ok) {
+      throw new Error(`Failed to fetch crypto ticker for ${symbol}`);
+    }
+    
+    const tickerData = await tickerResponse.json();
+    
+    // Get historical kline data (30 days)
+    const klinesResponse = await fetch(
+      `https://api.binance.com/api/v3/klines?symbol=${binanceSymbol}&interval=1d&limit=30`
+    );
+    
+    let historicalData = [];
+    if (klinesResponse.ok) {
+      const klines = await klinesResponse.json();
+      historicalData = klines.map((kline: any[]) => ({
+        t: kline[0], // timestamp
+        o: parseFloat(kline[1]), // open
+        h: parseFloat(kline[2]), // high
+        l: parseFloat(kline[3]), // low
+        c: parseFloat(kline[4]), // close
+        v: parseFloat(kline[5]) // volume
+      }));
+    }
+    
+    return {
+      quote: {
+        last_trade: { price: parseFloat(tickerData.lastPrice) },
+        prevDay: { c: parseFloat(tickerData.prevClosePrice) },
+        volume: parseFloat(tickerData.volume)
+      },
+      history: historicalData,
+      symbol,
+      timeframe
+    };
+  } catch (error) {
+    console.error(`Error fetching crypto data for ${symbol}:`, error);
+    throw error;
+  }
+}
+
+async function fetchForexData(symbol: string, timeframe: string) {
+  try {
+    const [base, quote] = symbol.split('/');
+    
+    // Get current exchange rate
+    const currentResponse = await fetch(
+      `https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`
+    );
+    
+    if (!currentResponse.ok) {
+      throw new Error(`Failed to fetch forex rate for ${symbol}`);
+    }
+    
+    const currentData = await currentResponse.json();
+    const currentRate = currentData.rates[quote];
+    
+    // Get historical data for the last 30 days
+    const historicalData = [];
+    for (let i = 1; i <= 30; i++) {
+      const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      try {
+        const histResponse = await fetch(
+          `https://api.exchangerate.host/${dateStr}?base=${base}&symbols=${quote}`
+        );
+        
+        if (histResponse.ok) {
+          const histData = await histResponse.json();
+          const rate = histData.rates[quote];
+          if (rate) {
+            historicalData.push({
+              t: date.getTime(),
+              o: rate,
+              h: rate * (1 + Math.random() * 0.002), // Simulate intraday high
+              l: rate * (1 - Math.random() * 0.002), // Simulate intraday low
+              c: rate,
+              v: 0 // Forex doesn't have volume
+            });
+          }
+        }
+        
+        // Rate limiting for historical requests
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (e) {
+        console.log(`Skipping historical data for ${dateStr}`);
+      }
+    }
+    
+    // Get previous day rate for comparison
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    let prevRate = currentRate;
+    
+    try {
+      const prevResponse = await fetch(
+        `https://api.exchangerate.host/${yesterdayStr}?base=${base}&symbols=${quote}`
+      );
+      
+      if (prevResponse.ok) {
+        const prevData = await prevResponse.json();
+        prevRate = prevData.rates[quote] || currentRate;
+      }
+    } catch (e) {
+      console.log('Could not fetch previous day rate');
+    }
+    
+    return {
+      quote: {
+        last_trade: { price: currentRate },
+        prevDay: { c: prevRate },
+        volume: 0
+      },
+      history: historicalData.reverse(), // Most recent first
+      symbol,
+      timeframe
+    };
+  } catch (error) {
+    console.error(`Error fetching forex data for ${symbol}:`, error);
+    throw error;
+  }
+}
+
+async function fetchStockData(symbol: string, timeframe: string) {
+  try {
     // Get current quote
     const quoteResponse = await fetch(
       `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${symbol}?apikey=${polygonApiKey}`
@@ -139,9 +291,8 @@ async function fetchMarketData(symbol: string, timeframe: string) {
       symbol,
       timeframe
     };
-    
   } catch (error) {
-    console.error(`Error fetching market data for ${symbol}:`, error);
+    console.error(`Error fetching stock data for ${symbol}:`, error);
     throw error;
   }
 }
@@ -163,8 +314,10 @@ async function generateAIAnalysis(symbol: string, marketData: any, analysisType:
     volume: day.v
   }));
 
+  const assetType = symbol.includes('/') ? (symbol.includes('USD') && !symbol.startsWith('USD') ? 'cryptocurrency' : 'forex pair') : 'stock';
+  
   const prompt = `
-As an expert financial analyst, analyze ${symbol} stock with the following data:
+As an expert financial analyst, analyze ${symbol} ${assetType} with the following data:
 
 Current Data:
 - Current Price: $${currentPrice}

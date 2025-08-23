@@ -109,10 +109,6 @@ export const SymbolCard = ({
 
         {/* Actions */}
         <div className="grid grid-cols-2 gap-2">
-          <Button size="sm" className="bg-primary hover:bg-primary/90">
-            <Plus className="h-4 w-4 mr-1" />
-            Watchlist
-          </Button>
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="border-border hover:border-primary">

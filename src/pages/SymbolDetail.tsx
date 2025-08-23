@@ -83,10 +83,6 @@ export const SymbolDetail = () => {
           
           <div className="flex items-center space-x-2">
             <Button variant="outline" size="sm">
-              <Star className="h-4 w-4 mr-2" />
-              Watchlist
-            </Button>
-            <Button variant="outline" size="sm">
               <Bell className="h-4 w-4 mr-2" />
               Alerts
             </Button>
