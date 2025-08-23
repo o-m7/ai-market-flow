@@ -85,9 +85,8 @@ serve(async (req) => {
     const searchQuery = query.toUpperCase();
     const results: SearchResult[] = [];
 
-    // Search in different markets
+    // Search only in crypto and forex markets
     const searchPromises = [
-      searchStocks(searchQuery, polygonApiKey),
       searchCrypto(searchQuery, polygonApiKey),
       searchForex(searchQuery, polygonApiKey)
     ];
@@ -162,8 +161,11 @@ async function searchStocks(query: string, apiKey: string): Promise<SearchResult
 
 async function searchCrypto(query: string, apiKey: string): Promise<SearchResult[]> {
   const cryptoSymbols = [
-    'X:BTCUSD', 'X:ETHUSD', 'X:BNBUSD', 'X:XRPUSD', 'X:ADAUSD', 
-    'X:SOLUSD', 'X:DOTUSD', 'X:MATICUSD', 'X:AVAXUSD', 'X:LINKUSD'
+    'X:BTCUSD', 'X:ETHUSD', 'X:BNBUSD', 'X:XRPUSD', 'X:ADAUSD', 'X:SOLUSD', 'X:DOTUSD', 
+    'X:MATICUSD', 'X:AVAXUSD', 'X:LINKUSD', 'X:UNIUSD', 'X:ATOMUSD', 'X:ALGOUSD', 
+    'X:VETUSD', 'X:ICPUSD', 'X:FILUSD', 'X:THETAUSD', 'X:TRXUSD', 'X:ETCUSD', 
+    'X:XMRUSD', 'X:BCHUSD', 'X:LTCUSD', 'X:DOGEUSD', 'X:SHIBUSD', 'X:NEARUSD', 
+    'X:FTMUSD', 'X:SANDUSD', 'X:MANAUSD', 'X:CRVUSD', 'X:AAVEUSD'
   ];
   
   const matchingSymbols = cryptoSymbols.filter(symbol => 
@@ -202,8 +204,11 @@ async function searchCrypto(query: string, apiKey: string): Promise<SearchResult
 
 async function searchForex(query: string, apiKey: string): Promise<SearchResult[]> {
   const forexSymbols = [
-    'C:EURUSD', 'C:GBPUSD', 'C:USDJPY', 'C:USDCHF', 
-    'C:AUDUSD', 'C:USDCAD', 'C:NZDUSD'
+    'C:EURUSD', 'C:GBPUSD', 'C:USDJPY', 'C:USDCHF', 'C:AUDUSD', 'C:USDCAD', 'C:NZDUSD', 
+    'C:EURGBP', 'C:EURJPY', 'C:GBPJPY', 'C:AUDJPY', 'C:EURCHF', 'C:GBPCHF', 'C:CHFJPY', 
+    'C:CADJPY', 'C:EURAUD', 'C:GBPAUD', 'C:AUDCHF', 'C:NZDJPY', 'C:EURCAD', 'C:GBPCAD', 
+    'C:AUDCAD', 'C:EURNZD', 'C:GBPNZD', 'C:USDSEK', 'C:USDNOK', 'C:USDDKK', 'C:EURSEK', 
+    'C:EURNOK', 'C:GBPSEK'
   ];
   
   const matchingSymbols = forexSymbols.filter(symbol => 
@@ -243,26 +248,6 @@ async function searchForex(query: string, apiKey: string): Promise<SearchResult[
 function generateMockSearchResults(query: string): Response {
   const mockResults: SearchResult[] = [
     {
-      symbol: "AAPL",
-      name: "Apple Inc.",
-      type: "stock",
-      price: 185.25,
-      change: 3.45,
-      changePercent: 1.89,
-      volume: "45.2M",
-      marketCap: "2.85T"
-    },
-    {
-      symbol: "MSFT",
-      name: "Microsoft Corporation", 
-      type: "stock",
-      price: 378.85,
-      change: -2.15,
-      changePercent: -0.56,
-      volume: "23.1M",
-      marketCap: "2.81T"
-    },
-    {
       symbol: "BTC/USD",
       name: "Bitcoin",
       type: "crypto",
@@ -272,6 +257,15 @@ function generateMockSearchResults(query: string): Response {
       volume: "1.8B"
     },
     {
+      symbol: "ETH/USD",
+      name: "Ethereum",
+      type: "crypto",
+      price: 2650.00,
+      change: 45.30,
+      changePercent: 1.74,
+      volume: "850M"
+    },
+    {
       symbol: "EUR/USD",
       name: "Euro / US Dollar",
       type: "forex", 
@@ -279,6 +273,15 @@ function generateMockSearchResults(query: string): Response {
       change: 0.0012,
       changePercent: 0.11,
       volume: "2.1B"
+    },
+    {
+      symbol: "GBP/USD",
+      name: "British Pound / US Dollar",
+      type: "forex",
+      price: 1.2845,
+      change: -0.0023,
+      changePercent: -0.18,
+      volume: "1.5B"
     }
   ].filter(result => 
     result.symbol.toLowerCase().includes(query.toLowerCase()) ||

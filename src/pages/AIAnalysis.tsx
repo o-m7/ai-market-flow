@@ -39,23 +39,23 @@ interface AnalysisResult {
 }
 
 const POPULAR_SYMBOLS = [
-  // Major Stocks
-  'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'CRM',
-  'UBER', 'SHOP', 'SQ', 'PYPL', 'COIN', 'RBLX', 'SNOW', 'PLTR', 'ARKK', 'SPY',
-  
   // Major Crypto
-  'BTCUSD', 'ETHUSD', 'ADAUSD', 'SOLUSD', 'DOGEUSD', 'LTCUSD', 'XRPUSD', 
-  'AVAXUSD', 'MATICUSD', 'DOTUSD', 'LINKUSD', 'UNIUSD', 'ATOMUSD', 'ALGOUSD',
+  'BTCUSD', 'ETHUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD', 'SOLUSD', 'DOTUSD', 'MATICUSD', 
+  'AVAXUSD', 'LINKUSD', 'UNIUSD', 'ATOMUSD', 'ALGOUSD', 'VETUSD', 'ICPUSD', 
+  'FILUSD', 'THETAUSD', 'TRXUSD', 'ETCUSD', 'XMRUSD', 'BCHUSD', 'LTCUSD', 
+  'DOGEUSD', 'SHIBUSD', 'NEARUSD', 'FTMUSD', 'SANDUSD', 'MANAUSD', 'CRVUSD', 'AAVEUSD',
   
   // Major Forex Pairs
-  'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 
-  'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY'
+  'EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD', 
+  'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'EURCHF', 'GBPCHF', 'CHFJPY', 
+  'CADJPY', 'EURAUD', 'GBPAUD', 'AUDCHF', 'NZDJPY', 'EURCAD', 'GBPCAD', 
+  'AUDCAD', 'EURNZD', 'GBPNZD', 'USDSEK', 'USDNOK', 'USDDKK', 'EURSEK', 
+  'EURNOK', 'GBPSEK'
 ];
 
 const SYMBOL_CATEGORIES = {
-  'Stocks': ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'AMD', 'CRM', 'UBER', 'SHOP', 'SQ', 'PYPL', 'COIN', 'RBLX', 'SNOW', 'PLTR', 'ARKK', 'SPY'],
-  'Crypto': ['BTCUSD', 'ETHUSD', 'ADAUSD', 'SOLUSD', 'DOGEUSD', 'LTCUSD', 'XRPUSD', 'AVAXUSD', 'MATICUSD', 'DOTUSD', 'LINKUSD', 'UNIUSD', 'ATOMUSD', 'ALGOUSD'],
-  'Forex': ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD', 'USDCHF', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'CADJPY']
+  'Crypto': ['BTCUSD', 'ETHUSD', 'BNBUSD', 'XRPUSD', 'ADAUSD', 'SOLUSD', 'DOTUSD', 'MATICUSD', 'AVAXUSD', 'LINKUSD', 'UNIUSD', 'ATOMUSD', 'ALGOUSD', 'VETUSD', 'ICPUSD', 'FILUSD', 'THETAUSD', 'TRXUSD', 'ETCUSD', 'XMRUSD', 'BCHUSD', 'LTCUSD', 'DOGEUSD', 'SHIBUSD', 'NEARUSD', 'FTMUSD', 'SANDUSD', 'MANAUSD', 'CRVUSD', 'AAVEUSD'],
+  'Forex': ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY', 'AUDJPY', 'EURCHF', 'GBPCHF', 'CHFJPY', 'CADJPY', 'EURAUD', 'GBPAUD', 'AUDCHF', 'NZDJPY', 'EURCAD', 'GBPCAD', 'AUDCAD', 'EURNZD', 'GBPNZD', 'USDSEK', 'USDNOK', 'USDDKK', 'EURSEK', 'EURNOK', 'GBPSEK']
 };
 
 const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
@@ -97,7 +97,7 @@ export const AIAnalysis = () => {
   // Get initial symbol from URL params or default
   const urlSymbol = searchParams.get('symbol');
   const urlType = searchParams.get('type');
-  const initialSymbol = urlSymbol ? convertSymbolFormat(urlSymbol, urlType) : "AAPL";
+  const initialSymbol = urlSymbol ? convertSymbolFormat(urlSymbol, urlType) : "BTCUSD";
   
   const [symbol, setSymbol] = useState(initialSymbol);
   const [timeframe, setTimeframe] = useState<'1'|'5'|'15'|'30'|'60'|'240'|'D'>("60");
@@ -242,14 +242,6 @@ export const AIAnalysis = () => {
                     <SelectValue placeholder="Select Symbol" />
                   </SelectTrigger>
                   <SelectContent className="max-h-80">
-                    <div className="p-2">
-                      <div className="font-semibold text-sm mb-2 text-green-600">📈 Stocks</div>
-                      {SYMBOL_CATEGORIES.Stocks.map((sym) => (
-                        <SelectItem key={sym} value={sym} className="pl-4">
-                          {sym}
-                        </SelectItem>
-                      ))}
-                    </div>
                     <div className="p-2">
                       <div className="font-semibold text-sm mb-2 text-orange-600">₿ Crypto</div>
                       {SYMBOL_CATEGORIES.Crypto.map((sym) => (

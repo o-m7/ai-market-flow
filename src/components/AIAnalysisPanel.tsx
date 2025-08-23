@@ -136,18 +136,12 @@ export const AIAnalysisPanel = ({ symbols }: AIAnalysisPanelProps) => {
             <div className="flex items-center gap-2 mb-4">
               <Button 
                 onClick={handleAnalysisRequest}
-                disabled={!connected || isAnalyzing || (!isSubscribed && usage.remainingAnalyses === 0 && !!user)}
+                disabled={!connected || isAnalyzing}
                 size="sm"
                 className="gap-2"
               >
-                {(!isSubscribed && usage.remainingAnalyses === 0 && !!user) ? (
-                  <Lock className="h-4 w-4" />
-                ) : (
-                  <RefreshCw className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                )}
-                {isAnalyzing ? 'Analyzing...' : 
-                 (!isSubscribed && usage.remainingAnalyses === 0 && !!user) ? 'Limit Reached' : 
-                 'Analyze All'}
+                <RefreshCw className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                {isAnalyzing ? 'Analyzing...' : 'Analyze All'}
               </Button>
               
               <select 
