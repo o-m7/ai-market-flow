@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
@@ -64,18 +65,23 @@ serve(async (req) => {
   }
 
   try {
-let openaiApiKey = Deno.env.get('OPENAI_API_KEY') || '';
-const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
-if (!openaiApiKey && headerKey) openaiApiKey = headerKey;
-console.log('OpenAI API Key available:', !!openaiApiKey);
+    let openaiApiKey =
+      Deno.env.get('OPENAI_API_KEY') ||
+      Deno.env.get('OPEN_AI_API_KEY') ||
+      Deno.env.get('OPENAI') ||
+      Deno.env.get('OPENAI_KEY') || '';
 
-if (!openaiApiKey) {
-  console.error('OpenAI API key not found in environment variables');
-  return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
-    status: 500,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}
+    const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
+    if (!openaiApiKey && headerKey) openaiApiKey = headerKey;
+    console.log('OpenAI API Key available:', !!openaiApiKey);
+
+    if (!openaiApiKey) {
+      console.error('OpenAI API key not found in environment variables');
+      return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const client = new OpenAI({ apiKey: openaiApiKey });
 
