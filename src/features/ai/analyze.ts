@@ -12,6 +12,16 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
   let url = '';
   const headers: Record<string,string> = { 'Content-Type':'application/json' };
 
+  // Optional: allow overriding OpenAI key via browser (for debugging)
+  try {
+    if (typeof window !== 'undefined') {
+      const urlKey = new URLSearchParams(window.location.search).get('openai');
+      const storedKey = window.localStorage?.getItem('OPENAI_API_KEY');
+      const k = urlKey || storedKey;
+      if (k) headers['x-openai-api-key'] = k;
+    }
+  } catch {}
+
   if (ENV.API_URL) {
     // Express/Railway backend path
     url = `${ENV.API_URL}/ai/analyze`;
