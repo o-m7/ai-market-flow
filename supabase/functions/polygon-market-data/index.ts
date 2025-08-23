@@ -194,6 +194,7 @@ serve(async (req) => {
     };
 
     const marketData: Array<any> = [];
+    let usedFallback = false;
 
     // Process symbols in batches to avoid rate limits
     for (const rawSymbol of symbolsToFetch.slice(0, 10)) {
@@ -201,113 +202,175 @@ serve(async (req) => {
         const { polygon: polygonSymbol, type } = getPolygonSymbol(rawSymbol);
         console.log(`Processing ${rawSymbol} -> ${polygonSymbol} (${type})`);
         
-        let url: string;
-        
-        // Use different endpoints based on asset type
-        if (type === 'stocks') {
-          // Use previous close endpoint for stocks (more reliable than snapshots)
-          url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
-        } else if (type === 'crypto') {
-          // Use crypto-specific endpoint
-          url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
-        } else {
-          // Forex
-          url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
-        }
-        
+        // Helpers for fallbacks
+        const toBinanceSymbol = (s: string) => s.replace('/', '').replace('USD', 'USDT').replace(/:/g, '');
+        const toYMD = (d: Date) => d.toISOString().slice(0,10);
+
+        const pushRecord = (price: number, prevClose: number, volumeNum: number) => {
+          const change = price - prevClose;
+          const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+          let aiSentiment: string;
+          if (changePercent > 1) aiSentiment = 'bullish';
+          else if (changePercent < -1) aiSentiment = 'bearish';
+          else aiSentiment = 'neutral';
+          marketData.push({
+            symbol: rawSymbol,
+            name: getMarketName(rawSymbol),
+            price: Number(price.toFixed(2)),
+            change: Number(change.toFixed(2)),
+            changePercent: Number(changePercent.toFixed(2)),
+            volume: formatVolume(volumeNum),
+            rsi: Math.floor(Math.random() * 40) + 30,
+            aiSentiment,
+            aiSummary: generateAISummary(rawSymbol, aiSentiment, price)
+          });
+        };
+
+        // Primary: Polygon prev aggs
+        const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
         console.log(`Fetching: ${url}`);
         const res = await fetch(url);
-        
+
         if (!res.ok) {
           console.error(`Failed to fetch ${polygonSymbol}:`, res.status, res.statusText);
-          
-          // If primary endpoint fails, try alternative approach
+
+          // Type-specific fallbacks
           if (type === 'stocks') {
-            // Try daily bars endpoint as fallback
-            const fallbackUrl = `https://api.polygon.io/v1/open-close/${polygonSymbol}/2025-08-22?adjusted=true&apikey=${polygonApiKey}`;
+            // Daily open-close fallback (yesterday)
+            const y = new Date(Date.now() - 24*60*60*1000);
+            const fallbackUrl = `https://api.polygon.io/v1/open-close/${polygonSymbol}/${toYMD(y)}?adjusted=true&apikey=${polygonApiKey}`;
             const fallbackRes = await fetch(fallbackUrl);
-            
             if (fallbackRes.ok) {
               const fallbackData = await fallbackRes.json();
               if (fallbackData.close && fallbackData.open) {
-                const currentPrice = fallbackData.close;
-                const prevClose = fallbackData.open;
-                const change = currentPrice - prevClose;
-                const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
-                const sentiments = ['bullish', 'bearish', 'neutral'];
-                const aiSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
-
-                marketData.push({
-                  symbol: rawSymbol,
-                  name: getMarketName(rawSymbol),
-                  price: Number(currentPrice.toFixed(2)),
-                  change: Number(change.toFixed(2)),
-                  changePercent: Number(changePercent.toFixed(2)),
-                  volume: formatVolume(fallbackData.volume || 0),
-                  rsi: Math.floor(Math.random() * 40) + 30,
-                  aiSentiment,
-                  aiSummary: generateAISummary(rawSymbol, aiSentiment, currentPrice)
-                });
-                
-                console.log(`Fallback success for ${rawSymbol}`);
+                usedFallback = true;
+                pushRecord(fallbackData.close, fallbackData.open, fallbackData.volume || 0);
+                console.log(`Stocks fallback success for ${rawSymbol}`);
               }
             }
+          } else if (type === 'crypto') {
+            try {
+              const sym = toBinanceSymbol(rawSymbol);
+              const bRes = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`);
+              if (bRes.ok) {
+                const b = await bRes.json();
+                const last = parseFloat(b.lastPrice);
+                const prev = parseFloat(b.prevClosePrice) || (last / (1 + (parseFloat(b.priceChangePercent)||0)/100));
+                usedFallback = true;
+                pushRecord(last, prev, Math.floor(parseFloat(b.volume) || 0));
+                console.log(`Crypto fallback (Binance) success for ${rawSymbol}`);
+              }
+            } catch (e) {
+              console.error(`Binance fallback failed for ${rawSymbol}:`, e);
+            }
+          } else {
+            try {
+              const [base, quote] = rawSymbol.split('/');
+              const y = new Date(Date.now() - 24*60*60*1000);
+              const latestRes = await fetch(`https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`);
+              if (latestRes.ok) {
+                const latest = await latestRes.json();
+                const rate = latest?.rates?.[quote];
+                if (rate) {
+                  let prev = rate;
+                  const histRes = await fetch(`https://api.exchangerate.host/${toYMD(y)}?base=${base}&symbols=${quote}`);
+                  if (histRes.ok) {
+                    const hist = await histRes.json();
+                    prev = hist?.rates?.[quote] ?? prev;
+                  }
+                  usedFallback = true;
+                  pushRecord(rate, prev, 0);
+                  console.log(`Forex fallback success for ${rawSymbol}`);
+                }
+              }
+            } catch (e) {
+              console.error(`Forex fallback failed for ${rawSymbol}:`, e);
+            }
           }
+          // proceed to next symbol
+          await new Promise((r)=>setTimeout(r,150));
           continue;
         }
-        
+
         const data = await res.json();
         console.log(`Response for ${polygonSymbol}:`, JSON.stringify(data, null, 2));
         
-        // Handle different response formats
         let currentPrice = 0;
         let prevClose = 0;
         let volume = 0;
         
         if (data.results && data.results.length > 0) {
           const result = data.results[0];
-          currentPrice = result.c || result.close || 0;
-          prevClose = result.o || result.open || currentPrice;
-          volume = result.v || result.volume || 0;
+          currentPrice = result.c ?? result.close ?? 0;
+          prevClose = result.o ?? result.open ?? currentPrice;
+          volume = result.v ?? result.volume ?? 0;
         } else if (data.close !== undefined) {
           currentPrice = data.close;
-          prevClose = data.open || currentPrice;
-          volume = data.volume || 0;
+          prevClose = data.open ?? currentPrice;
+          volume = data.volume ?? 0;
         }
-        
+
         if (currentPrice === 0) {
-          console.warn(`No valid price data for ${polygonSymbol}`);
+          console.warn(`No valid price data for ${polygonSymbol}, attempting fallback...`);
+          if (type === 'stocks') {
+            const y = new Date(Date.now() - 24*60*60*1000);
+            const fallbackUrl = `https://api.polygon.io/v1/open-close/${polygonSymbol}/${toYMD(y)}?adjusted=true&apikey=${polygonApiKey}`;
+            const fallbackRes = await fetch(fallbackUrl);
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json();
+              if (fallbackData.close && fallbackData.open) {
+                usedFallback = true;
+                pushRecord(fallbackData.close, fallbackData.open, fallbackData.volume || 0);
+                console.log(`Stocks fallback success for ${rawSymbol}`);
+              }
+            }
+          } else if (type === 'crypto') {
+            try {
+              const sym = toBinanceSymbol(rawSymbol);
+              const bRes = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`);
+              if (bRes.ok) {
+                const b = await bRes.json();
+                const last = parseFloat(b.lastPrice);
+                const prev = parseFloat(b.prevClosePrice) || (last / (1 + (parseFloat(b.priceChangePercent)||0)/100));
+                usedFallback = true;
+                pushRecord(last, prev, Math.floor(parseFloat(b.volume) || 0));
+                console.log(`Crypto fallback (Binance) success for ${rawSymbol}`);
+              }
+            } catch (e) {
+              console.error(`Binance fallback failed for ${rawSymbol}:`, e);
+            }
+          } else {
+            try {
+              const [base, quote] = rawSymbol.split('/');
+              const y = new Date(Date.now() - 24*60*60*1000);
+              const latestRes = await fetch(`https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`);
+              if (latestRes.ok) {
+                const latest = await latestRes.json();
+                const rate = latest?.rates?.[quote];
+                if (rate) {
+                  let prev = rate;
+                  const histRes = await fetch(`https://api.exchangerate.host/${toYMD(y)}?base=${base}&symbols=${quote}`);
+                  if (histRes.ok) {
+                    const hist = await histRes.json();
+                    prev = hist?.rates?.[quote] ?? prev;
+                  }
+                  usedFallback = true;
+                  pushRecord(rate, prev, 0);
+                  console.log(`Forex fallback success for ${rawSymbol}`);
+                }
+              }
+            } catch (e) {
+              console.error(`Forex fallback failed for ${rawSymbol}:`, e);
+            }
+          }
+          await new Promise((r)=>setTimeout(r,150));
           continue;
         }
 
-        const change = currentPrice - prevClose;
-        const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
-
-        // Generate realistic AI sentiment based on change
-        let aiSentiment: string;
-        if (changePercent > 1) {
-          aiSentiment = 'bullish';
-        } else if (changePercent < -1) {
-          aiSentiment = 'bearish';
-        } else {
-          aiSentiment = 'neutral';
-        }
-
-        marketData.push({
-          symbol: rawSymbol, // Use original symbol format
-          name: getMarketName(rawSymbol),
-          price: Number(currentPrice.toFixed(2)),
-          change: Number(change.toFixed(2)),
-          changePercent: Number(changePercent.toFixed(2)),
-          volume: formatVolume(volume),
-          rsi: Math.floor(Math.random() * 40) + 30, // Mock RSI between 30-70
-          aiSentiment,
-          aiSummary: generateAISummary(rawSymbol, aiSentiment, currentPrice)
-        });
-
-        console.log(`Successfully processed ${rawSymbol}: $${currentPrice} (${changePercent.toFixed(2)}%)`);
+        // Push polygon data
+        pushRecord(currentPrice, prevClose, volume);
+        console.log(`Successfully processed ${rawSymbol}: $${currentPrice} (${((currentPrice - prevClose) / (prevClose || currentPrice) * 100).toFixed(2)}%)`);
         
-        // Rate limiting - wait between requests
         await new Promise((r) => setTimeout(r, 150));
       } catch (error) {
         console.error(`Error processing ${rawSymbol}:`, error);
@@ -343,7 +406,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       data: marketData,
       timestamp: new Date().toISOString(),
-      source: marketData.length > 0 && marketData.some(item => item.price > 0) ? 'polygon' : 'mock'
+      source: usedFallback ? 'mixed' : (marketData.length > 0 && marketData.some(item => item.price > 0) ? 'polygon' : 'mock')
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
