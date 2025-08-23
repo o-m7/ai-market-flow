@@ -2,16 +2,19 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Crown, Zap, TrendingUp, BarChart3, Brain, Shield } from 'lucide-react';
+import { Crown, Zap, TrendingUp, BarChart3, Brain, Shield, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 interface PremiumGatewayProps {
   children: React.ReactNode;
   feature: string;
+  symbol?: string; // For symbol-specific analysis
 }
 
-export function PremiumGateway({ children, feature }: PremiumGatewayProps) {
+export function PremiumGateway({ children, feature, symbol }: PremiumGatewayProps) {
   const { user, subscription, loading } = useAuth();
+  const { usage, isSubscribed } = useUsageTracking();
   const navigate = useNavigate();
 
   // Show loading state
@@ -63,6 +66,69 @@ export function PremiumGateway({ children, feature }: PremiumGatewayProps) {
   // If user is subscribed or in trial, show the content
   if (hasActiveSubscription || isInTrial) {
     return <>{children}</>;
+  }
+
+  // For free users, check usage limits for AI analysis features
+  if (feature.includes('AI') || feature.includes('analysis')) {
+    const canUse = symbol ? usage.canAnalyzeSymbol(symbol) : usage.remainingAnalyses > 0;
+    
+    if (canUse) {
+      return <>{children}</>;
+    }
+
+    // Show usage limit reached message
+    return (
+      <div className="flex items-center justify-center min-h-64 px-4">
+        <Card className="w-full max-w-2xl bg-gradient-card border-border">
+          <CardHeader className="text-center">
+            <div className="mx-auto h-16 w-16 rounded-full bg-orange-500/10 flex items-center justify-center mb-4">
+              <AlertCircle className="h-8 w-8 text-orange-500" />
+            </div>
+            <CardTitle className="text-2xl">Daily Limit Reached</CardTitle>
+            <CardDescription className="text-base">
+              {symbol && !usage.symbolsAnalyzed.includes(symbol) && usage.symbolsAnalyzed.length >= 5
+                ? `You've reached the limit of 5 different symbols per day. You can still analyze: ${usage.symbolsAnalyzed.join(', ')}`
+                : `You've used all ${usage.remainingAnalyses + usage.dailyAnalysisCount} AI analyses for today. Upgrade to Premium for unlimited access.`
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="text-center p-4 rounded-lg bg-secondary/50">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="font-semibold">{usage.dailyAnalysisCount}/5</div>
+                  <div className="text-muted-foreground">Analyses Used</div>
+                </div>
+                <div>
+                  <div className="font-semibold">{usage.symbolsAnalyzed.length}/5</div>
+                  <div className="text-muted-foreground">Symbols Analyzed</div>
+                </div>
+              </div>
+              {usage.symbolsAnalyzed.length > 0 && (
+                <div className="mt-3 pt-3 border-t">
+                  <div className="text-xs text-muted-foreground mb-1">Today's symbols:</div>
+                  <div className="text-xs font-medium">{usage.symbolsAnalyzed.join(', ')}</div>
+                </div>
+              )}
+            </div>
+
+            <Button 
+              onClick={() => navigate('/pricing')} 
+              className="w-full h-12 text-base font-semibold"
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              Upgrade to Premium
+            </Button>
+
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">
+                Your limits reset daily at midnight UTC
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Show trial expired or premium required
