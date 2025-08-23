@@ -58,7 +58,13 @@ serve(async (req) => {
       throw new Error('Polygon API key not configured');
     }
 
-    const requestData: MarketAnalysisRequest = await req.json();
+    const requestData = await req.json().catch(() => null);
+    if (!requestData || !Array.isArray(requestData.symbols) || requestData.symbols.length === 0) {
+      return new Response(JSON.stringify({ success: false, error: 'symbols[] required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const { symbols, analysisType = 'comprehensive', timeframe = '1day' } = requestData;
 
     console.log(`Analyzing ${symbols.length} symbols with ${analysisType} analysis`);
@@ -376,7 +382,7 @@ Respond in JSON format with the following structure:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
@@ -387,12 +393,15 @@ Respond in JSON format with the following structure:
             content: prompt
           }
         ],
-        max_completion_tokens: 1200
+        temperature: 0.3,
+        max_tokens: 1200
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errText = await response.text().catch(() => '');
+      console.error('OpenAI API error:', errText);
+      throw new Error(errText || `OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();

@@ -104,13 +104,10 @@ serve(async (req) => {
       "Data:\n" + JSON.stringify(bars.slice(-100)); // Use less data for faster processing
 
     const r = await client.chat.completions.create({
-      model: "gpt-4.1-mini-2025-04-14",
+      model: "gpt-4o",
       messages: [{ role: "user", content: prompt }],
-      max_completion_tokens: 800, // Reduced for faster response
-      response_format: {
-        type: "json_schema",
-        json_schema: analysisSchema
-      }
+      temperature: 0.3,
+      max_tokens: 800
     });
 
     const out = r.choices[0].message.content;
