@@ -40,7 +40,7 @@ const App = () => (
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/ai-analysis" element={
-              <ProtectedRoute requireSubscription>
+              <ProtectedRoute>
                 <AIAnalysis />
               </ProtectedRoute>
             } />
