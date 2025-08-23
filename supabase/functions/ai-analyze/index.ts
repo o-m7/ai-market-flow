@@ -84,26 +84,17 @@ serve(async (req) => {
       "Columns: t,o,h,l,c,v (t=epoch seconds).\n" +
       "Data:\n" + JSON.stringify(bars);
 
-    const r = await client.responses.create({
+    const r = await client.chat.completions.create({
       model: "gpt-4.1-mini-2025-04-14",
-      input: prompt,
+      messages: [{ role: "user", content: prompt }],
       max_completion_tokens: 1200,
-
-      // ✅ JSON Schema output (replaces deprecated response_format)
-      text_format: {
+      response_format: {
         type: "json_schema",
         json_schema: analysisSchema
       }
-      // In some SDKs this may be nested as:
-      // text: { format: { type: "json_schema", json_schema: analysisSchema } }
     });
 
-    const out =
-      (r as any).output_text ??
-      (r as any).output?.[0]?.content?.[0]?.text ??
-      (r as any).content?.[0]?.text ??
-      r;
-
+    const out = r.choices[0].message.content;
     const parsed = typeof out === "string" ? JSON.parse(out) : out;
     
     const result = { 
