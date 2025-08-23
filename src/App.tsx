@@ -16,6 +16,8 @@ import News from "./pages/News";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Pricing from "./pages/Pricing";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCanceled from "./pages/PaymentCanceled";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
@@ -32,6 +34,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/payment-success" element={<PaymentSuccess />} />
+            <Route path="/payment-canceled" element={<PaymentCanceled />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/search" element={<SearchResults />} />
             <Route path="/watchlist" element={<Watchlist />} />
