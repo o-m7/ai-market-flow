@@ -24,7 +24,6 @@ serve(async (req) => {
           pattern_candidates: null, succinct_plan: null, confidence: null
         }
       }), {
-        status: 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -86,17 +85,18 @@ No commentary outside JSON.`.trim();
     const content: any[] = [{ type: "text", text: userText }];
     if (snapshotBase64) content.push({ type: "image_url", image_url: { url: snapshotBase64 } });
 
+    // Prefer JSON responses from the model
     const requestBody = {
       model: "gpt-4o-mini",
-      temperature: 0.1,
+      response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: system }, 
+        { role: "system", content: system },
         { role: "user", content }
       ]
-    };
+    } as const;
 
-    console.log('Calling OpenAI API for analysis...');
-    
+    console.log('Calling OpenAI API for analysis (json_object)...');
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -106,51 +106,64 @@ No commentary outside JSON.`.trim();
       body: JSON.stringify(requestBody),
     });
 
+    let text = "{}";
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorText = await response.text().catch(() => '');
       console.error('OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
+      return new Response(JSON.stringify({
+        analysis: {
+          status: "insufficient_data",
+          risk_note: `OpenAI API error: ${response.status}`,
+          direction: null, trend: null, key_levels: null, momentum: null,
+          pattern_candidates: null, succinct_plan: null, confidence: null
+        }
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const data = await response.json();
-    let text = data.choices[0]?.message?.content || "{}";
-    let parsed: any;
-    
-    try { 
-      parsed = JSON.parse(text); 
-    } catch {
-      // retry once with a hard reminder
-      console.log('First parse failed, retrying with stricter prompt...');
-      const retryBody = {
-        model: "gpt-4o-mini",
-        temperature: 0.0,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userText + "\nREMINDER: Return ONLY valid JSON matching the schema." }
-        ]
-      };
+    const data = await response.json().catch(() => ({ choices: [] }));
+    text = data.choices?.[0]?.message?.content || "{}";
 
-      const resp2 = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(retryBody),
-      });
-
-      const data2 = await resp2.json();
-      text = data2.choices[0]?.message?.content || "{}";
+    let parsed: any = null;
+    try {
       parsed = JSON.parse(text);
+    } catch (e1) {
+      console.warn('First parse failed, attempting to coerce JSON');
+      // Try to extract the first JSON object from the text
+      const match = text.match(/\{[\s\S]*\}$/);
+      if (match) {
+        try { parsed = JSON.parse(match[0]); } catch {}
+      }
+
+      // Last resort: retry once with stricter prompt
+      if (!parsed) {
+        const retryBody = {
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: userText + "\nREMINDER: Return ONLY valid JSON matching the schema." }
+          ]
+        } as const;
+
+        const resp2 = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(retryBody),
+        });
+
+        const data2 = await resp2.json().catch(() => ({ choices: [] }));
+        const text2 = data2.choices?.[0]?.message?.content || "{}";
+        try { parsed = JSON.parse(text2); } catch {}
+      }
     }
 
-    // basic sanitation
     if (!parsed || parsed.status === "insufficient_data") {
-      return new Response(JSON.stringify({ 
-        analysis: { status: "insufficient_data", ...parsed } 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return new Response(JSON.stringify({
+        analysis: { status: "insufficient_data", ...parsed }
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     return new Response(JSON.stringify({ analysis: parsed }), {
@@ -167,7 +180,6 @@ No commentary outside JSON.`.trim();
         pattern_candidates: null, succinct_plan: null, confidence: null
       }
     }), {
-      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

@@ -54,7 +54,13 @@ export async function onGenerateAnalysis({
     body: JSON.stringify({ symbol, asset: assetClass, timeframe, ohlcv, snapshotBase64, finnhubData })
   });
 
-  const json = await res.json();
-  if (!res.ok || !json?.analysis) throw new Error(json?.error || "Analysis failed");
-  return json.analysis; // strict JSON
+  let json: any = null;
+  try {
+    json = await res.json();
+  } catch {}
+
+  if (json?.analysis) return json.analysis; // prefer analysis even if status != 200
+
+  if (!res.ok) throw new Error(json?.error || `Analysis failed (${res.status})`);
+  throw new Error("Analysis failed");
 }
