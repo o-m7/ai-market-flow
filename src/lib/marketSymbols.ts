@@ -23,6 +23,26 @@ export const MARKET_SYMBOLS = {
     'MATIC/USD', // Polygon
     'AVAX/USD',  // Avalanche
     'LINK/USD',  // Chainlink
+    'UNI/USD',   // Uniswap
+    'ATOM/USD',  // Cosmos
+    'ALGO/USD',  // Algorand
+    'VET/USD',   // VeChain
+    'ICP/USD',   // Internet Computer
+    'FIL/USD',   // Filecoin
+    'THETA/USD', // Theta Network
+    'TRX/USD',   // TRON
+    'ETC/USD',   // Ethereum Classic
+    'XMR/USD',   // Monero
+    'BCH/USD',   // Bitcoin Cash
+    'LTC/USD',   // Litecoin
+    'DOGE/USD',  // Dogecoin
+    'SHIB/USD',  // Shiba Inu
+    'NEAR/USD',  // NEAR Protocol
+    'FTM/USD',   // Fantom
+    'SAND/USD',  // The Sandbox
+    'MANA/USD',  // Decentraland
+    'CRV/USD',   // Curve DAO
+    'AAVE/USD',  // Aave
   ],
   forex: [
     'EUR/USD',  // Euro to US Dollar
@@ -35,6 +55,26 @@ export const MARKET_SYMBOLS = {
     'EUR/GBP',  // Euro to British Pound
     'EUR/JPY',  // Euro to Japanese Yen
     'GBP/JPY',  // British Pound to Japanese Yen
+    'AUD/JPY',  // Australian Dollar to Japanese Yen
+    'EUR/CHF',  // Euro to Swiss Franc
+    'GBP/CHF',  // British Pound to Swiss Franc
+    'CHF/JPY',  // Swiss Franc to Japanese Yen
+    'CAD/JPY',  // Canadian Dollar to Japanese Yen
+    'EUR/AUD',  // Euro to Australian Dollar
+    'GBP/AUD',  // British Pound to Australian Dollar
+    'AUD/CHF',  // Australian Dollar to Swiss Franc
+    'NZD/JPY',  // New Zealand Dollar to Japanese Yen
+    'EUR/CAD',  // Euro to Canadian Dollar
+    'GBP/CAD',  // British Pound to Canadian Dollar
+    'AUD/CAD',  // Australian Dollar to Canadian Dollar
+    'EUR/NZD',  // Euro to New Zealand Dollar
+    'GBP/NZD',  // British Pound to New Zealand Dollar
+    'USD/SEK',  // US Dollar to Swedish Krona
+    'USD/NOK',  // US Dollar to Norwegian Krone
+    'USD/DKK',  // US Dollar to Danish Krone
+    'EUR/SEK',  // Euro to Swedish Krona
+    'EUR/NOK',  // Euro to Norwegian Krone
+    'GBP/SEK',  // British Pound to Swedish Krona
   ],
   indices: [
     'SPY',   // S&P 500 ETF
@@ -52,21 +92,18 @@ export const MARKET_SYMBOLS = {
 
 export function getSymbolsByMarketType(marketType: string): string[] {
   switch (marketType) {
-    case 'stocks':
-      return MARKET_SYMBOLS.stocks;
     case 'crypto':
       return MARKET_SYMBOLS.crypto;
     case 'forex':
       return MARKET_SYMBOLS.forex;
+    case 'stocks':
     case 'indices':
-      return MARKET_SYMBOLS.indices;
     case 'all':
     default:
+      // Focus on crypto + forex only - show top symbols
       return [
-        ...MARKET_SYMBOLS.stocks.slice(0, 3),
-        ...MARKET_SYMBOLS.crypto.slice(0, 3),
-        ...MARKET_SYMBOLS.forex.slice(0, 2),
-        ...MARKET_SYMBOLS.indices.slice(0, 2)
+        ...MARKET_SYMBOLS.crypto.slice(0, 8),
+        ...MARKET_SYMBOLS.forex.slice(0, 7)
       ];
   }
 }

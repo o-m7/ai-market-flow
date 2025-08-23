@@ -98,16 +98,35 @@ const formatVolume = (volume: number): string => {
 
 const getMarketName = (symbol: string): string => {
   const map: Record<string, string> = {
+    // Stocks
     AAPL: 'Apple Inc.', MSFT: 'Microsoft Corporation', GOOGL: 'Alphabet Inc.',
     AMZN: 'Amazon.com Inc.', TSLA: 'Tesla Inc.', NVDA: 'NVIDIA Corporation',
     META: 'Meta Platforms Inc.', NFLX: 'Netflix Inc.', DIS: 'The Walt Disney Company',
     BABA: 'Alibaba Group Holding Limited',
+    // Crypto currencies
     'BTC/USD': 'Bitcoin', 'ETH/USD': 'Ethereum', 'BNB/USD': 'Binance Coin', 'XRP/USD': 'Ripple',
     'ADA/USD': 'Cardano', 'SOL/USD': 'Solana', 'DOT/USD': 'Polkadot', 'MATIC/USD': 'Polygon',
-    'AVAX/USD': 'Avalanche', 'LINK/USD': 'Chainlink',
+    'AVAX/USD': 'Avalanche', 'LINK/USD': 'Chainlink', 'UNI/USD': 'Uniswap', 'ATOM/USD': 'Cosmos',
+    'ALGO/USD': 'Algorand', 'VET/USD': 'VeChain', 'ICP/USD': 'Internet Computer', 'FIL/USD': 'Filecoin',
+    'THETA/USD': 'Theta Network', 'TRX/USD': 'TRON', 'ETC/USD': 'Ethereum Classic', 'XMR/USD': 'Monero',
+    'BCH/USD': 'Bitcoin Cash', 'LTC/USD': 'Litecoin', 'DOGE/USD': 'Dogecoin', 'SHIB/USD': 'Shiba Inu',
+    'NEAR/USD': 'NEAR Protocol', 'FTM/USD': 'Fantom', 'SAND/USD': 'The Sandbox', 'MANA/USD': 'Decentraland',
+    'CRV/USD': 'Curve DAO', 'AAVE/USD': 'Aave',
+    // Forex pairs
     'EUR/USD': 'Euro / US Dollar', 'GBP/USD': 'British Pound / US Dollar', 'USD/JPY': 'US Dollar / Japanese Yen',
+    'USD/CHF': 'US Dollar / Swiss Franc', 'AUD/USD': 'Australian Dollar / US Dollar', 'USD/CAD': 'US Dollar / Canadian Dollar',
+    'NZD/USD': 'New Zealand Dollar / US Dollar', 'EUR/GBP': 'Euro / British Pound', 'EUR/JPY': 'Euro / Japanese Yen',
+    'GBP/JPY': 'British Pound / Japanese Yen', 'AUD/JPY': 'Australian Dollar / Japanese Yen', 'EUR/CHF': 'Euro / Swiss Franc',
+    'GBP/CHF': 'British Pound / Swiss Franc', 'CHF/JPY': 'Swiss Franc / Japanese Yen', 'CAD/JPY': 'Canadian Dollar / Japanese Yen',
+    'EUR/AUD': 'Euro / Australian Dollar', 'GBP/AUD': 'British Pound / Australian Dollar', 'AUD/CHF': 'Australian Dollar / Swiss Franc',
+    'NZD/JPY': 'New Zealand Dollar / Japanese Yen', 'EUR/CAD': 'Euro / Canadian Dollar', 'GBP/CAD': 'British Pound / Canadian Dollar',
+    'AUD/CAD': 'Australian Dollar / Canadian Dollar', 'EUR/NZD': 'Euro / New Zealand Dollar', 'GBP/NZD': 'British Pound / New Zealand Dollar',
+    'USD/SEK': 'US Dollar / Swedish Krona', 'USD/NOK': 'US Dollar / Norwegian Krone', 'USD/DKK': 'US Dollar / Danish Krone',
+    'EUR/SEK': 'Euro / Swedish Krona', 'EUR/NOK': 'Euro / Norwegian Krone', 'GBP/SEK': 'British Pound / Swedish Krona',
+    // ETFs and Indices
     SPY: 'SPDR S&P 500 ETF', QQQ: 'Invesco QQQ Trust ETF', DIA: 'SPDR Dow Jones Industrial Average ETF',
-    IWM: 'iShares Russell 2000 ETF', VTI: 'Vanguard Total Stock Market ETF', GLD: 'SPDR Gold Shares', SLV: 'iShares Silver Trust', USO: 'United States Oil Fund'
+    IWM: 'iShares Russell 2000 ETF', VTI: 'Vanguard Total Stock Market ETF', EFA: 'EAFE ETF', EEM: 'Emerging Markets ETF',
+    GLD: 'SPDR Gold Shares', SLV: 'iShares Silver Trust', USO: 'United States Oil Fund'
   };
   return map[symbol] || symbol;
 };

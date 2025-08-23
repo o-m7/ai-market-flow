@@ -119,7 +119,7 @@ export const SearchBar = () => {
           }}
           onFocus={() => setShowResults(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search symbols (e.g., AAPL, BTC, EUR/USD)"
+          placeholder="Search crypto & forex (e.g., BTC/USD, DOGE/USD, EUR/JPY)"
           className="pl-10 pr-10 bg-secondary border-border focus:border-primary"
         />
       </div>
