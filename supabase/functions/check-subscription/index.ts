@@ -46,11 +46,36 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Fetch existing subscriber record for fallback logic
-    const { data: existingSub } = await supabaseClient
-      .from("subscribers")
-      .select("*")
-      .eq("email", user.email)
-      .maybeSingle();
+    let existingSub: any = null;
+    {
+      const { data } = await supabaseClient
+        .from("subscribers")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) existingSub = data;
+      else {
+        const { data: byEmail } = await supabaseClient
+          .from("subscribers")
+          .select("*")
+          .eq("email", user.email)
+          .maybeSingle();
+        if (byEmail) existingSub = byEmail;
+      }
+    }
+
+    // If DB marks user subscribed (manual/promo), respect it immediately
+    if (existingSub?.subscribed) {
+      logStep("DB override: user marked subscribed, returning without Stripe check");
+      return new Response(JSON.stringify({
+        subscribed: true,
+        subscription_tier: existingSub.subscription_tier ?? "Premium",
+        subscription_end: existingSub.subscription_end ?? null,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     if (!stripeKey) {
       logStep("No Stripe key configured, using DB subscription state");
@@ -156,21 +181,30 @@ serve(async (req) => {
       logStep("No active subscription found");
     }
 
+    // Respect DB override if present
+    const finalSubscribed = hasActiveSub || (existingSub?.subscribed === true);
+    const finalTier = finalSubscribed
+      ? (hasActiveSub ? (subscriptionTier ?? existingSub?.subscription_tier ?? "Premium") : (existingSub?.subscription_tier ?? "Premium"))
+      : null;
+    const finalEnd = finalSubscribed
+      ? (hasActiveSub ? (subscriptionEnd ?? existingSub?.subscription_end ?? null) : (existingSub?.subscription_end ?? null))
+      : null;
+
     await supabaseClient.from("subscribers").upsert({
       email: user.email,
       user_id: user.id,
       stripe_customer_id: customerId,
-      subscribed: hasActiveSub,
-      subscription_tier: subscriptionTier,
-      subscription_end: subscriptionEnd,
+      subscribed: finalSubscribed,
+      subscription_tier: finalTier,
+      subscription_end: finalEnd,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'email' });
 
-    logStep("Updated database with subscription info", { subscribed: hasActiveSub, subscriptionTier });
+    logStep("Updated database with subscription info", { subscribed: finalSubscribed, subscriptionTier: finalTier });
     return new Response(JSON.stringify({
-      subscribed: hasActiveSub,
-      subscription_tier: subscriptionTier,
-      subscription_end: subscriptionEnd
+      subscribed: finalSubscribed,
+      subscription_tier: finalTier,
+      subscription_end: finalEnd
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

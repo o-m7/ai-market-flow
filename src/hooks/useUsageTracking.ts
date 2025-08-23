@@ -19,7 +19,7 @@ export function useUsageTracking() {
   });
   const [loading, setLoading] = useState(true);
 
-  const isSubscribed = subscription?.subscribed;
+  const isSubscribed = Boolean(subscription?.subscribed || subscription?.subscription_tier === 'Premium');
   const FREE_DAILY_LIMIT = 5;
   const FREE_SYMBOL_LIMIT = 5;
 

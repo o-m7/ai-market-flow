@@ -58,7 +58,7 @@ export function PremiumGateway({ children, feature, symbol }: PremiumGatewayProp
 
   // Check if user has active subscription or trial
   const now = new Date();
-  const hasActiveSubscription = subscription?.subscribed;
+  const hasActiveSubscription = (subscription?.subscribed ?? false) || (subscription?.subscription_tier === 'Premium');
   const trialEnd = subscription && subscription.subscription_end ? new Date(subscription.subscription_end) : null;
   const isInTrial = trialEnd && now < trialEnd && !hasActiveSubscription;
   const trialExpired = trialEnd && now > trialEnd && !hasActiveSubscription;
