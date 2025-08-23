@@ -88,7 +88,7 @@ export function useUsageTracking() {
         .eq('user_id', user.id)
         .eq('analysis_date', today)
         .eq('symbol', symbol)
-        .single();
+        .maybeSingle();
 
       if (existingRecord) {
         // Update existing record

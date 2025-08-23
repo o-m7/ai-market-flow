@@ -3,11 +3,14 @@ import { MarketFilters, type MarketFilters as MarketFiltersType } from "./Market
 import { SymbolCard } from "./SymbolCard";
 import { AIAssistant } from "./AIAssistant";
 import { usePolygonData } from "@/hooks/usePolygonData";
+import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { RefreshCw, TrendingUp, TrendingDown, BarChart3, Zap } from "lucide-react";
 import { useState, useMemo } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Dashboard = () => {
   const [filters, setFilters] = useState<MarketFiltersType>({
@@ -15,6 +18,9 @@ export const Dashboard = () => {
     trend: 'all',
     timeframe: '1d'
   });
+
+  const { user } = useAuth();
+  const { usage, loading: usageLoading, isSubscribed } = useUsageTracking();
 
   // Get symbols based on selected market type
   const symbols = useMemo(() => getSymbolsByMarketType(filters.marketType), [filters.marketType]);
@@ -71,16 +77,24 @@ export const Dashboard = () => {
               </p>
             )}
           </div>
-          <Button 
-            onClick={refetch} 
-            disabled={loading}
-            variant="outline"
-            size="sm"
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Data
-          </Button>
+          <div className="flex items-center gap-3">
+            {user && !isSubscribed && !usageLoading && (
+              <Badge variant="outline" className="gap-2">
+                <Zap className="h-3 w-3" />
+                {usage.remainingAnalyses}/5 AI analyses left today
+              </Badge>
+            )}
+            <Button 
+              onClick={refetch} 
+              disabled={loading}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh Data
+            </Button>
+          </div>
         </div>
 
         <MarketFilters filters={filters} onFiltersChange={setFilters} />

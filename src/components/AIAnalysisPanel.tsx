@@ -5,7 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRealtimeAnalysis } from '@/hooks/useRealtimeAnalysis';
-import { Brain, TrendingUp, TrendingDown, Minus, Zap, RefreshCw } from 'lucide-react';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
+import { Brain, TrendingUp, TrendingDown, Minus, Zap, RefreshCw, Lock } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AIAnalysisPanelProps {
   symbols: string[];
@@ -23,6 +26,10 @@ export const AIAnalysisPanel = ({ symbols }: AIAnalysisPanelProps) => {
     disconnect,
     requestAnalysis
   } = useRealtimeAnalysis(symbols);
+
+  const { user } = useAuth();
+  const { usage, loading: usageLoading, trackAnalysis, isSubscribed } = useUsageTracking();
+  const { toast } = useToast();
 
   const getSentimentIcon = (sentiment: string) => {
     switch (sentiment) {
@@ -46,8 +53,45 @@ export const AIAnalysisPanel = ({ symbols }: AIAnalysisPanelProps) => {
     }
   };
 
-  const handleAnalysisRequest = () => {
-    requestAnalysis(symbols, selectedAnalysisType);
+  const handleAnalysisRequest = async () => {
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please sign in to use AI analysis features.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if user can perform analysis for all symbols
+    if (!isSubscribed) {
+      const availableSymbols = symbols.filter(symbol => usage.canAnalyzeSymbol(symbol));
+      
+      if (availableSymbols.length === 0) {
+        toast({
+          title: 'Usage Limit Reached',
+          description: `You've reached your daily limit of ${5} analyses or ${5} symbols. Upgrade to Premium for unlimited access.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if (availableSymbols.length < symbols.length) {
+        toast({
+          title: 'Partial Analysis Available',
+          description: `Only ${availableSymbols.length} of ${symbols.length} symbols can be analyzed with your remaining quota.`,
+        });
+      }
+      
+      // Track usage for each symbol
+      for (const symbol of availableSymbols.slice(0, usage.remainingAnalyses)) {
+        await trackAnalysis(symbol);
+      }
+      
+      requestAnalysis(availableSymbols.slice(0, usage.remainingAnalyses), selectedAnalysisType);
+    } else {
+      requestAnalysis(symbols, selectedAnalysisType);
+    }
   };
 
   return (
@@ -60,6 +104,11 @@ export const AIAnalysisPanel = ({ symbols }: AIAnalysisPanelProps) => {
             <Badge variant={connected ? "default" : "secondary"} className="text-xs">
               {connected ? 'Live' : 'Offline'}
             </Badge>
+            {!isSubscribed && user && !usageLoading && (
+              <Badge variant="outline" className="text-xs">
+                {usage.remainingAnalyses}/5 analyses left
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {!connected ? (
@@ -87,12 +136,18 @@ export const AIAnalysisPanel = ({ symbols }: AIAnalysisPanelProps) => {
             <div className="flex items-center gap-2 mb-4">
               <Button 
                 onClick={handleAnalysisRequest}
-                disabled={!connected || isAnalyzing}
+                disabled={!connected || isAnalyzing || (!isSubscribed && usage.remainingAnalyses === 0 && !!user)}
                 size="sm"
                 className="gap-2"
               >
-                <RefreshCw className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
-                {isAnalyzing ? 'Analyzing...' : 'Analyze All'}
+                {(!isSubscribed && usage.remainingAnalyses === 0 && !!user) ? (
+                  <Lock className="h-4 w-4" />
+                ) : (
+                  <RefreshCw className={`h-4 w-4 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                )}
+                {isAnalyzing ? 'Analyzing...' : 
+                 (!isSubscribed && usage.remainingAnalyses === 0 && !!user) ? 'Limit Reached' : 
+                 'Analyze All'}
               </Button>
               
               <select 
@@ -108,10 +163,25 @@ export const AIAnalysisPanel = ({ symbols }: AIAnalysisPanelProps) => {
 
             <ScrollArea className="h-80">
               <div className="space-y-3">
-                {analysisResults.length === 0 ? (
+                {!user ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Lock className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm">Sign in to access AI analysis features</p>
+                  </div>
+                ) : analysisResults.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Brain className="h-12 w-12 mx-auto mb-3 opacity-50" />
                     <p className="text-sm">Connect and request analysis to see AI insights</p>
+                    {!isSubscribed && (
+                      <div className="mt-4 p-3 bg-muted rounded-md">
+                        <p className="text-xs">
+                          Free Plan: {usage.remainingAnalyses}/5 analyses remaining today
+                        </p>
+                        <p className="text-xs mt-1">
+                          Symbols analyzed: {usage.symbolsAnalyzed.length}/5
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   analysisResults.map((result) => (
