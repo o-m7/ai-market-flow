@@ -77,7 +77,8 @@ export default function Pricing() {
 
   const handleSubscribe = async (plan: typeof plans[0]) => {
     if (!user) {
-      navigate('/auth');
+      // Store the selected plan and redirect to auth
+      navigate(`/auth?plan=${plan.priceId}&tier=${encodeURIComponent(plan.name)}`);
       return;
     }
 

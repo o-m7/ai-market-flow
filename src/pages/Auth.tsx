@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,21 +9,63 @@ import { Brain, Mail, Lock, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp, signInWithGoogle, user } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user, session } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  
+  // Get plan details from URL params
+  const planId = searchParams.get('plan');
+  const tierName = searchParams.get('tier');
 
-  // Redirect authenticated users to home
-  useEffect(() => {
-    if (user) {
+  // Function to handle post-auth checkout
+  const handlePostAuthCheckout = async () => {
+    if (planId && session?.access_token) {
+      try {
+        const { data, error } = await supabase.functions.invoke('create-checkout', {
+          body: { priceId: planId, tier: tierName },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (error) throw error;
+        
+        // Open Stripe checkout in a new tab
+        window.open(data.url, '_blank');
+        // Redirect to pricing page
+        navigate('/pricing');
+      } catch (error: any) {
+        toast({
+          title: 'Checkout Failed',
+          description: error.message || 'Unable to start checkout process',
+          variant: 'destructive',
+        });
+        navigate('/pricing');
+      }
+    } else {
       navigate('/');
     }
-  }, [user, navigate]);
+  };
+
+  // Redirect authenticated users
+  useEffect(() => {
+    if (user && session) {
+      if (planId) {
+        // If there's a plan in the URL, proceed to checkout
+        handlePostAuthCheckout();
+      } else {
+        // Otherwise go to home
+        navigate('/');
+      }
+    }
+  }, [user, session, planId]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +80,11 @@ export default function Auth() {
         variant: 'destructive',
       });
     } else {
-      navigate('/');
+      // Success will be handled by useEffect when user state updates
+      toast({
+        title: 'Welcome back!',
+        description: planId ? 'Redirecting to checkout...' : 'Successfully signed in.',
+      });
     }
     
     setLoading(false);
@@ -59,7 +105,7 @@ export default function Auth() {
     } else {
       toast({
         title: 'Check Your Email',
-        description: 'We sent you a confirmation link to complete registration.',
+        description: 'We sent you a confirmation link. After confirming, you can complete your subscription.',
       });
     }
     
@@ -76,6 +122,11 @@ export default function Auth() {
         title: 'Google Sign In Failed',
         description: error.message,
         variant: 'destructive',
+      });
+    } else if (planId) {
+      toast({
+        title: 'Welcome!',
+        description: 'Redirecting to checkout...',
       });
     }
     
@@ -102,9 +153,14 @@ export default function Auth() {
                 <Brain className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">Welcome to AI Trading</CardTitle>
+            <CardTitle className="text-2xl font-bold">
+              {planId ? `Subscribe to ${tierName}` : 'Welcome to Alphaedge'}
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
-              Sign in to access professional AI-powered market analysis
+              {planId 
+                ? 'Sign in or create an account to complete your subscription'
+                : 'Sign in to access professional AI-powered market analysis'
+              }
             </CardDescription>
           </CardHeader>
           
@@ -283,7 +339,7 @@ export default function Auth() {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Need help? Contact support at support@example.com
+            Need help? Contact support at support@alphaedge.com
           </p>
         </div>
       </div>
