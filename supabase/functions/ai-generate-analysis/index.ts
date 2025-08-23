@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+// Read API key per-request inside the handler to avoid stale values after secret updates
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +15,7 @@ serve(async (req) => {
   }
 
   try {
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
       return new Response(JSON.stringify({ 
         analysis: {
