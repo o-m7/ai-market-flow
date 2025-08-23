@@ -1,12 +1,12 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+let openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
 const polygonApiKey = Deno.env.get('POLYGON_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-openai-api-key, x-openai-key',
 };
 
 interface MarketAnalysisRequest {
@@ -40,7 +40,13 @@ serve(async (req) => {
   }
 
   try {
-    if (!openAIApiKey) {
+    let apiKey = openAIApiKey;
+    const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
+    if (!apiKey && headerKey) {
+      openAIApiKey = headerKey;
+      apiKey = openAIApiKey;
+    }
+    if (!apiKey) {
       throw new Error('OpenAI API key not configured');
     }
 
@@ -377,8 +383,7 @@ Respond in JSON format with the following structure:
             content: prompt
           }
         ],
-        temperature: 0.3,
-        max_tokens: 1500
+        max_completion_tokens: 1200
       }),
     });
 
