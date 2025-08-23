@@ -2,7 +2,6 @@ import { Navigation } from "./Navigation";
 import { MarketFilters, type MarketFilters as MarketFiltersType } from "./MarketFilters";
 import { SymbolCard } from "./SymbolCard";
 import { AIAssistant } from "./AIAssistant";
-import { PremiumGateway } from "./PremiumGateway";
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -127,37 +126,35 @@ export const Dashboard = () => {
         )}
 
         {/* Symbols Grid */}
-        <PremiumGateway feature="Real-Time Market Data">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {loading ? (
-              // Loading skeletons
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="bg-gradient-card border border-border rounded-lg p-6">
-                  <Skeleton className="h-6 w-20 mb-2" />
-                  <Skeleton className="h-4 w-32 mb-4" />
-                  <Skeleton className="h-8 w-24 mb-2" />
-                  <Skeleton className="h-4 w-16 mb-4" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-3/4" />
-                  </div>
-                </div>
-              ))
-            ) : filteredData.length > 0 ? (
-              filteredData.map((symbol) => (
-                <SymbolCard key={symbol.symbol} {...symbol} />
-              ))
-            ) : (
-              <div className="col-span-full text-center py-12">
-                <div className="text-muted-foreground">
-                  <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No symbols match your filters</h3>
-                  <p>Try adjusting your filter criteria or clearing all filters</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {loading ? (
+            // Loading skeletons
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-gradient-card border border-border rounded-lg p-6">
+                <Skeleton className="h-6 w-20 mb-2" />
+                <Skeleton className="h-4 w-32 mb-4" />
+                <Skeleton className="h-8 w-24 mb-2" />
+                <Skeleton className="h-4 w-16 mb-4" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
                 </div>
               </div>
-            )}
-          </div>
-        </PremiumGateway>
+            ))
+          ) : filteredData.length > 0 ? (
+            filteredData.map((symbol) => (
+              <SymbolCard key={symbol.symbol} {...symbol} />
+            ))
+          ) : (
+            <div className="col-span-full text-center py-12">
+              <div className="text-muted-foreground">
+                <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium mb-2">No symbols match your filters</h3>
+                <p>Try adjusting your filter criteria or clearing all filters</p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Enhanced Performance Stats */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-4 gap-6">
