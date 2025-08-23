@@ -242,13 +242,42 @@ serve(async (req) => {
 
 // ---- Helper functions ----
 function mapCrypto(uiSymbol: string): string {
-  const [base, quote] = uiSymbol.replace(/\s+/g, "").split("/");
-  return `X:${(base || "BTC").toUpperCase()}${(quote || "USD").toUpperCase()}`;
+  const s = uiSymbol.replace(/\s+/g, "").toUpperCase();
+  
+  // Handle symbols that are already in correct format (e.g., "BTCUSD")
+  if (!s.includes("/") && s.length >= 6) {
+    // Assume last 3 characters are quote currency for most crypto pairs
+    if (s.endsWith('USD') || s.endsWith('EUR') || s.endsWith('BTC')) {
+      return `X:${s}`;
+    }
+  }
+  
+  // Handle slash-separated format (e.g., "BTC/USD")
+  if (s.includes("/")) {
+    const [base, quote] = s.split("/");
+    return `X:${(base || "BTC").toUpperCase()}${(quote || "USD").toUpperCase()}`;
+  }
+  
+  // Default fallback - assume it's already in the right format
+  return `X:${s}`;
 }
 
 function mapFx(uiSymbol: string): string {
-  const [base, quote] = uiSymbol.replace(/\s+/g, "").split("/");
-  return `C:${(base || "EUR").toUpperCase()}${(quote || "USD").toUpperCase()}`;
+  const s = uiSymbol.replace(/\s+/g, "").toUpperCase();
+  
+  // Handle symbols that are already in correct format (e.g., "EURUSD")
+  if (!s.includes("/") && s.length === 6) {
+    return `C:${s}`;
+  }
+  
+  // Handle slash-separated format (e.g., "EUR/USD") 
+  if (s.includes("/")) {
+    const [base, quote] = s.split("/");
+    return `C:${(base || "EUR").toUpperCase()}${(quote || "USD").toUpperCase()}`;
+  }
+  
+  // Default fallback
+  return `C:${s}`;
 }
 
 function mapTimeframe(tf: string): { mult: number; span: string } {
