@@ -12,7 +12,7 @@ import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { useAuth } from "@/contexts/AuthContext";
 import { type LWBar } from "@/features/ai/collectBars";
 import { AiResult } from "@/features/ai/Result";
-import { onGenerateAnalysis } from "@/features/ai/onGenerateAnalysis";
+import { analyzeWithAI, type AnalysisRequest } from "@/features/ai/analyze";
 
 interface AnalysisResult {
   symbol: string;
@@ -177,46 +177,35 @@ export const AIAnalysis = () => {
         v: bar.volume || 0
       }));
 
-      // Use the new analysis function (chart snapshot not available)
-      const result = await onGenerateAnalysis({
-        chart: null, // Chart ref not available
-        seriesData,
+      // Call Edge Function ai-analyze with OHLCV-only payload
+      const payload: AnalysisRequest = {
         symbol: symbol.toUpperCase(),
-        assetClass: getAssetType(symbol).toLowerCase() as "crypto" | "stock" | "forex",
-        timeframe: timeframeMap[timeframe]
-      });
+        timeframe: timeframeMap[timeframe],
+        market: getAssetType(symbol),
+        candles: seriesData,
+      };
 
+      const result = await analyzeWithAI(payload);
       console.log('Analysis result:', result);
-      
-      // Handle the new JSON schema response
-      if (result.status === "insufficient_data") {
-        setAiError(result.risk_note || "Insufficient data for analysis");
-        toast({
-          title: 'Analysis Failed',
-          description: result.risk_note || 'Not enough data to analyze',
-          variant: 'destructive',
-        });
-        return;
-      }
 
       // Convert to the format expected by AiResult component
       const analysisForDisplay = {
         symbol: symbol.toUpperCase(),
-        analysis: result.succinct_plan || result.trend || 'Analysis completed successfully',
-        recommendation: result.direction === 'bullish' ? 'buy' : 
-                       result.direction === 'bearish' ? 'sell' : 'hold',
-        confidence: result.confidence || 0.5,
-        keyLevels: result.key_levels || { support: [], resistance: [] },
+        analysis: [result.summary, result.trade_idea?.rationale].filter(Boolean).join(' ') || 'Analysis completed successfully',
+        recommendation: result.trade_idea?.direction === 'long' ? 'buy' : 
+                       result.trade_idea?.direction === 'short' ? 'sell' : 'hold',
+        confidence: typeof result.confidence === 'number' ? result.confidence : 0.5,
+        keyLevels: result.levels || { support: [], resistance: [] },
         technicalIndicators: {
           rsi: 50, // Would need to calculate this from data
-          trend: result.direction || 'neutral',
-          momentum: result.momentum || 'neutral'
+          trend: result.outlook || 'neutral',
+          momentum: 'neutral'
         },
-        chartPatterns: result.pattern_candidates || [],
+        chartPatterns: [],
         priceTargets: { bullish: 0, bearish: 0 }, // Not in new schema
         riskAssessment: {
           level: 'medium' as const,
-          factors: result.risk_note ? [result.risk_note] : []
+          factors: result.risks ? [result.risks] : []
         },
         timestamp: new Date().toISOString(),
       };
