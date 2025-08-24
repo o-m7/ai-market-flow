@@ -71,17 +71,11 @@ serve(async (req) => {
     }
 
     if (!openaiPresent) {
-      return new Response(JSON.stringify({ success: false, error: 'OpenAI API key not configured' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.warn('[ai-market-analysis] OPENAI_API_KEY missing - will use heuristic analysis for all symbols');
     }
 
     if (!polyPresent) {
-      return new Response(JSON.stringify({ success: false, error: 'Polygon API key not configured' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      console.warn('[ai-market-analysis] POLYGON_API_KEY missing - stock data will use fallback (no Polygon)');
     }
 
     if (!requestData || !Array.isArray(requestData.symbols) || requestData.symbols.length === 0) {

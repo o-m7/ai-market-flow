@@ -106,9 +106,75 @@ serve(async (req) => {
     }
 
     if (!openaiApiKey) {
-      console.error('OpenAI API key not found in environment variables');
-      return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
-        status: 401,
+      console.warn('[ai-analyze] OPENAI_API_KEY missing - using local heuristic analysis');
+      // Heuristic fallback using provided candles (no external API)
+      const closes = bars.map(b => b.c);
+      const highs = bars.map(b => b.h);
+      const lows = bars.map(b => b.l);
+      const last = closes[closes.length - 1];
+      const sma = (n: number) => closes.slice(-n).reduce((a, b) => a + b, 0) / Math.max(1, Math.min(n, closes.length));
+      const ema = (n: number) => {
+        const k = 2 / (n + 1);
+        let emaVal = closes[0];
+        for (let i = 1; i < closes.length; i++) emaVal = closes[i] * k + emaVal * (1 - k);
+        return emaVal;
+      };
+      const rsi = (period = 14) => {
+        let gains = 0, losses = 0;
+        for (let i = closes.length - period; i < closes.length; i++) {
+          const diff = closes[i] - closes[i - 1];
+          if (diff >= 0) gains += diff; else losses -= diff;
+        }
+        const avgGain = gains / period;
+        const avgLoss = losses / period;
+        if (avgLoss === 0) return 100;
+        const rs = avgGain / avgLoss;
+        return 100 - (100 / (1 + rs));
+      };
+      const pickLevels = (arr: number[], lookback = 30, count = 3, mode: 'min'|'max' = 'min') => {
+        const segment = arr.slice(-lookback);
+        const levels: number[] = [];
+        for (let i = 0; i < count; i++) {
+          if (!segment.length) break;
+          const val = mode === 'min' ? Math.min(...segment) : Math.max(...segment);
+          levels.push(val);
+          // remove a neighborhood around the found level to avoid duplicates
+          const idx = segment.indexOf(val);
+          const radius = Math.max(1, Math.floor(lookback / (count * 3)));
+          segment.splice(Math.max(0, idx - radius), radius * 2 + 1);
+        }
+        return levels.sort((a,b) => a - b);
+      };
+      const ma20 = sma(20), ma50 = sma(50), ma200 = sma(200);
+      const ema20 = ema(20);
+      const curRsi = rsi(14);
+      const supports = pickLevels(lows, 60, 3, 'min');
+      const resistances = pickLevels(highs, 60, 3, 'max');
+
+      let outlook: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+      if (last > ma50 && ma50 >= ma200) outlook = 'bullish';
+      else if (last < ma50 && ma50 <= ma200) outlook = 'bearish';
+
+      const direction: 'long' | 'short' | 'none' = outlook === 'bullish' ? 'long' : outlook === 'bearish' ? 'short' : 'none';
+      const entry = last;
+      const stop = direction === 'long' ? last * 0.98 : direction === 'short' ? last * 1.02 : last;
+      const targets = direction === 'long' ? [last * 1.02, last * 1.04] : direction === 'short' ? [last * 0.98, last * 0.96] : [];
+
+      const result = {
+        symbol,
+        timeframe,
+        summary: `Local analysis: price ${last.toFixed(2)} vs MA20 ${ma20.toFixed(2)}, MA50 ${ma50.toFixed(2)}, MA200 ${ma200.toFixed(2)}. RSI ${curRsi.toFixed(1)}.`,
+        outlook,
+        levels: { support: supports, resistance: resistances, vwap: null },
+        trade_idea: { direction, entry, stop, targets, rationale: 'Heuristic analysis used (no OpenAI key). Manage risk accordingly.' },
+        confidence: Math.max(0.3, Math.min(0.75, Math.abs((last - ma50) / (ma50 || 1)) + (Math.abs(curRsi - 50) / 100))),
+        risks: 'This is a heuristic estimate without AI; validate with your strategy.',
+        json_version: '1.0.0',
+        analyzed_at: new Date().toISOString(),
+        candles_analyzed: bars.length
+      } as const;
+
+      return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
