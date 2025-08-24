@@ -476,11 +476,7 @@ export const AIAnalysis = () => {
             <CardContent className="flex flex-col items-center justify-center h-64">
               <Brain className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center max-w-md">
-                Professional AI analysis using live Polygon data and chart snapshots. 
-                No mock data - if Polygon fails, you'll see an error.
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                📊 {chartData.length} candles loaded • 📸 Chart snapshot • OpenAI + strict JSON schema
+                Select a symbol above and click "Generate Analysis" to get AI-powered technical analysis.
               </p>
             </CardContent>
           </Card>
