@@ -157,35 +157,60 @@ serve(async (req) => {
 
     console.log('[ai-analyze] Calling OpenAI API...');
     const r = await client.chat.completions.create({
-      model: "gpt-5-2025-08-07",
-      messages: [{ role: "user", content: prompt }],
-      max_completion_tokens: 1000,
+      model: "gpt-4o-mini",
+      messages: [
+        { 
+          role: "system", 
+          content: "You are a professional technical analyst. Analyze OHLCV data and return ONLY valid JSON with no additional text or formatting." 
+        },
+        { 
+          role: "user", 
+          content: prompt 
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 1000,
       response_format: { type: "json_object" }
     });
 
     const out = r.choices?.[0]?.message?.content || "";
     console.log('[ai-analyze] OpenAI response length:', out.length);
+    console.log('[ai-analyze] OpenAI raw response:', out.slice(0, 500) + (out.length > 500 ? '...' : ''));
 
     let parsed: any = null;
     try {
       parsed = JSON.parse(out);
+      console.log('[ai-analyze] JSON parsed successfully');
     } catch (e1) {
       console.warn('[ai-analyze] JSON parse failed, attempting cleanup');
+      console.error('[ai-analyze] Parse error:', e1.message);
       const start = out.indexOf('{');
       const end = out.lastIndexOf('}');
       if (start !== -1 && end !== -1 && end > start) {
         try {
-          parsed = JSON.parse(out.slice(start, end + 1));
+          const jsonStr = out.slice(start, end + 1);
+          console.log('[ai-analyze] Attempting to parse extracted JSON:', jsonStr.slice(0, 200));
+          parsed = JSON.parse(jsonStr);
+          console.log('[ai-analyze] JSON cleanup succeeded');
         } catch (e2) {
-          console.error('[ai-analyze] JSON cleanup failed:', out.slice(0, 200));
-          return new Response(JSON.stringify({ error: "AI returned invalid JSON format" }), {
+          console.error('[ai-analyze] JSON cleanup failed:', e2.message);
+          console.error('[ai-analyze] Problematic content:', out.slice(0, 300));
+          return new Response(JSON.stringify({ 
+            error: "AI returned invalid JSON format",
+            details: out.slice(0, 200),
+            parseError: e2.message
+          }), {
             status: 502,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
       } else {
         console.error('[ai-analyze] No valid JSON found in response');
-        return new Response(JSON.stringify({ error: "AI did not return JSON" }), {
+        console.error('[ai-analyze] Full response:', out);
+        return new Response(JSON.stringify({ 
+          error: "AI did not return JSON",
+          response: out.slice(0, 200)
+        }), {
           status: 502,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
