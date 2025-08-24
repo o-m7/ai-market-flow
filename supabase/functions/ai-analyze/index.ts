@@ -108,7 +108,7 @@ serve(async (req) => {
     if (!openaiApiKey) {
       console.error('OpenAI API key not found in environment variables');
       return new Response(JSON.stringify({ error: "OpenAI API key not configured" }), {
-        status: 500,
+        status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
