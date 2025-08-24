@@ -103,9 +103,30 @@ serve(async (req) => {
     const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
     if (headerKey) openaiApiKey = headerKey as string;
 
+    // Last-resort: scan all env vars for any OPENAI-like key
+    if (!openaiApiKey) {
+      try {
+        // @ts-ignore Deno.env.toObject may not be typed in some runtimes
+        const envObj = (Deno.env as any)?.toObject?.() || {};
+        for (const [k, v] of Object.entries(envObj)) {
+          const K = k.toUpperCase();
+          if ((K.includes('OPENAI') && K.includes('KEY')) || K === 'OPENAI') {
+            if (typeof v === 'string' && v.trim()) {
+              openaiApiKey = v.trim();
+              console.log('[ai-analyze] Found OpenAI key in env var:', k);
+              break;
+            }
+          }
+        }
+      } catch (scanErr) {
+        console.log('[ai-analyze] Env scan not available:', (scanErr as any)?.message || scanErr);
+      }
+    }
+
     console.log('[ai-analyze] Key sources:', {
       env_OPENAI_API_KEY: !!Deno.env.get('OPENAI_API_KEY'),
       header_override: !!headerKey,
+      scanned_any: !!openaiApiKey,
       final_key_available: !!openaiApiKey
     });
 
