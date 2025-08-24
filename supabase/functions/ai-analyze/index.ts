@@ -163,12 +163,12 @@ serve(async (req) => {
       const result = {
         symbol,
         timeframe,
-        summary: `Local analysis: price ${last.toFixed(2)} vs MA20 ${ma20.toFixed(2)}, MA50 ${ma50.toFixed(2)}, MA200 ${ma200.toFixed(2)}. RSI ${curRsi.toFixed(1)}.`,
+        summary: `⚠️ Heuristic analysis (no OpenAI key): price ${last.toFixed(2)} vs MA20 ${ma20.toFixed(2)}, MA50 ${ma50.toFixed(2)}, MA200 ${ma200.toFixed(2)}. RSI ${curRsi.toFixed(1)}. Configure OpenAI API key for full AI analysis.`,
         outlook,
         levels: { support: supports, resistance: resistances, vwap: null },
-        trade_idea: { direction, entry, stop, targets, rationale: 'Heuristic analysis used (no OpenAI key). Manage risk accordingly.' },
-        confidence: Math.max(0.3, Math.min(0.75, Math.abs((last - ma50) / (ma50 || 1)) + (Math.abs(curRsi - 50) / 100))),
-        risks: 'This is a heuristic estimate without AI; validate with your strategy.',
+        trade_idea: { direction, entry, stop, targets, rationale: 'Basic technical indicators only (missing OpenAI key). Please add OPENAI_API_KEY for comprehensive AI analysis.' },
+        confidence: Math.max(0.2, Math.min(0.5, Math.abs((last - ma50) / (ma50 || 1)) + (Math.abs(curRsi - 50) / 100))),
+        risks: 'This is a basic heuristic estimate without AI analysis. Add OpenAI API key for comprehensive market analysis with pattern recognition and advanced insights.',
         json_version: '1.0.0',
         analyzed_at: new Date().toISOString(),
         candles_analyzed: bars.length
@@ -197,10 +197,9 @@ serve(async (req) => {
       "Data:\n" + JSON.stringify(bars.slice(-100)); // Use less data for faster processing
 
     const r = await client.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5-2025-08-07",
       messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-      max_tokens: 800,
+      max_completion_tokens: 800,
       response_format: { type: "json_object" }
     });
 

@@ -88,7 +88,7 @@ No commentary outside JSON.`.trim();
 
     // Prefer JSON responses from the model
     const requestBody = {
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini-2025-08-07",
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: system },
@@ -138,7 +138,7 @@ No commentary outside JSON.`.trim();
       // Last resort: retry once with stricter prompt
       if (!parsed) {
         const retryBody = {
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini-2025-08-07",
           response_format: { type: "json_object" },
           messages: [
             { role: "system", content: system },

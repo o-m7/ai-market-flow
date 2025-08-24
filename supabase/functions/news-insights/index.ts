@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const client = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")! });
+const client = new OpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY") || "" });
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,7 +18,15 @@ serve(async (req) => {
   try {
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
-      throw new Error('OPENAI_API_KEY not configured');
+      return new Response(JSON.stringify({ 
+        insights: "OpenAI API key not configured. Unable to generate AI insights.",
+        analysisType: "market",
+        articlesAnalyzed: 0,
+        generatedAt: new Date().toISOString(),
+        confidence: 'low'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const { articles, analysisType = 'market' } = await req.json();
@@ -154,13 +162,12 @@ serve(async (req) => {
 
     if (!insights) {
       const response = await client.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5-2025-08-07",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        max_tokens: 1200,
-        temperature: 0.3
+        max_completion_tokens: 1200
       });
       insights = response.choices[0]?.message?.content ?? null;
     }

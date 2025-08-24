@@ -405,7 +405,7 @@ Respond in JSON format with the following structure:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5-2025-08-07',
         messages: [
           {
             role: 'system',
@@ -416,8 +416,7 @@ Respond in JSON format with the following structure:
             content: prompt
           }
         ],
-        temperature: 0.3,
-        max_tokens: 1200,
+        max_completion_tokens: 1200,
         response_format: { type: 'json_object' }
       }),
     });
