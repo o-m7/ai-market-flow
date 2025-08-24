@@ -1,3 +1,4 @@
+// src/features/ai/Result.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,18 +61,37 @@ interface InstitutionalAnalysis {
   };
 }
 
+/* ---------- safe helpers (prevent .toUpperCase() crashes) ---------- */
+const safeUpper = (v: unknown, fb = "—") =>
+  typeof v === "string" ? v.toUpperCase() : fb;
+
+const safeText = (v: unknown, fb = "—") =>
+  typeof v === "string" && v.trim() ? v : fb;
+
+const safeNum = (v: unknown, digits = 4, fb = "—") => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(digits) : fb;
+};
+
+const isInstitutionalShape = (d: any) =>
+  d &&
+  typeof d === "object" &&
+  !("error" in d) &&
+  d.fibonacci &&
+  d.technical &&
+  typeof d.confidence_calibrated !== "undefined";
+
 export function AiResult({ data }: { data: any }) {
   if (!data) return null;
-  
-  // Handle both new institutional format and legacy format
-  const isInstitutional = data.fibonacci && data.technical && data.confidence_calibrated !== undefined;
-  
+
+  const isInstitutional = isInstitutionalShape(data);
+
+  /* ---------------------- legacy fallback block ---------------------- */
   if (!isInstitutional) {
-    // Legacy format fallback
-    const outlook = data.technicalIndicators?.trend || data.outlook || 'neutral';
-    const confidence = data.confidence || 50;
-    const summary = data.analysis || data.summary || 'Analysis not available';
-    
+    const outlook = data?.technicalIndicators?.trend || data?.outlook || "neutral";
+    const confidence = Number(data?.confidence ?? 50);
+    const summary = data?.analysis || data?.summary || "Analysis not available";
+
     return (
       <Card className="ai-analysis-card">
         <CardHeader>
@@ -87,32 +107,36 @@ export function AiResult({ data }: { data: any }) {
     );
   }
 
-  // New institutional format
+  /* -------------------- new institutional format -------------------- */
   const analysis = data as InstitutionalAnalysis;
-  
-  const getActionColor = (action: string) => {
+
+  const getActionColor = (action?: string) => {
     switch (action) {
-      case 'buy':
-        return 'bg-green-500 text-white hover:bg-green-600';
-      case 'sell':
-        return 'bg-red-500 text-white hover:bg-red-600';
+      case "buy":
+        return "bg-green-500 text-white hover:bg-green-600";
+      case "sell":
+        return "bg-red-500 text-white hover:bg-red-600";
       default:
-        return 'bg-yellow-500 text-white hover:bg-yellow-600';
+        return "bg-yellow-500 text-white hover:bg-yellow-600";
     }
   };
 
-  const getActionIcon = (action: string) => {
+  const getActionIcon = (action?: string) => {
     switch (action) {
-      case 'buy':
+      case "buy":
         return <TrendingUp className="h-4 w-4" />;
-      case 'sell':
+      case "sell":
         return <TrendingDown className="h-4 w-4" />;
       default:
         return <Minus className="h-4 w-4" />;
     }
   };
 
-  const formatPrice = (price: number) => price?.toFixed(4) || '0.0000';
+  const formatPrice = (price: unknown) => safeNum(price, 4, "0.0000");
+
+  const supports = Array.isArray(analysis?.levels?.support) ? analysis.levels.support : [];
+  const resistances = Array.isArray(analysis?.levels?.resistance) ? analysis.levels.resistance : [];
+  const vwap = analysis?.levels?.vwap ?? null;
 
   return (
     <div className="space-y-6">
@@ -121,69 +145,73 @@ export function AiResult({ data }: { data: any }) {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button className={getActionColor(analysis.action)} size="sm">
-                {getActionIcon(analysis.action)}
-                {analysis.action.toUpperCase()}
+              <Button className={getActionColor(analysis?.action)} size="sm">
+                {getActionIcon(analysis?.action)}
+                {safeUpper(analysis?.action)}
               </Button>
               <Badge variant="outline" className="font-mono">
-                {analysis.outlook.toUpperCase()}
+                {safeUpper(analysis?.outlook)}
               </Badge>
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="secondary">
                 <Brain className="h-3 w-3 mr-1" />
-                Model: {analysis.confidence_model}%
+                Model: {safeNum(analysis?.confidence_model, 0, "—")}%
               </Badge>
               <Badge variant="default">
                 <Shield className="h-3 w-3 mr-1" />
-                Calibrated: {analysis.confidence_calibrated}%
+                Calibrated: {safeNum(analysis?.confidence_calibrated, 0, "—")}%
               </Badge>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <p className="font-medium text-sm">{analysis.action_text}</p>
-          <p className="text-sm text-muted-foreground mt-2">{analysis.summary}</p>
+          <p className="font-medium text-sm">{safeText(analysis?.action_text)}</p>
+          <p className="text-sm text-muted-foreground mt-2">{safeText(analysis?.summary)}</p>
         </CardContent>
       </Card>
 
       {/* Trade Setup */}
-      {analysis.trade_idea?.direction !== 'none' && (
+      {analysis?.trade_idea?.direction !== "none" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-4 w-4" />
-              Trade Setup - {analysis.trade_idea.setup_type.replace('_', ' ').toUpperCase()}
+              Trade Setup — {safeUpper(analysis?.trade_idea?.setup_type?.replace?.("_", " "))}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">ENTRY</p>
-                <p className="font-mono text-sm">{formatPrice(analysis.trade_idea.entry)}</p>
+                <p className="font-mono text-sm">{formatPrice(analysis?.trade_idea?.entry)}</p>
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground">STOP</p>
-                <p className="font-mono text-sm text-red-600">{formatPrice(analysis.trade_idea.stop)}</p>
+                <p className="font-mono text-sm text-red-600">{formatPrice(analysis?.trade_idea?.stop)}</p>
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground">TARGET</p>
                 <p className="font-mono text-sm text-green-600">
-                  {analysis.trade_idea.targets?.map(t => formatPrice(t)).join(', ') || 'N/A'}
+                  {Array.isArray(analysis?.trade_idea?.targets) && analysis.trade_idea.targets.length
+                    ? analysis.trade_idea.targets.map((t) => formatPrice(t)).join(", ")
+                    : "N/A"}
                 </p>
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground">R:R</p>
-                <p className="font-mono text-sm">{analysis.trade_idea.rr_estimate?.toFixed(1)}:1</p>
+                <p className="font-mono text-sm">
+                  {safeNum(analysis?.trade_idea?.rr_estimate, 1, "—")}:1
+                </p>
               </div>
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-1">RATIONALE</p>
-              <p className="text-sm">{analysis.trade_idea.rationale}</p>
+              <p className="text-sm">{safeText(analysis?.trade_idea?.rationale)}</p>
             </div>
             <div className="flex gap-2">
-              <Badge variant="outline">{analysis.trade_idea.time_horizon.toUpperCase()}</Badge>
-              <Badge variant="outline">{analysis.trade_idea.direction.toUpperCase()}</Badge>
+              <Badge variant="outline">{safeUpper(analysis?.trade_idea?.time_horizon)}</Badge>
+              <Badge variant="outline">{safeUpper(analysis?.trade_idea?.direction)}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -202,35 +230,35 @@ export function AiResult({ data }: { data: any }) {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="font-medium">EMA 20</p>
-                <p className="font-mono text-xs">{formatPrice(analysis.technical.ema20)}</p>
+                <p className="font-mono text-xs">{formatPrice(analysis?.technical?.ema20)}</p>
               </div>
               <div>
                 <p className="font-medium">EMA 50</p>
-                <p className="font-mono text-xs">{formatPrice(analysis.technical.ema50)}</p>
+                <p className="font-mono text-xs">{formatPrice(analysis?.technical?.ema50)}</p>
               </div>
               <div>
                 <p className="font-medium">EMA 200</p>
-                <p className="font-mono text-xs">{formatPrice(analysis.technical.ema200)}</p>
+                <p className="font-mono text-xs">{formatPrice(analysis?.technical?.ema200)}</p>
               </div>
               <div>
                 <p className="font-medium">RSI (14)</p>
-                <p className="font-mono text-xs">{analysis.technical.rsi14?.toFixed(1) || '50.0'}</p>
+                <p className="font-mono text-xs">{safeNum(analysis?.technical?.rsi14, 1, "50.0")}</p>
               </div>
               <div>
                 <p className="font-medium">MACD Line</p>
-                <p className="font-mono text-xs">{analysis.technical.macd?.line?.toFixed(4) || '0.0000'}</p>
+                <p className="font-mono text-xs">{safeNum(analysis?.technical?.macd?.line, 4, "0.0000")}</p>
               </div>
               <div>
                 <p className="font-medium">MACD Signal</p>
-                <p className="font-mono text-xs">{analysis.technical.macd?.signal?.toFixed(4) || '0.0000'}</p>
+                <p className="font-mono text-xs">{safeNum(analysis?.technical?.macd?.signal, 4, "0.0000")}</p>
               </div>
               <div>
                 <p className="font-medium">ATR (14)</p>
-                <p className="font-mono text-xs">{analysis.technical.atr14?.toFixed(4) || '0.0000'}</p>
+                <p className="font-mono text-xs">{safeNum(analysis?.technical?.atr14, 4, "0.0000")}</p>
               </div>
               <div>
                 <p className="font-medium">BB Mid</p>
-                <p className="font-mono text-xs">{formatPrice(analysis.technical.bb?.mid)}</p>
+                <p className="font-mono text-xs">{formatPrice(analysis?.technical?.bb?.mid)}</p>
               </div>
             </div>
           </CardContent>
@@ -247,19 +275,20 @@ export function AiResult({ data }: { data: any }) {
               <div className="flex items-center justify-between mb-2">
                 <p className="font-medium text-sm">Support</p>
                 <p className="font-mono text-xs text-green-600">
-                  {analysis.levels.support?.map(s => formatPrice(s)).join(', ') || 'N/A'}
+                  {supports.length ? supports.map((s) => formatPrice(s)).join(", ") : "N/A"}
                 </p>
               </div>
               <div className="flex items-center justify-between mb-2">
                 <p className="font-medium text-sm">Resistance</p>
                 <p className="font-mono text-xs text-red-600">
-                  {analysis.levels.resistance?.map(r => formatPrice(r)).join(', ') || 'N/A'}
+                  {resistances.length ? resistances.map((r) => formatPrice(r)).join(", ") : "N/A"}
                 </p>
               </div>
-              {analysis.levels.vwap && (
+              {/* show when 0, hide only when null/undefined */}
+              {(analysis?.levels?.vwap !== null && analysis?.levels?.vwap !== undefined) && (
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-sm">VWAP</p>
-                  <p className="font-mono text-xs text-blue-600">{formatPrice(analysis.levels.vwap)}</p>
+                  <p className="font-mono text-xs text-blue-600">{formatPrice(analysis?.levels?.vwap)}</p>
                 </div>
               )}
             </div>
@@ -269,26 +298,26 @@ export function AiResult({ data }: { data: any }) {
             {/* Fibonacci */}
             <div>
               <p className="font-medium text-sm mb-2">
-                Fibonacci ({analysis.fibonacci.direction.toUpperCase()})
+                Fibonacci ({safeUpper(analysis?.fibonacci?.direction)})
               </p>
               <div className="space-y-1 text-xs">
                 <div className="grid grid-cols-2 gap-2">
-                  <div>Pivot High: {formatPrice(analysis.fibonacci.pivot_high)}</div>
-                  <div>Pivot Low: {formatPrice(analysis.fibonacci.pivot_low)}</div>
+                  <div>Pivot High: {formatPrice(analysis?.fibonacci?.pivot_high)}</div>
+                  <div>Pivot Low: {formatPrice(analysis?.fibonacci?.pivot_low)}</div>
                 </div>
                 <div className="mt-2">
                   <p className="font-medium mb-1">Retracements:</p>
                   <div className="grid grid-cols-2 gap-1 font-mono">
-                    <div>23.6%: {formatPrice(analysis.fibonacci.retracements["23.6"])}</div>
-                    <div>38.2%: {formatPrice(analysis.fibonacci.retracements["38.2"])}</div>
-                    <div>50.0%: {formatPrice(analysis.fibonacci.retracements["50.0"])}</div>
-                    <div>61.8%: {formatPrice(analysis.fibonacci.retracements["61.8"])}</div>
-                    <div>78.6%: {formatPrice(analysis.fibonacci.retracements["78.6"])}</div>
+                    <div>23.6%: {formatPrice(analysis?.fibonacci?.retracements?.["23.6"])}</div>
+                    <div>38.2%: {formatPrice(analysis?.fibonacci?.retracements?.["38.2"])}</div>
+                    <div>50.0%: {formatPrice(analysis?.fibonacci?.retracements?.["50.0"])}</div>
+                    <div>61.8%: {formatPrice(analysis?.fibonacci?.retracements?.["61.8"])}</div>
+                    <div>78.6%: {formatPrice(analysis?.fibonacci?.retracements?.["78.6"])}</div>
                   </div>
                   <p className="font-medium mt-2 mb-1">Extensions:</p>
                   <div className="grid grid-cols-2 gap-1 font-mono">
-                    <div>127.2%: {formatPrice(analysis.fibonacci.extensions["127.2"])}</div>
-                    <div>161.8%: {formatPrice(analysis.fibonacci.extensions["161.8"])}</div>
+                    <div>127.2%: {formatPrice(analysis?.fibonacci?.extensions?.["127.2"])}</div>
+                    <div>161.8%: {formatPrice(analysis?.fibonacci?.extensions?.["161.8"])}</div>
                   </div>
                 </div>
               </div>
@@ -307,7 +336,7 @@ export function AiResult({ data }: { data: any }) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {analysis.evidence?.length > 0 ? (
+            {Array.isArray(analysis?.evidence) && analysis.evidence.length ? (
               <ul className="space-y-1 text-sm">
                 {analysis.evidence.map((item, idx) => (
                   <li key={idx} className="flex items-center gap-2">
@@ -330,26 +359,31 @@ export function AiResult({ data }: { data: any }) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm">{analysis.risks}</p>
+            <p className="text-sm">{safeText(analysis?.risks)}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Timeframe Profiles */}
-      {analysis.timeframe_profile && (
+      {analysis?.timeframe_profile && (
         <Card>
           <CardHeader>
             <CardTitle>Multi-Timeframe Analysis</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {Object.entries(analysis.timeframe_profile).map(([tf, profile]) => (
+              {Object.entries(analysis.timeframe_profile).map(([tf, profile]: any) => (
                 <div key={tf} className="space-y-2">
                   <h4 className="font-medium text-sm capitalize">{tf}</h4>
                   <div className="text-xs space-y-1 font-mono">
-                    <div>Entry: {formatPrice(profile.entry)}</div>
-                    <div>Stop: {formatPrice(profile.stop)}</div>
-                    <div>Targets: {profile.targets?.map(t => formatPrice(t)).join(', ')}</div>
+                    <div>Entry: {formatPrice(profile?.entry)}</div>
+                    <div>Stop: {formatPrice(profile?.stop)}</div>
+                    <div>
+                      Targets:{" "}
+                      {Array.isArray(profile?.targets) && profile.targets.length
+                        ? profile.targets.map((t: any) => formatPrice(t)).join(", ")
+                        : "—"}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -359,7 +393,8 @@ export function AiResult({ data }: { data: any }) {
       )}
 
       <div className="text-xs text-muted-foreground text-center">
-        Institutional Analysis • Version {data.json_version || '1.0.0'} • Generated: {new Date().toLocaleString()}
+        Institutional Analysis • Version {safeText((data as any)?.json_version, "1.0.0")} • Generated:{" "}
+        {new Date().toLocaleString()}
       </div>
     </div>
   );
