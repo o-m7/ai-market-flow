@@ -45,21 +45,45 @@ serve(async (req) => {
   }
 
   try {
-    let apiKey = openAIApiKey;
-    const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
-    if (!apiKey && headerKey) {
-      openAIApiKey = headerKey;
-      apiKey = openAIApiKey;
-    }
-    if (!apiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
-
-    if (!polygonApiKey) {
-      throw new Error('Polygon API key not configured');
-    }
-
     const requestData = await req.json().catch(() => null);
+    const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
+    const apiKey = (headerKey as string) ||
+      Deno.env.get('OPENAI_API_KEY') ||
+      Deno.env.get('OPEN_AI_API_KEY') ||
+      Deno.env.get('OPENAI') ||
+      Deno.env.get('OPENAI_KEY') || '';
+
+    const debug = requestData?.debug === true;
+    const polyPresent = !!polygonApiKey;
+    const openaiPresent = !!apiKey;
+
+    if (debug) {
+      const symbols = Array.isArray(requestData?.symbols) ? requestData.symbols : [];
+      return new Response(JSON.stringify({
+        success: true,
+        debug: true,
+        env: { openaiPresent, polygonPresent: polyPresent },
+        headerKeyPresent: !!headerKey,
+        symbols,
+        timeframe: requestData?.timeframe ?? null,
+        analyzed_at: new Date().toISOString(),
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (!openaiPresent) {
+      return new Response(JSON.stringify({ success: false, error: 'OpenAI API key not configured' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!polyPresent) {
+      return new Response(JSON.stringify({ success: false, error: 'Polygon API key not configured' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (!requestData || !Array.isArray(requestData.symbols) || requestData.symbols.length === 0) {
       return new Response(JSON.stringify({ success: false, error: 'symbols[] required' }), {
         status: 400,
@@ -69,7 +93,6 @@ serve(async (req) => {
     const { symbols, analysisType = 'comprehensive', timeframe = '1day' } = requestData;
 
     console.log(`Analyzing ${symbols.length} symbols with ${analysisType} analysis`);
-
     const analysisResults: AnalysisResult[] = [];
 
     for (const symbol of symbols) {
@@ -78,7 +101,7 @@ serve(async (req) => {
         const marketData = await fetchMarketData(symbol, timeframe);
         
         // Generate AI analysis
-        const analysis = await generateAIAnalysis(symbol, marketData, analysisType);
+        const analysis = await generateAIAnalysis(symbol, marketData, analysisType, apiKey);
         
         analysisResults.push(analysis);
         
@@ -111,14 +134,19 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
-    console.error('Error in ai-market-analysis function:', error);
+  } catch (error: any) {
+    const rawStatus = error?.status ?? error?.response?.status ?? 500;
+    let status = rawStatus;
+    if (rawStatus === 401 || rawStatus === 403) status = 401;
+    else if (rawStatus >= 500) status = 502;
+    const errMsg = typeof error?.message === 'string' ? error.message : 'Unexpected error';
+    console.error('Error in ai-market-analysis function:', { rawStatus, mappedStatus: status, errMsg });
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
+      error: errMsg,
       results: []
     }), {
-      status: 500,
+      status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
@@ -314,7 +342,7 @@ async function fetchStockData(symbol: string, timeframe: string) {
   }
 }
 
-async function generateAIAnalysis(symbol: string, marketData: any, analysisType: string): Promise<AnalysisResult> {
+async function generateAIAnalysis(symbol: string, marketData: any, analysisType: string, apiKey: string): Promise<AnalysisResult> {
   const currentPrice = marketData.quote?.last_trade?.price || marketData.quote?.prevDay?.c || 0;
   const previousClose = marketData.quote?.prevDay?.c || currentPrice;
   const change = currentPrice - previousClose;
@@ -379,7 +407,7 @@ Respond in JSON format with the following structure:
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

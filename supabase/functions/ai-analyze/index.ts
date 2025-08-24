@@ -178,12 +178,20 @@ serve(async (req) => {
     });
 
   } catch (e: any) {
-    const status = e?.status ?? e?.response?.status ?? 500;
+    const rawStatus = e?.status ?? e?.response?.status ?? 500;
+    // Normalize statuses to avoid ambiguous 500/403 surfacing to clients
+    // - Map 401/403 from upstream auth errors to 401
+    // - Map any 5xx to 502 (bad upstream)
+    let status = rawStatus;
+    if (rawStatus === 401 || rawStatus === 403) status = 401;
+    else if (rawStatus >= 500) status = 502;
+
     const body = (e?.response && typeof e.response.text === "function")
       ? await e.response.text().catch(() => "")
       : (e?.message || "");
-    console.error("[ai-analyze] OpenAI error", status, body);
-    return new Response(JSON.stringify({ error: body || "OpenAI call failed" }), { 
+
+    console.error("[ai-analyze] OpenAI error", { rawStatus, mappedStatus: status, body });
+    return new Response(JSON.stringify({ error: body || "OpenAI call failed" }), {
       status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
