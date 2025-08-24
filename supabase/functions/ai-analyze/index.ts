@@ -72,8 +72,38 @@ serve(async (req) => {
       Deno.env.get('OPENAI_KEY') || '';
 
     const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
-    if (!openaiApiKey && headerKey) openaiApiKey = headerKey;
+    if (!openaiApiKey && headerKey) openaiApiKey = headerKey as string;
     console.log('OpenAI API Key available:', !!openaiApiKey);
+
+    // Parse body early to support debug mode without requiring an API key
+    const body = await req.json().catch(() => ({}));
+    const { symbol, timeframe, market, candles, debug } = body || {};
+    const bars = sanitizeCandles(candles);
+
+    // Debug endpoint: returns diagnostic info without calling OpenAI
+    if (debug === true) {
+      const envKeyRaw =
+        Deno.env.get('OPENAI_API_KEY') ||
+        Deno.env.get('OPEN_AI_API_KEY') ||
+        Deno.env.get('OPENAI') ||
+        Deno.env.get('OPENAI_KEY') || '';
+
+      const payload = {
+        envKeyPresent: !!envKeyRaw,
+        headerKeyPresent: !!headerKey,
+        keyThatWillBeUsedPresent: !!openaiApiKey,
+        symbol: symbol || null,
+        timeframe: timeframe || null,
+        candleCount: bars.length,
+        firstBar: bars[0] || null,
+        lastBar: bars[bars.length - 1] || null,
+        analyzed_at: new Date().toISOString(),
+      };
+      console.log('[ai-analyze] Debug payload:', payload);
+      return new Response(JSON.stringify(payload), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (!openaiApiKey) {
       console.error('OpenAI API key not found in environment variables');
@@ -85,15 +115,12 @@ serve(async (req) => {
 
     const client = new OpenAI({ apiKey: openaiApiKey });
 
-    const { symbol, timeframe, market, candles } = await req.json();
-    const bars = sanitizeCandles(candles);
     if (!symbol || bars.length < 20) {
-      return new Response(JSON.stringify({ error: "symbol and >=20 candles required" }), { 
+      return new Response(JSON.stringify({ error: "symbol and >=20 candles required" }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-
     console.log(`Analyzing ${symbol} (${timeframe}) with ${bars.length} candles`);
 
     const prompt =
