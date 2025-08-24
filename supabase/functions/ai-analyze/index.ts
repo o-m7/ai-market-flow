@@ -65,121 +65,59 @@ serve(async (req) => {
   }
 
   try {
+    // Parse body first
+    const body = await req.json().catch(() => ({}));
+    const { symbol, timeframe, market, candles, debug } = body || {};
+    const bars = sanitizeCandles(candles);
+
+    // Debug endpoint
+    if (debug === true) {
+      const envKeys = {
+        OPENAI_API_KEY: !!Deno.env.get('OPENAI_API_KEY'),
+        OPEN_AI_API_KEY: !!Deno.env.get('OPEN_AI_API_KEY'),
+        OPENAI: !!Deno.env.get('OPENAI'),
+        OPENAI_KEY: !!Deno.env.get('OPENAI_KEY'),
+      };
+      const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
+      
+      return new Response(JSON.stringify({
+        envKeys,
+        headerKeyPresent: !!headerKey,
+        symbol: symbol || null,
+        timeframe: timeframe || null,
+        candleCount: bars.length,
+        analyzed_at: new Date().toISOString(),
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Get OpenAI API key - try multiple sources
     let openaiApiKey =
       Deno.env.get('OPENAI_API_KEY') ||
       Deno.env.get('OPEN_AI_API_KEY') ||
       Deno.env.get('OPENAI') ||
       Deno.env.get('OPENAI_KEY') || '';
 
+    // Allow header override
     const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
-    if (!openaiApiKey && headerKey) openaiApiKey = headerKey as string;
-    console.log('OpenAI API Key available:', !!openaiApiKey);
+    if (headerKey) openaiApiKey = headerKey as string;
 
-    // Parse body early to support debug mode without requiring an API key
-    const body = await req.json().catch(() => ({}));
-    const { symbol, timeframe, market, candles, debug } = body || {};
-    const bars = sanitizeCandles(candles);
-
-    // Debug endpoint: returns diagnostic info without calling OpenAI
-    if (debug === true) {
-      const envKeyRaw =
-        Deno.env.get('OPENAI_API_KEY') ||
-        Deno.env.get('OPEN_AI_API_KEY') ||
-        Deno.env.get('OPENAI') ||
-        Deno.env.get('OPENAI_KEY') || '';
-
-      const payload = {
-        envKeyPresent: !!envKeyRaw,
-        headerKeyPresent: !!headerKey,
-        keyThatWillBeUsedPresent: !!openaiApiKey,
-        symbol: symbol || null,
-        timeframe: timeframe || null,
-        candleCount: bars.length,
-        firstBar: bars[0] || null,
-        lastBar: bars[bars.length - 1] || null,
-        analyzed_at: new Date().toISOString(),
-      };
-      console.log('[ai-analyze] Debug payload:', payload);
-      return new Response(JSON.stringify(payload), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    console.log('[ai-analyze] Key sources:', {
+      env_OPENAI_API_KEY: !!Deno.env.get('OPENAI_API_KEY'),
+      header_override: !!headerKey,
+      final_key_available: !!openaiApiKey
+    });
 
     if (!openaiApiKey) {
-      console.warn('[ai-analyze] OPENAI_API_KEY missing - using local heuristic analysis');
-      // Heuristic fallback using provided candles (no external API)
-      const closes = bars.map(b => b.c);
-      const highs = bars.map(b => b.h);
-      const lows = bars.map(b => b.l);
-      const last = closes[closes.length - 1];
-      const sma = (n: number) => closes.slice(-n).reduce((a, b) => a + b, 0) / Math.max(1, Math.min(n, closes.length));
-      const ema = (n: number) => {
-        const k = 2 / (n + 1);
-        let emaVal = closes[0];
-        for (let i = 1; i < closes.length; i++) emaVal = closes[i] * k + emaVal * (1 - k);
-        return emaVal;
-      };
-      const rsi = (period = 14) => {
-        let gains = 0, losses = 0;
-        for (let i = closes.length - period; i < closes.length; i++) {
-          const diff = closes[i] - closes[i - 1];
-          if (diff >= 0) gains += diff; else losses -= diff;
-        }
-        const avgGain = gains / period;
-        const avgLoss = losses / period;
-        if (avgLoss === 0) return 100;
-        const rs = avgGain / avgLoss;
-        return 100 - (100 / (1 + rs));
-      };
-      const pickLevels = (arr: number[], lookback = 30, count = 3, mode: 'min'|'max' = 'min') => {
-        const segment = arr.slice(-lookback);
-        const levels: number[] = [];
-        for (let i = 0; i < count; i++) {
-          if (!segment.length) break;
-          const val = mode === 'min' ? Math.min(...segment) : Math.max(...segment);
-          levels.push(val);
-          // remove a neighborhood around the found level to avoid duplicates
-          const idx = segment.indexOf(val);
-          const radius = Math.max(1, Math.floor(lookback / (count * 3)));
-          segment.splice(Math.max(0, idx - radius), radius * 2 + 1);
-        }
-        return levels.sort((a,b) => a - b);
-      };
-      const ma20 = sma(20), ma50 = sma(50), ma200 = sma(200);
-      const ema20 = ema(20);
-      const curRsi = rsi(14);
-      const supports = pickLevels(lows, 60, 3, 'min');
-      const resistances = pickLevels(highs, 60, 3, 'max');
-
-      let outlook: 'bullish' | 'bearish' | 'neutral' = 'neutral';
-      if (last > ma50 && ma50 >= ma200) outlook = 'bullish';
-      else if (last < ma50 && ma50 <= ma200) outlook = 'bearish';
-
-      const direction: 'long' | 'short' | 'none' = outlook === 'bullish' ? 'long' : outlook === 'bearish' ? 'short' : 'none';
-      const entry = last;
-      const stop = direction === 'long' ? last * 0.98 : direction === 'short' ? last * 1.02 : last;
-      const targets = direction === 'long' ? [last * 1.02, last * 1.04] : direction === 'short' ? [last * 0.98, last * 0.96] : [];
-
-      const result = {
-        symbol,
-        timeframe,
-        summary: `⚠️ Heuristic analysis (no OpenAI key): price ${last.toFixed(2)} vs MA20 ${ma20.toFixed(2)}, MA50 ${ma50.toFixed(2)}, MA200 ${ma200.toFixed(2)}. RSI ${curRsi.toFixed(1)}. Configure OpenAI API key for full AI analysis.`,
-        outlook,
-        levels: { support: supports, resistance: resistances, vwap: null },
-        trade_idea: { direction, entry, stop, targets, rationale: 'Basic technical indicators only (missing OpenAI key). Please add OPENAI_API_KEY for comprehensive AI analysis.' },
-        confidence: Math.max(0.2, Math.min(0.5, Math.abs((last - ma50) / (ma50 || 1)) + (Math.abs(curRsi - 50) / 100))),
-        risks: 'This is a basic heuristic estimate without AI analysis. Add OpenAI API key for comprehensive market analysis with pattern recognition and advanced insights.',
-        json_version: '1.0.0',
-        analyzed_at: new Date().toISOString(),
-        candles_analyzed: bars.length
-      } as const;
-
-      return new Response(JSON.stringify(result), {
+      console.error('[ai-analyze] No OpenAI API key found in environment or headers');
+      return new Response(JSON.stringify({ 
+        error: "OpenAI API key not configured. Please set OPENAI_API_KEY in Supabase secrets or provide via x-openai-api-key header." 
+      }), {
+        status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-
-    const client = new OpenAI({ apiKey: openaiApiKey });
 
     if (!symbol || bars.length < 20) {
       return new Response(JSON.stringify({ error: "symbol and >=20 candles required" }), {
@@ -187,42 +125,67 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-    console.log(`Analyzing ${symbol} (${timeframe}) with ${bars.length} candles`);
+
+    console.log(`[ai-analyze] Starting AI analysis for ${symbol} (${timeframe}) with ${bars.length} candles`);
+
+    const client = new OpenAI({ apiKey: openaiApiKey });
 
     const prompt =
       "You are a professional technical analyst. " +
-      "Use price action plus EMA20/50/200, RSI, MACD, ATR, Bollinger conceptually. " +
-      "Be concise and numeric. Return ONLY valid JSON to the schema.\n" +
-      "Columns: t,o,h,l,c,v (t=epoch seconds).\n" +
-      "Data:\n" + JSON.stringify(bars.slice(-100)); // Use less data for faster processing
+      "Analyze the provided OHLCV data using technical indicators like RSI, MACD, moving averages, and price patterns. " +
+      "Provide a comprehensive analysis with specific entry/exit levels and rationale. " +
+      "Return ONLY valid JSON matching this schema:\n" +
+      JSON.stringify({
+        summary: "string - detailed technical analysis",
+        outlook: "bullish|bearish|neutral", 
+        levels: {
+          support: ["number array"],
+          resistance: ["number array"],
+          vwap: "number or null"
+        },
+        trade_idea: {
+          direction: "long|short|none",
+          entry: "number",
+          stop: "number", 
+          targets: ["number array"],
+          rationale: "string"
+        },
+        confidence: "number 0-1",
+        risks: "string"
+      }) + "\n\nOHLCV Data (t=timestamp_ms,o=open,h=high,l=low,c=close,v=volume):\n" + 
+      JSON.stringify(bars.slice(-150));
 
+    console.log('[ai-analyze] Calling OpenAI API...');
     const r = await client.chat.completions.create({
       model: "gpt-5-2025-08-07",
       messages: [{ role: "user", content: prompt }],
-      max_completion_tokens: 800,
+      max_completion_tokens: 1000,
       response_format: { type: "json_object" }
     });
 
     const out = r.choices?.[0]?.message?.content || "";
+    console.log('[ai-analyze] OpenAI response length:', out.length);
+
     let parsed: any = null;
     try {
-      parsed = typeof out === "string" ? JSON.parse(out) : out;
-    } catch (_e) {
+      parsed = JSON.parse(out);
+    } catch (e1) {
+      console.warn('[ai-analyze] JSON parse failed, attempting cleanup');
       const start = out.indexOf('{');
       const end = out.lastIndexOf('}');
       if (start !== -1 && end !== -1 && end > start) {
         try {
           parsed = JSON.parse(out.slice(start, end + 1));
         } catch (e2) {
-          console.error("[ai-analyze] JSON parse failed slice:", out.slice(0, 200));
-          return new Response(JSON.stringify({ error: "Model did not return valid JSON" }), {
+          console.error('[ai-analyze] JSON cleanup failed:', out.slice(0, 200));
+          return new Response(JSON.stringify({ error: "AI returned invalid JSON format" }), {
             status: 502,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
       } else {
-        console.error("[ai-analyze] No JSON in response:", out);
-        return new Response(JSON.stringify({ error: "Model did not return JSON" }), {
+        console.error('[ai-analyze] No valid JSON found in response');
+        return new Response(JSON.stringify({ error: "AI did not return JSON" }), {
           status: 502,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -238,15 +201,14 @@ serve(async (req) => {
       candles_analyzed: bars.length
     };
 
+    console.log('[ai-analyze] Analysis completed successfully');
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (e: any) {
+    console.error('[ai-analyze] Error:', e);
     const rawStatus = e?.status ?? e?.response?.status ?? 500;
-    // Normalize statuses to avoid ambiguous 500/403 surfacing to clients
-    // - Map 401/403 from upstream auth errors to 401
-    // - Map any 5xx to 502 (bad upstream)
     let status = rawStatus;
     if (rawStatus === 401 || rawStatus === 403) status = 401;
     else if (rawStatus >= 500) status = 502;
@@ -255,8 +217,7 @@ serve(async (req) => {
       ? await e.response.text().catch(() => "")
       : (e?.message || "");
 
-    console.error("[ai-analyze] OpenAI error", { rawStatus, mappedStatus: status, body });
-    return new Response(JSON.stringify({ error: body || "OpenAI call failed" }), {
+    return new Response(JSON.stringify({ error: body || "Analysis failed" }), {
       status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
