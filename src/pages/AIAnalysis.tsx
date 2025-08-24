@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Loader2, TrendingUp, TrendingDown, Activity, Brain, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
@@ -119,6 +120,19 @@ export const AIAnalysis = () => {
   const [aiError, setAiError] = useState<string | null>(null);
   const chartRef = useRef<any>(null);
   const { toast } = useToast();
+
+  // Optional: allow a local OpenAI key for AI analysis (stored in browser)
+  const [showKeySettings, setShowKeySettings] = useState(false);
+  const [openaiKey, setOpenaiKey] = useState<string>("");
+  const [hasLocalKey, setHasLocalKey] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      const k = window.localStorage?.getItem('OPENAI_API_KEY') || '';
+      setOpenaiKey(k);
+      setHasLocalKey(!!k);
+    } catch {}
+  }, []);
 
   const handleAnalysis = async () => {
     if (!user) {
@@ -317,23 +331,32 @@ export const AIAnalysis = () => {
                 </SelectContent>
               </Select>
               
-              <Button 
-                onClick={handleAnalysis} 
-                disabled={loading || chartData.length < 30}
-                className="min-w-[140px]"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Analyzing...
-                  </>
-                  ) : (
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={handleAnalysis} 
+                  disabled={loading || chartData.length < 30}
+                  className="min-w-[140px]"
+                >
+                  {loading ? (
                     <>
-                      <Brain className="h-4 w-4 mr-2" />
-                      Generate Analysis
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Analyzing...
                     </>
-                  )}
-              </Button>
+                    ) : (
+                      <>
+                        <Brain className="h-4 w-4 mr-2" />
+                        Generate Analysis
+                      </>
+                    )}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowKeySettings(v => !v)}
+                  className="min-w-[110px]"
+                >
+                  {hasLocalKey ? 'AI Key: Set' : 'AI Key: Set Key'}
+                </Button>
+              </div>
             </div>
             
             {/* Usage indicator for non-subscribed users */}
@@ -344,6 +367,55 @@ export const AIAnalysis = () => {
             )}
           </div>
           
+          {showKeySettings && (
+            <Card className="mb-4">
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row items-center gap-3">
+                  <Input
+                    type="password"
+                    placeholder={hasLocalKey ? "Key stored in browser" : "Enter OpenAI API key (sk-...)"}
+                    value={openaiKey}
+                    onChange={(e) => setOpenaiKey(e.target.value)}
+                    className="md:flex-1"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        try {
+                          window.localStorage?.setItem('OPENAI_API_KEY', openaiKey);
+                          setHasLocalKey(!!openaiKey);
+                          toast({ title: 'AI Key Saved', description: 'Your key is stored locally and will be used for analysis.' });
+                        } catch {
+                          toast({ title: 'Failed to Save', description: 'Could not access localStorage.', variant: 'destructive' });
+                        }
+                      }}
+                    >
+                      Save Key
+                    </Button>
+                    {hasLocalKey && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          try {
+                            window.localStorage?.removeItem('OPENAI_API_KEY');
+                            setOpenaiKey('');
+                            setHasLocalKey(false);
+                            toast({ title: 'AI Key Cleared', description: 'Local key removed. Server key will be used if configured.' });
+                          } catch {}
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Your API key is stored only in your browser and sent securely to the Edge Function for analysis. It is not shared with other users.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Data Echo */}
           {chartData.length > 0 && (
             <div className="text-xs text-muted-foreground mb-4 font-mono">
