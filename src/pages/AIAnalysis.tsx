@@ -217,23 +217,36 @@ export const AIAnalysis = () => {
       // Convert to the format expected by AiResult component
       const analysisForDisplay = {
         symbol: symbol.toUpperCase(),
-        analysis: [result.summary, result.trade_idea?.rationale].filter(Boolean).join(' ') || 'Analysis completed successfully',
-        recommendation: result.trade_idea?.direction === 'long' ? 'buy' : 
-                       result.trade_idea?.direction === 'short' ? 'sell' : 'hold',
-        confidence: typeof result.confidence === 'number' ? result.confidence : 0.5,
+        analysis: result.summary || 'Analysis completed successfully',
+        recommendation: result.action || 'hold',
+        confidence: result.confidence_calibrated || result.confidence_model || 0.5,
         keyLevels: result.levels || { support: [], resistance: [] },
         technicalIndicators: {
-          rsi: 50, // Would need to calculate this from data
+          rsi: result.technical?.rsi14 || 50,
           trend: result.outlook || 'neutral',
-          momentum: 'neutral'
+          momentum: result.technical?.macd?.hist > 0 ? 'strong' : 
+                   result.technical?.macd?.hist < 0 ? 'weak' : 'neutral'
         },
-        chartPatterns: [],
-        priceTargets: { bullish: 0, bearish: 0 }, // Not in new schema
+        chartPatterns: result.evidence || [],
+        priceTargets: { 
+          bullish: result.trade_idea?.targets?.[0] || 0, 
+          bearish: result.trade_idea?.stop || 0 
+        },
         riskAssessment: {
-          level: 'medium' as const,
+          level: result.confidence_calibrated > 70 ? 'low' : 
+                 result.confidence_calibrated > 50 ? 'medium' : 'high',
           factors: result.risks ? [result.risks] : []
         },
         timestamp: new Date().toISOString(),
+        // Add new institutional-grade fields
+        action_text: result.action_text,
+        fibonacci: result.fibonacci,
+        trade_idea: result.trade_idea,
+        technical: result.technical,
+        confidence_model: result.confidence_model,
+        confidence_calibrated: result.confidence_calibrated,
+        evidence: result.evidence,
+        timeframe_profile: result.timeframe_profile
       };
 
       setAnalysis(analysisForDisplay);

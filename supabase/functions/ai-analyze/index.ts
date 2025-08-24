@@ -9,13 +9,13 @@ const corsHeaders = {
 };
 
 const analysisSchema = {
-  name: "TaResult",
+  name: "InstitutionalTaResult",
   schema: {
     type: "object",
     properties: {
-      symbol: { type: "string" },
-      timeframe: { type: "string" },
       summary: { type: "string" },
+      action: { type: "string", enum: ["buy","sell","hold"] },
+      action_text: { type: "string" },
       outlook: { type: "string", enum: ["bullish","bearish","neutral"] },
       levels: {
         type: "object",
@@ -26,6 +26,32 @@ const analysisSchema = {
         },
         required: ["support","resistance"]
       },
+      fibonacci: {
+        type: "object",
+        properties: {
+          pivot_high: { type: "number" },
+          pivot_low: { type: "number" },
+          retracements: {
+            type: "object",
+            properties: {
+              "23.6": { type: "number" },
+              "38.2": { type: "number" },
+              "50.0": { type: "number" },
+              "61.8": { type: "number" },
+              "78.6": { type: "number" }
+            }
+          },
+          extensions: {
+            type: "object", 
+            properties: {
+              "127.2": { type: "number" },
+              "161.8": { type: "number" }
+            }
+          },
+          direction: { type: "string", enum: ["up","down"] }
+        },
+        required: ["pivot_high","pivot_low","retracements","extensions","direction"]
+      },
       trade_idea: {
         type: "object",
         properties: {
@@ -33,15 +59,76 @@ const analysisSchema = {
           entry: { type: "number" },
           stop: { type: "number" },
           targets: { type: "array", items: { type: "number" } },
-          rationale: { type: "string" }
+          rationale: { type: "string" },
+          time_horizon: { type: "string", enum: ["scalp","intraday","swing","position"] },
+          setup_type: { type: "string", enum: ["breakout","pullback","mean_reversion","range","other"] },
+          rr_estimate: { type: "number" }
         },
-        required: ["direction","rationale"]
+        required: ["direction","entry","stop","targets","rationale","time_horizon","setup_type","rr_estimate"]
       },
-      confidence: { type: "number" },
+      technical: {
+        type: "object",
+        properties: {
+          ema20: { type: "number" },
+          ema50: { type: "number" },
+          ema200: { type: "number" },
+          rsi14: { type: "number" },
+          macd: {
+            type: "object",
+            properties: {
+              line: { type: "number" },
+              signal: { type: "number" },
+              hist: { type: "number" }
+            }
+          },
+          atr14: { type: "number" },
+          bb: {
+            type: "object",
+            properties: {
+              mid: { type: "number" },
+              upper: { type: "number" },
+              lower: { type: "number" }
+            }
+          }
+        },
+        required: ["ema20","ema50","ema200","rsi14","macd","atr14","bb"]
+      },
+      confidence_model: { type: "number" },
+      confidence_calibrated: { type: "number" },
+      evidence: { type: "array", items: { type: "string" } },
       risks: { type: "string" },
+      timeframe_profile: {
+        type: "object",
+        properties: {
+          scalp: {
+            type: "object",
+            properties: {
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } }
+            }
+          },
+          intraday: {
+            type: "object", 
+            properties: {
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } }
+            }
+          },
+          swing: {
+            type: "object",
+            properties: {
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } }
+            }
+          }
+        }
+      },
       json_version: { type: "string" }
     },
-    required: ["summary","outlook","levels","trade_idea","confidence","risks"]
+    required: ["summary","action","action_text","outlook","levels","fibonacci","trade_idea","technical","confidence_model","confidence_calibrated","evidence","risks","timeframe_profile","json_version"]
   },
   strict: true
 };
@@ -151,46 +238,134 @@ serve(async (req) => {
 
     const client = new OpenAI({ apiKey: openaiApiKey });
 
-    const prompt =
-      "You are a professional technical analyst. " +
-      "Analyze the provided OHLCV data using technical indicators like RSI, MACD, moving averages, and price patterns. " +
-      "Provide a comprehensive analysis with specific entry/exit levels and rationale. " +
-      "Return ONLY valid JSON matching this schema:\n" +
-      JSON.stringify({
-        summary: "string - detailed technical analysis",
-        outlook: "bullish|bearish|neutral", 
-        levels: {
-          support: ["number array"],
-          resistance: ["number array"],
-          vwap: "number or null"
-        },
-        trade_idea: {
-          direction: "long|short|none",
-          entry: "number",
-          stop: "number", 
-          targets: ["number array"],
-          rationale: "string"
-        },
-        confidence: "number 0-1",
-        risks: "string"
-      }) + "\n\nOHLCV Data (t=timestamp_ms,o=open,h=high,l=low,c=close,v=volume):\n" + 
-      JSON.stringify(bars.slice(-150));
+    const institutionalPrompt = `You are an institutional-grade technical analysis engine.
+Use only the numeric data provided by the backend (symbol, timeframe, OHLCV candles, and any precomputed indicators).
+Be deterministic and consistent: given the same inputs, return the same outputs.
+Return ONLY JSON that matches the schema below — no extra prose.
 
-    console.log('[ai-analyze] Calling OpenAI API...');
+Requirements
+
+Action words & decision
+Must produce an explicit decision and wording that starts with BUY, SELL, or HOLD.
+Use both directional terms and trader lingo: "action": "buy|sell|hold", "trade_idea.direction": "long|short|none", and an action_text that begins with BUY/SELL/HOLD followed by a one-line reason (e.g., BUY — Pullback to EMA50 with bullish RSI divergence).
+
+Detailed, efficient, number-driven analysis
+Base everything on the actual numbers provided. Never invent data.
+Include price action structure (HH/HL or LH/LL), EMA(20/50/200), SMA(50/200), RSI(14), MACD (line/signal/cross), ATR(14), Bollinger(20,2), VWAP (if provided), and volume cues (if provided).
+
+Fibonacci: compute retracements 23.6/38.2/50/61.8/78.6 and extensions 127.2/161.8 from the most recent valid swing:
+Identify the swing using the last N bars for the current timeframe:
+scalp (1m–15m): N=100,
+intraday (30m–4h): N=150, 
+swing (1D–1W): N=200.
+For an up-swing: pivotLow = min(low), pivotHigh = max(high) over N; retracements off that move.
+For a down-swing: pivotHigh then pivotLow similarly.
+
+Entries/stops/targets must be numeric, realistic, and tied to ATR, recent highs/lows, Fibs, or clear S/R.
+Provide why with concise bullet-style rationale that references concrete levels (e.g., "Close > EMA200 and EMA20>EMA50; RSI 62; MACD cross up; ATR supports 1.2× risk with 2.0× target").
+
+Confidence that's real (no 1%)
+Output two fields:
+confidence_model (0–100): your internal estimate based on signals.
+confidence_calibrated (0–100): apply this rubric to avoid trivial values:
+Start at 50.
++8–12 each independent confluence (trend alignment across EMAs; momentum confirmation via RSI>60 or MACD cross with rising histogram; breakout close beyond structure; bounce off EMA50/200 with confirming candle; location vs. Bollinger bands). Max +30.
+−10 if conflicting signals (e.g., price > EMA20 but < EMA200).
+−10–20 if ATR is elevated vs. 30-bar median and stop would exceed 1×ATR.
+Cap at 88 unless backtest metadata explicitly authorizes 90–99.
+Never default to 1%. If mixed, return 55–65 or "action":"hold".
+
+Consistency
+Deterministic decisions: do not use randomness.
+Given identical inputs, produce identical outputs (same levels ± rounding).
+Prefer rule-based selection of swings/levels per the rules above.
+
+Timeframe-aware profiles
+Tailor analysis to the provided timeframe and produce a profile for trader types:
+scalp (1–15m): tighter stops (0.5–1.0× ATR), smaller targets (1.0–1.5× ATR), quick invalidation.
+intraday (30m–4h): stops ~1.0–1.5× ATR, targets 1.5–2.5× ATR.
+swing (1D–1W): stops ~1.5–2.5× ATR, targets 2–4× ATR; give Fib confluence with higher-TF EMAs/SR.
+If only one timeframe is provided, still include a short note on how the setup scales to other horizons.
+
+Symbol: ${symbol}
+Timeframe: ${timeframe}
+Market: ${market}
+
+OHLCV Data (t=timestamp_ms,o=open,h=high,l=low,c=close,v=volume):
+${JSON.stringify(bars.slice(-200))}
+
+Return ONLY JSON matching this exact schema:
+{
+  "summary": "string",
+  "action": "buy|sell|hold",
+  "action_text": "string starting with BUY/SELL/HOLD",
+  "outlook": "bullish|bearish|neutral",
+  "levels": {
+    "support": [number],
+    "resistance": [number],
+    "vwap": null
+  },
+  "fibonacci": {
+    "pivot_high": number,
+    "pivot_low": number,
+    "retracements": {
+      "23.6": number,
+      "38.2": number,
+      "50.0": number,
+      "61.8": number,
+      "78.6": number
+    },
+    "extensions": {
+      "127.2": number,
+      "161.8": number
+    },
+    "direction": "up|down"
+  },
+  "trade_idea": {
+    "direction": "long|short|none",
+    "entry": number,
+    "stop": number,
+    "targets": [number],
+    "rationale": "string with bullet-like reasons",
+    "time_horizon": "scalp|intraday|swing|position",
+    "setup_type": "breakout|pullback|mean_reversion|range|other",
+    "rr_estimate": number
+  },
+  "technical": {
+    "ema20": number,
+    "ema50": number,
+    "ema200": number,
+    "rsi14": number,
+    "macd": { "line": number, "signal": number, "hist": number },
+    "atr14": number,
+    "bb": { "mid": number, "upper": number, "lower": number }
+  },
+  "confidence_model": number,
+  "confidence_calibrated": number,
+  "evidence": ["list confluences used"],
+  "risks": "string (e.g., news risk, mixed signals, high ATR)",
+  "timeframe_profile": {
+    "scalp": { "entry": number, "stop": number, "targets": [number] },
+    "intraday": { "entry": number, "stop": number, "targets": [number] },
+    "swing": { "entry": number, "stop": number, "targets": [number] }
+  },
+  "json_version": "1.0.0"
+}`;
+
+    console.log('[ai-analyze] Calling OpenAI API with institutional-grade prompt...');
     const r = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-2025-08-07",
       messages: [
         { 
           role: "system", 
-          content: "You are a professional technical analyst. Analyze OHLCV data and return ONLY valid JSON with no additional text or formatting." 
+          content: "You are an institutional-grade technical analysis engine. Analyze OHLCV data using strict numerical methods and return ONLY valid JSON with no additional text, explanations, or formatting. Be deterministic and consistent." 
         },
         { 
           role: "user", 
-          content: prompt 
+          content: institutionalPrompt 
         }
       ],
-      temperature: 0.3,
-      max_tokens: 1000,
+      max_completion_tokens: 2000,
       response_format: { type: "json_object" }
     });
 
