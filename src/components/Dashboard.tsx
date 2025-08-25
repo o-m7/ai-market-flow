@@ -1,121 +1,67 @@
-// src/hooks/usePolygonData.ts
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Navigation } from "@/components/Navigation";
+import { SymbolCard } from "@/components/SymbolCard";
+import { usePolygonData } from "@/hooks/usePolygonData";
+import { getSymbolsByMarketType } from "@/lib/marketSymbols";
+import { RefreshCw } from "lucide-react";
 
-/** REPLACE WITH YOUR PROJECT ID */
-const EDGE = "https://<PROJECT_ID>.functions.supabase.co";
+export const Dashboard = () => {
+  // Choose a balanced default list (crypto + forex focus per project defaults)
+  const symbols = useMemo(() => getSymbolsByMarketType("all"), []);
+  const { data, loading, error, lastUpdated, refetch } = usePolygonData(symbols, 10000);
 
-/**
- * Calls the polygon-market-data Edge Function for one symbol.
- * We keep it resilient: 200-only, safe JSON, no throw on upstream empty/rate limit.
- */
-async function fetchOne(symbol: string, timeframe = "1m") {
-  const url = `${EDGE}/polygon-market-data?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}`;
-  try {
-    const res = await fetch(url, { method: "GET" });
-    const payload = await res.json().catch(() => null);
-    if (!payload || typeof payload !== "object") {
-      return { ok: false as const, symbol, lastPrice: null, note: "parse_fail" };
-    }
-    // payload has: { lastPrice, candles, notes, ... }
-    return {
-      ok: true as const,
-      symbol: payload.input_symbol || symbol,
-      lastPrice: payload.lastPrice ?? null,
-      notes: payload.notes || [],
-      raw: payload,
-    };
-  } catch (e) {
-    return { ok: false as const, symbol, lastPrice: null, note: "network_error" };
-  }
-}
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <Navigation />
 
-type Row = {
-  symbol: string;
-  price?: number | null;
-  lastUpdatedAt?: number;
-  aiSentiment?: "bullish" | "bearish" | "neutral";
-  // keep any other fields SymbolCard expects:
-  [k: string]: any;
+      <main className="container mx-auto px-4 py-6">
+        <header className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Markets Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Live snapshot of top crypto and forex pairs</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground">Updated: {new Date(lastUpdated).toLocaleTimeString()}</span>
+            )}
+            <Button variant="outline" size="sm" onClick={refetch} className="gap-2">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+        </header>
+
+        {error && (
+          <Alert className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Grid */}
+        <section aria-label="market-cards" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {loading && data.length === 0 && Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-60 rounded-lg" />
+          ))}
+
+          {data.map((item) => (
+            <SymbolCard
+              key={item.symbol}
+              symbol={item.symbol}
+              name={item.name}
+              price={item.price}
+              change={item.change}
+              changePercent={item.changePercent}
+              volume={item.volume}
+              rsi={item.rsi}
+              aiSentiment={item.aiSentiment}
+              aiSummary={item.aiSummary}
+            />
+          ))}
+        </section>
+      </main>
+    </div>
+  );
 };
-
-export function usePolygonData(symbols: string[], timeframe = "1m") {
-  const [data, setData] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
-
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastGoodRef = useRef<Record<string, Row>>({});
-
-  // Build a map for quick merges
-  const toMap = (rows: Row[]) => rows.reduce<Record<string, Row>>((m, r) => { m[r.symbol] = r; return m; }, {});
-
-  const loadAll = useCallback(async (initial = false) => {
-    if (!symbols?.length) {
-      setLoading(false);
-      return;
-    }
-
-    // Stagger requests to avoid 429s
-    const promises = symbols.map((sym, i) =>
-      new Promise<{ sym: string; res: Awaited<ReturnType<typeof fetchOne>> }>((resolve) => {
-        setTimeout(async () => {
-          const res = await fetchOne(sym, timeframe);
-          resolve({ sym, res });
-        }, i * 200); // 200ms spacing
-      })
-    );
-
-    const results = await Promise.all(promises);
-
-    // Merge into current state while keeping last good values
-    const currentMap = toMap(data);
-    const nextMap: Record<string, Row> = { ...lastGoodRef.current, ...currentMap };
-
-    let anySuccess = false;
-
-    for (const { sym, res } of results) {
-      if (res.ok) {
-        anySuccess = true;
-        const prev = nextMap[sym] || { symbol: sym };
-        nextMap[sym] = {
-          ...prev,
-          symbol: sym,
-          price: res.lastPrice,
-          lastUpdatedAt: Date.now(),
-          // keep previous fields the card may need (aiSentiment, volume, etc.)
-        };
-        // update last-good cache
-        lastGoodRef.current[sym] = nextMap[sym];
-      } else {
-        // keep last good value; do NOT set global error that triggers "fallback data"
-        if (!nextMap[sym]) nextMap[sym] = { symbol: sym, price: null };
-      }
-    }
-
-    const next = symbols.map((s) => nextMap[s] || { symbol: s, price: null });
-
-    setData(next);
-    setLastUpdated(Date.now());
-    setLoading(false);
-
-    // Only show an error if literally *everything* failed (network off, etc.)
-    setError(anySuccess ? null : "Live feed unavailable (network/rate-limit). Keeping last prices.");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(symbols), timeframe, data]);
-
-  const refetch = useCallback(() => loadAll(false), [loadAll]);
-
-  useEffect(() => {
-    setLoading(true);
-    loadAll(true);
-    // poll every 4s for the grid
-    timerRef.current && clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => loadAll(false), 4000);
-    return () => {
-      timerRef.current && clearInterval(timerRef.current);
-    };
-  }, [loadAll]);
-
-  return { data, loading, error, lastUpdated, refetch };
-}
