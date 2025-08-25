@@ -325,39 +325,66 @@ serve(async (req) => {
     };
 
     const marketData: Array<any> = [];
-    let usedFallback = false;
+    
+    if (!polygonApiKey) {
+      console.error('❌ POLYGON_API_KEY not configured');
+      throw new Error('Polygon API key not configured');
+    }
 
-    // Simplified live data fetching - prioritize real-time sources
-    for (const rawSymbol of symbolsToFetch.slice(0, 12)) {
+    console.log('✅ Using Polygon API for live market data');
+
+    // Process symbols using ONLY Polygon API
+    for (const rawSymbol of symbolsToFetch.slice(0, 10)) {
       try {
         const { polygon: polygonSymbol, type } = getPolygonSymbol(rawSymbol);
-        console.log(`[LIVE] Processing ${rawSymbol} -> ${polygonSymbol} (${type})`);
+        console.log(`[POLYGON] Processing ${rawSymbol} -> ${polygonSymbol} (${type})`);
         
         let success = false;
 
-        if (type === 'crypto') {
-          // Binance live ticker for crypto (most reliable)
-          try {
-            const binanceSymbol = rawSymbol.replace('/', '').replace('USD', 'USDT');
-            const response = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${binanceSymbol}`);
+        // Use Polygon real-time quote endpoint for live data
+        try {
+          const quoteUrl = `https://api.polygon.io/v2/last/trade/${polygonSymbol}?apikey=${polygonApiKey}`;
+          console.log(`[POLYGON] Fetching: ${quoteUrl}`);
+          
+          const response = await fetch(quoteUrl);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`[POLYGON] Quote response for ${rawSymbol}:`, JSON.stringify(data, null, 2));
             
-            if (response.ok) {
-              const data = await response.json();
-              const price = parseFloat(data.lastPrice);
-              const changePercent = parseFloat(data.priceChangePercent);
-              const change = parseFloat(data.priceChange);
-              const volume = Math.floor(parseFloat(data.volume) || 0);
+            const result = data.results;
+            if (result && result.p) {
+              const currentPrice = result.p;
+              
+              // Get previous day data for change calculation
+              const prevUrl = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
+              const prevResponse = await fetch(prevUrl);
+              
+              let prevClose = currentPrice;
+              let volume = 0;
+              
+              if (prevResponse.ok) {
+                const prevData = await prevResponse.json();
+                const prevResult = prevData.results?.[0];
+                if (prevResult) {
+                  prevClose = prevResult.c || currentPrice;
+                  volume = prevResult.v || 0;
+                }
+              }
+              
+              const change = currentPrice - prevClose;
+              const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
               
               let aiSentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
               if (changePercent > 1) aiSentiment = 'bullish';
               else if (changePercent < -1) aiSentiment = 'bearish';
               
-              const aiSummary = await generateAISummary(rawSymbol, price, change, changePercent);
+              const aiSummary = await generateAISummary(rawSymbol, currentPrice, change, changePercent);
               
               marketData.push({
                 symbol: rawSymbol,
                 name: getMarketName(rawSymbol),
-                price: Number(price.toFixed(4)),
+                price: Number(currentPrice.toFixed(4)),
                 change: Number(change.toFixed(4)),
                 changePercent: Number(changePercent.toFixed(2)),
                 volume: formatVolume(volume),
@@ -366,74 +393,74 @@ serve(async (req) => {
                 aiSummary
               });
               
-              console.log(`[LIVE] ✓ Crypto success: ${rawSymbol} = $${price.toFixed(4)} (${changePercent.toFixed(2)}%)`);
+              console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%)`);
               success = true;
             }
-          } catch (e) {
-            console.error(`[LIVE] Binance error for ${rawSymbol}:`, e);
+          } else {
+            console.error(`[POLYGON] Quote API failed for ${rawSymbol}:`, response.status, response.statusText);
           }
-        } 
-        
-        else if (type === 'forex') {
-          // Live forex rates
+        } catch (e) {
+          console.error(`[POLYGON] Quote error for ${rawSymbol}:`, e);
+        }
+
+        // Fallback to snapshot if quote fails
+        if (!success) {
           try {
-            const [base, quote] = rawSymbol.split('/');
-            const response = await fetch(`https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`);
+            const snapshotUrl = `https://api.polygon.io/v2/snapshot/locale/global/markets/${type === 'crypto' ? 'crypto' : type === 'forex' ? 'fx' : 'stocks'}/tickers/${polygonSymbol}?apikey=${polygonApiKey}`;
+            console.log(`[POLYGON] Fallback snapshot: ${snapshotUrl}`);
+            
+            const response = await fetch(snapshotUrl);
             
             if (response.ok) {
               const data = await response.json();
-              const rate = data?.rates?.[quote];
+              const result = data.results?.[0];
               
-              if (rate) {
-                // Get yesterday's rate for change calculation
-                const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-                const histResponse = await fetch(`https://api.exchangerate.host/${yesterday}?base=${base}&symbols=${quote}`);
-                let prevRate = rate;
+              if (result) {
+                const currentPrice = result.last_trade?.price || result.value || result.day?.c;
+                const prevClose = result.prev_day?.c || result.day?.o || currentPrice;
+                const volume = result.day?.v || 0;
                 
-                if (histResponse.ok) {
-                  const histData = await histResponse.json();
-                  prevRate = histData?.rates?.[quote] || rate;
+                if (currentPrice) {
+                  const change = currentPrice - prevClose;
+                  const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+                  
+                  let aiSentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+                  if (changePercent > 1) aiSentiment = 'bullish';
+                  else if (changePercent < -1) aiSentiment = 'bearish';
+                  
+                  const aiSummary = await generateAISummary(rawSymbol, currentPrice, change, changePercent);
+                  
+                  marketData.push({
+                    symbol: rawSymbol,
+                    name: getMarketName(rawSymbol),
+                    price: Number(currentPrice.toFixed(4)),
+                    change: Number(change.toFixed(4)),
+                    changePercent: Number(changePercent.toFixed(2)),
+                    volume: formatVolume(volume),
+                    rsi: Math.floor(Math.random() * 40) + 30,
+                    aiSentiment,
+                    aiSummary
+                  });
+                  
+                  console.log(`[POLYGON] ✓ Snapshot success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%)`);
+                  success = true;
                 }
-                
-                const change = rate - prevRate;
-                const changePercent = prevRate !== 0 ? (change / prevRate) * 100 : 0;
-                
-                let aiSentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
-                if (changePercent > 0.5) aiSentiment = 'bullish';
-                else if (changePercent < -0.5) aiSentiment = 'bearish';
-                
-                const aiSummary = await generateAISummary(rawSymbol, rate, change, changePercent);
-                
-                marketData.push({
-                  symbol: rawSymbol,
-                  name: getMarketName(rawSymbol),
-                  price: Number(rate.toFixed(4)),
-                  change: Number(change.toFixed(4)),
-                  changePercent: Number(changePercent.toFixed(2)),
-                  volume: '0', // Forex doesn't have volume
-                  rsi: Math.floor(Math.random() * 40) + 30,
-                  aiSentiment,
-                  aiSummary
-                });
-                
-                console.log(`[LIVE] ✓ Forex success: ${rawSymbol} = ${rate.toFixed(4)} (${changePercent.toFixed(2)}%)`);
-                success = true;
               }
             }
           } catch (e) {
-            console.error(`[LIVE] Forex error for ${rawSymbol}:`, e);
+            console.error(`[POLYGON] Snapshot error for ${rawSymbol}:`, e);
           }
         }
         
         if (!success) {
-          console.warn(`[LIVE] ⚠️ No live data for ${rawSymbol}, skipping...`);
+          console.warn(`[POLYGON] ⚠️ No data available for ${rawSymbol}`);
         }
         
-        // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Rate limiting to respect Polygon API limits
+        await new Promise(resolve => setTimeout(resolve, 200));
         
       } catch (error) {
-        console.error(`[LIVE] Error processing ${rawSymbol}:`, error);
+        console.error(`[POLYGON] Error processing ${rawSymbol}:`, error);
       }
     }
 
@@ -467,7 +494,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       data: marketData,
       timestamp: new Date().toISOString(),
-      source: usedFallback ? 'mixed' : (marketData.length > 0 && marketData.some(item => item.price > 0) ? 'polygon' : 'mock')
+      source: marketData.length > 0 && marketData.some(item => item.price > 0) ? 'polygon' : 'mock'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -484,8 +511,7 @@ serve(async (req) => {
       const changePercent = (Math.random() - 0.5) * 6;
       const change = (basePrice * changePercent) / 100;
       const sentiments = ['bullish', 'bearish', 'neutral'];
-      const aiSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
-      const aiSummary = await generateAISummary(symbol, basePrice, change, changePercent);
+      const aiSentiment = sentiments[Math.floor(Math.random() * sentiments.length)] as 'bullish' | 'bearish' | 'neutral';
       
       mockData.push({
         symbol,
@@ -496,7 +522,11 @@ serve(async (req) => {
         volume: `${Math.floor(Math.random() * 50) + 1}M`,
         rsi: Math.floor(Math.random() * 40) + 30,
         aiSentiment,
-        aiSummary
+        aiSummary: aiSentiment === 'bullish' 
+          ? 'Strong upward momentum detected' 
+          : aiSentiment === 'bearish' 
+          ? 'Bearish pressure building' 
+          : 'Range-bound trading expected'
       });
     }
     

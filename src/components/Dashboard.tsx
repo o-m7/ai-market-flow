@@ -17,7 +17,7 @@ export const Dashboard = () => {
   });
 
   const symbols = useMemo(() => getSymbolsByMarketType(filters.marketType), [filters.marketType]);
-  const { data, loading, error, lastUpdated, refetch } = usePolygonData(symbols, 5000); // More frequent updates
+  const { data, loading, error, lastUpdated, refetch } = usePolygonData(symbols, 3000); // Live updates every 3 seconds
 
   // Filter data based on trend
   const filteredData = useMemo(() => {
@@ -46,7 +46,7 @@ export const Dashboard = () => {
           <div>
             <h1 className="text-2xl font-bold">Live Markets Dashboard</h1>
             <p className="text-sm text-muted-foreground">
-              Real-time data • {filteredData.length} symbols • Auto-refresh every 5s
+              Polygon API Live Data • {filteredData.length} symbols • Auto-refresh every 3s
             </p>
           </div>
           <div className="flex items-center gap-3">
