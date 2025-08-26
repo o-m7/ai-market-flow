@@ -333,136 +333,121 @@ serve(async (req) => {
 
     console.log('✅ Using Polygon API for live market data');
 
-    // Process symbols using ONLY Polygon API
-    for (const rawSymbol of symbolsToFetch.slice(0, 10)) {
+    // Process symbols with batch requests for better performance
+    const batchPromises = symbolsToFetch.slice(0, 10).map(async (rawSymbol) => {
       try {
         const { polygon: polygonSymbol, type } = getPolygonSymbol(rawSymbol);
         console.log(`[POLYGON] Processing ${rawSymbol} -> ${polygonSymbol} (${type})`);
         
-        let success = false;
-
-        // Use Polygon real-time quote endpoint for live data
-        try {
-          const quoteUrl = `https://api.polygon.io/v2/last/trade/${polygonSymbol}?apikey=${polygonApiKey}`;
-          console.log(`[POLYGON] Fetching: ${quoteUrl}`);
+        let marketDataItem = null;
+        
+        // Try multiple endpoints simultaneously for maximum real-time data
+        const promises = [
+          // Real-time quote
+          fetch(`https://api.polygon.io/v2/last/trade/${polygonSymbol}?apikey=${polygonApiKey}`)
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null),
           
-          const response = await fetch(quoteUrl);
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`[POLYGON] Quote response for ${rawSymbol}:`, JSON.stringify(data, null, 2));
+          // Real-time quote (alternative endpoint)  
+          fetch(`https://api.polygon.io/v2/last/quote/${polygonSymbol}?apikey=${polygonApiKey}`)
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null),
             
-            const result = data.results;
-            if (result && result.p) {
-              const currentPrice = result.p;
-              
-              // Get previous day data for change calculation
-              const prevUrl = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`;
-              const prevResponse = await fetch(prevUrl);
-              
-              let prevClose = currentPrice;
-              let volume = 0;
-              
-              if (prevResponse.ok) {
-                const prevData = await prevResponse.json();
-                const prevResult = prevData.results?.[0];
-                if (prevResult) {
-                  prevClose = prevResult.c || currentPrice;
-                  volume = prevResult.v || 0;
-                }
-              }
-              
-              const change = currentPrice - prevClose;
-              const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
-              
-              let aiSentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
-              if (changePercent > 1) aiSentiment = 'bullish';
-              else if (changePercent < -1) aiSentiment = 'bearish';
-              
-              const aiSummary = await generateAISummary(rawSymbol, currentPrice, change, changePercent);
-              
-              marketData.push({
-                symbol: rawSymbol,
-                name: getMarketName(rawSymbol),
-                price: Number(currentPrice.toFixed(4)),
-                change: Number(change.toFixed(4)),
-                changePercent: Number(changePercent.toFixed(2)),
-                volume: formatVolume(volume),
-                rsi: Math.floor(Math.random() * 40) + 30,
-                aiSentiment,
-                aiSummary
-              });
-              
-              console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%)`);
-              success = true;
-            }
-          } else {
-            console.error(`[POLYGON] Quote API failed for ${rawSymbol}:`, response.status, response.statusText);
-          }
-        } catch (e) {
-          console.error(`[POLYGON] Quote error for ${rawSymbol}:`, e);
-        }
-
-        // Fallback to snapshot if quote fails
-        if (!success) {
-          try {
-            const snapshotUrl = `https://api.polygon.io/v2/snapshot/locale/global/markets/${type === 'crypto' ? 'crypto' : type === 'forex' ? 'fx' : 'stocks'}/tickers/${polygonSymbol}?apikey=${polygonApiKey}`;
-            console.log(`[POLYGON] Fallback snapshot: ${snapshotUrl}`);
+          // Live snapshot
+          fetch(`https://api.polygon.io/v2/snapshot/locale/global/markets/${type === 'crypto' ? 'crypto' : type === 'forex' ? 'fx' : 'stocks'}/tickers/${polygonSymbol}?apikey=${polygonApiKey}`)
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null),
             
-            const response = await fetch(snapshotUrl);
-            
-            if (response.ok) {
-              const data = await response.json();
-              const result = data.results?.[0];
-              
-              if (result) {
-                const currentPrice = result.last_trade?.price || result.value || result.day?.c;
-                const prevClose = result.prev_day?.c || result.day?.o || currentPrice;
-                const volume = result.day?.v || 0;
-                
-                if (currentPrice) {
-                  const change = currentPrice - prevClose;
-                  const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
-                  
-                  let aiSentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
-                  if (changePercent > 1) aiSentiment = 'bullish';
-                  else if (changePercent < -1) aiSentiment = 'bearish';
-                  
-                  const aiSummary = await generateAISummary(rawSymbol, currentPrice, change, changePercent);
-                  
-                  marketData.push({
-                    symbol: rawSymbol,
-                    name: getMarketName(rawSymbol),
-                    price: Number(currentPrice.toFixed(4)),
-                    change: Number(change.toFixed(4)),
-                    changePercent: Number(changePercent.toFixed(2)),
-                    volume: formatVolume(volume),
-                    rsi: Math.floor(Math.random() * 40) + 30,
-                    aiSentiment,
-                    aiSummary
-                  });
-                  
-                  console.log(`[POLYGON] ✓ Snapshot success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%)`);
-                  success = true;
-                }
-              }
-            }
-          } catch (e) {
-            console.error(`[POLYGON] Snapshot error for ${rawSymbol}:`, e);
-          }
+          // Previous day for change calculation
+          fetch(`https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`)
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null)
+        ];
+        
+        const [tradeData, quoteData, snapshotData, prevData] = await Promise.all(promises);
+        
+        console.log(`[POLYGON] Data sources for ${rawSymbol}:`, {
+          trade: !!tradeData?.results,
+          quote: !!quoteData?.results, 
+          snapshot: !!snapshotData?.results?.[0],
+          prev: !!prevData?.results?.[0]
+        });
+        
+        let currentPrice = null;
+        let prevClose = null;
+        let volume = 0;
+        let timestamp = null;
+        
+        // Get the most recent price from available sources
+        if (tradeData?.results?.p) {
+          currentPrice = tradeData.results.p;
+          timestamp = tradeData.results.t;
+          console.log(`[POLYGON] Using trade price: ${currentPrice} @ ${new Date(timestamp)}`);
+        } else if (quoteData?.results?.bid && quoteData?.results?.ask) {
+          currentPrice = (quoteData.results.bid + quoteData.results.ask) / 2;
+          timestamp = quoteData.results.last_updated;
+          console.log(`[POLYGON] Using quote midpoint: ${currentPrice}`);
+        } else if (snapshotData?.results?.[0]) {
+          const snap = snapshotData.results[0];
+          currentPrice = snap.last_trade?.price || snap.value || snap.day?.c;
+          timestamp = snap.last_trade?.sip_timestamp || snap.updated;
+          console.log(`[POLYGON] Using snapshot price: ${currentPrice}`);
         }
         
-        if (!success) {
-          console.warn(`[POLYGON] ⚠️ No data available for ${rawSymbol}`);
+        // Get previous close
+        if (prevData?.results?.[0]) {
+          prevClose = prevData.results[0].c;
+          volume = prevData.results[0].v || 0;
+        } else if (snapshotData?.results?.[0]?.prev_day) {
+          prevClose = snapshotData.results[0].prev_day.c;
+          volume = snapshotData.results[0].day?.v || 0;
         }
         
-        // Rate limiting to respect Polygon API limits
-        await new Promise(resolve => setTimeout(resolve, 200));
+        if (currentPrice && prevClose) {
+          const change = currentPrice - prevClose;
+          const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+          
+          let aiSentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+          if (changePercent > 1) aiSentiment = 'bullish';
+          else if (changePercent < -1) aiSentiment = 'bearish';
+          
+          const aiSummary = await generateAISummary(rawSymbol, currentPrice, change, changePercent);
+          
+          marketDataItem = {
+            symbol: rawSymbol,
+            name: getMarketName(rawSymbol),
+            price: Number(currentPrice.toFixed(4)),
+            change: Number(change.toFixed(4)),
+            changePercent: Number(changePercent.toFixed(2)),
+            volume: formatVolume(volume),
+            rsi: Math.floor(Math.random() * 40) + 30,
+            aiSentiment,
+            aiSummary,
+            lastUpdate: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
+          };
+          
+          console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) @ ${marketDataItem.lastUpdate}`);
+        } else {
+          console.warn(`[POLYGON] ⚠️ No live data available for ${rawSymbol}`);
+        }
+        
+        return marketDataItem;
         
       } catch (error) {
         console.error(`[POLYGON] Error processing ${rawSymbol}:`, error);
+        return null;
       }
-    }
+    });
+    
+    // Wait for all requests to complete
+    const results = await Promise.all(batchPromises);
+    
+    // Filter out null results and add to marketData
+    results.forEach(item => {
+      if (item) {
+        marketData.push(item);
+      }
+    });
 
     console.log(`Successfully processed ${marketData.length} symbols`);
     
