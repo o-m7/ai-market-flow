@@ -415,6 +415,14 @@ serve(async (req) => {
             currentPrice = (snapshotData.ticker.lastQuote.bid + snapshotData.ticker.lastQuote.ask) / 2;
             timestamp = snapshotData.ticker.lastQuote.timestamp || snapshotData.ticker.updated || Date.now();
             console.log(`[POLYGON][FX] Using snapshot midpoint: ${currentPrice}`);
+          } else if (snapshotData?.ticker?.day?.c) {
+            currentPrice = snapshotData.ticker.day.c;
+            timestamp = snapshotData.ticker.updated || Date.now();
+            console.log(`[POLYGON][FX] Using snapshot day close: ${currentPrice}`);
+          } else if (snapshotData?.results?.[0]?.day?.c) {
+            currentPrice = snapshotData.results[0].day.c;
+            timestamp = snapshotData.results[0].updated || Date.now();
+            console.log(`[POLYGON][FX] Using snapshot results[0] day close: ${currentPrice}`);
           }
         } else {
           if (tradeData?.results?.p) {
@@ -448,17 +456,19 @@ serve(async (req) => {
         } else if (snapshotData?.results?.[0]?.prev_day) {
           prevClose = snapshotData.results[0].prev_day.c;
           volume = snapshotData.results[0].day?.v || 0;
+        } else if (type === 'forex' && snapshotData?.ticker?.day?.o) {
+          prevClose = snapshotData.ticker.day.o;
+        } else if (snapshotData?.ticker?.day?.c) {
+          prevClose = snapshotData.ticker.day.c;
+        } else if (type === 'forex' && snapshotData?.results?.[0]?.day?.o) {
+          prevClose = snapshotData.results[0].day.o;
+        } else if (snapshotData?.results?.[0]?.day?.c) {
+          prevClose = snapshotData.results[0].day.c;
         }
         
         if (currentPrice && prevClose) {
           const change = currentPrice - prevClose;
           const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
-          
-          let aiSentiment: 'bullish' | 'bearish' | 'neutral' = 'neutral';
-          if (changePercent > 1) aiSentiment = 'bullish';
-          else if (changePercent < -1) aiSentiment = 'bearish';
-          
-          const aiSummary = await generateAISummary(rawSymbol, currentPrice, change, changePercent);
           
           marketDataItem = {
             symbol: rawSymbol,
@@ -466,10 +476,7 @@ serve(async (req) => {
             price: Number(currentPrice.toFixed(4)),
             change: Number(change.toFixed(4)),
             changePercent: Number(changePercent.toFixed(2)),
-            volume: type === "forex" ? "—" : formatVolume(volume),
-            rsi: Math.floor(Math.random() * 40) + 30,
-            aiSentiment,
-            aiSummary,
+            volume: type === 'forex' ? '—' : formatVolume(volume),
             lastUpdate: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
           };
           

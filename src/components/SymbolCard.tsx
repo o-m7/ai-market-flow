@@ -12,9 +12,9 @@ interface SymbolCardProps {
   change: number;
   changePercent: number;
   volume: string;
-  rsi: number;
-  aiSentiment: "bullish" | "bearish" | "neutral";
-  aiSummary: string;
+  rsi?: number;
+  aiSentiment?: "bullish" | "bearish" | "neutral";
+  aiSummary?: string;
 }
 
 export const SymbolCard = ({ 
@@ -26,7 +26,7 @@ export const SymbolCard = ({
   volume, 
   rsi,
   aiSentiment,
-  aiSummary 
+  aiSummary
 }: SymbolCardProps) => {
   const isPositive = change > 0;
   const isNegative = change < 0;
@@ -88,24 +88,27 @@ export const SymbolCard = ({
             <span className="text-muted-foreground">Volume:</span>
             <div className="font-medium">{volume}</div>
           </div>
-          <div>
-            <span className="text-muted-foreground">RSI:</span>
-            <div className={`font-medium ${rsi > 70 ? 'text-bear' : rsi < 30 ? 'text-bull' : 'text-neutral'}`}>
-              {rsi}
+          {typeof rsi === 'number' && (
+            <div>
+              <span className="text-muted-foreground">RSI:</span>
+              <div className={`font-medium ${rsi > 70 ? 'text-bear' : rsi < 30 ? 'text-bull' : 'text-neutral'}`}>
+                {rsi}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* AI Analysis */}
-        <div className="bg-secondary/50 rounded-lg p-3 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-muted-foreground">AI Analysis</span>
-            <Badge variant={getSentimentBadgeVariant(aiSentiment)} className="text-xs">
-              {aiSentiment.toUpperCase()}
-            </Badge>
+        {aiSummary && (
+          <div className="bg-secondary/50 rounded-lg p-3 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-muted-foreground">AI Analysis</span>
+              <Badge variant={getSentimentBadgeVariant(aiSentiment || 'neutral')} className="text-xs">
+                {(aiSentiment || 'neutral').toUpperCase()}
+              </Badge>
+            </div>
+            <p className="text-sm text-foreground line-clamp-2">{aiSummary}</p>
           </div>
-          <p className="text-sm text-foreground line-clamp-2">{aiSummary}</p>
-        </div>
+        )}
 
         {/* Actions */}
         <div className="grid grid-cols-2 gap-2">

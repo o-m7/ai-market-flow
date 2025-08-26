@@ -47,40 +47,22 @@ export const MarketDataPanel = ({ symbol }: MarketDataPanelProps) => {
           change: symbolData.change,
           changePercent: symbolData.changePercent,
           volume: symbolData.volume,
-          high24h: symbolData.price * (1 + Math.random() * 0.05),
-          low24h: symbolData.price * (1 - Math.random() * 0.05),
+          high24h: symbolData.price,
+          low24h: symbolData.price,
           openPrice: symbolData.price - symbolData.change,
         });
         setLastUpdated(new Date().toLocaleTimeString());
-      } else {
-        // Generate mock data if no real data available
-        generateMockData();
-      }
+        } else {
+          setMarketData(null);
+        }
     } catch (error) {
       console.error('Error fetching market data:', error);
-      generateMockData();
     } finally {
       setLoading(false);
     }
   };
 
-  const generateMockData = () => {
-    const basePrice = 150 + Math.random() * 200;
-    const change = (Math.random() - 0.5) * 20;
-    const changePercent = (change / basePrice) * 100;
-
-    setMarketData({
-      currentPrice: basePrice,
-      change,
-      changePercent,
-      volume: `${(Math.random() * 50 + 10).toFixed(1)}M`,
-      marketCap: `${(Math.random() * 500 + 100).toFixed(1)}B`,
-      high24h: basePrice + Math.random() * 10,
-      low24h: basePrice - Math.random() * 10,
-      openPrice: basePrice - change,
-    });
-    setLastUpdated(new Date().toLocaleTimeString());
-  };
+// Removed mock data generation
 
   useEffect(() => {
     fetchMarketData();

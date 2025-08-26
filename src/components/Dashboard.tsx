@@ -26,11 +26,11 @@ export const Dashboard = () => {
     return data.filter(item => {
       switch (filters.trend) {
         case "bullish":
-          return item.changePercent > 0 && item.aiSentiment === "bullish";
+          return item.changePercent > 0;
         case "bearish":
-          return item.changePercent < 0 && item.aiSentiment === "bearish";
+          return item.changePercent < 0;
         case "neutral":
-          return Math.abs(item.changePercent) < 1 || item.aiSentiment === "neutral";
+          return Math.abs(item.changePercent) < 1;
         default:
           return true;
       }
