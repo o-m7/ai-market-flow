@@ -451,30 +451,6 @@ serve(async (req) => {
 
     console.log(`Successfully processed ${marketData.length} symbols`);
     
-    // If no real data, return mock data to ensure UI works
-    if (marketData.length === 0) {
-      console.log("No live data available, generating mock data");
-      for (const symbol of symbolsToFetch.slice(0, 10)) {
-        const basePrice = Math.random() * 200 + 50;
-        const changePercent = (Math.random() - 0.5) * 6; // -3% to +3%
-        const change = (basePrice * changePercent) / 100;
-        const sentiments = ['bullish', 'bearish', 'neutral'];
-        const aiSentiment = sentiments[Math.floor(Math.random() * sentiments.length)];
-        const aiSummary = await generateAISummary(symbol, basePrice, change, changePercent);
-        
-        marketData.push({
-          symbol,
-          name: getMarketName(symbol),
-          price: Number(basePrice.toFixed(2)),
-          change: Number(change.toFixed(2)),
-          changePercent: Number(changePercent.toFixed(2)),
-          volume: formatVolume(Math.floor(Math.random() * 50000000) + 1000000),
-          rsi: Math.floor(Math.random() * 40) + 30,
-          aiSentiment,
-          aiSummary
-        });
-      }
-    }
 
     return new Response(JSON.stringify({ 
       data: marketData,
@@ -487,38 +463,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in polygon-market-data function:', error);
     
-    // Return mock data on error to ensure UI functionality
-    const mockData = [];
-    const fallbackSymbols = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY'];
-    
-    for (const symbol of fallbackSymbols) {
-      const basePrice = symbol.includes('/') && !symbol.includes('USD/') ? Math.random() * 200 + 50 : 1 + Math.random() * 0.5;
-      const changePercent = (Math.random() - 0.5) * 6;
-      const change = (basePrice * changePercent) / 100;
-      const sentiments = ['bullish', 'bearish', 'neutral'];
-      const aiSentiment = sentiments[Math.floor(Math.random() * sentiments.length)] as 'bullish' | 'bearish' | 'neutral';
-      
-      mockData.push({
-        symbol,
-        name: getMarketName(symbol),
-        price: Number(basePrice.toFixed(4)),
-        change: Number(change.toFixed(4)),
-        changePercent: Number(changePercent.toFixed(2)),
-        volume: `${Math.floor(Math.random() * 50) + 1}M`,
-        rsi: Math.floor(Math.random() * 40) + 30,
-        aiSentiment,
-        aiSummary: aiSentiment === 'bullish' 
-          ? 'Strong upward momentum detected' 
-          : aiSentiment === 'bearish' 
-          ? 'Bearish pressure building' 
-          : 'Range-bound trading expected'
-      });
-    }
-    
     return new Response(JSON.stringify({ 
-      data: mockData,
+      data: [],
       timestamp: new Date().toISOString(),
-      source: 'mock',
+      source: 'polygon',
       error: error.message
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
