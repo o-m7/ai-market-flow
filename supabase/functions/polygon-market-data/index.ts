@@ -342,36 +342,63 @@ serve(async (req) => {
         let marketDataItem = null;
         
         // Try multiple endpoints simultaneously for maximum real-time data
-        const promises = [
-          // Real-time quote
-          fetch(`https://api.polygon.io/v2/last/trade/${polygonSymbol}?apikey=${polygonApiKey}`)
-            .then(r => r.ok ? r.json() : null)
-            .catch(() => null),
-          
-          // Real-time quote (alternative endpoint)  
-          fetch(`https://api.polygon.io/v2/last/quote/${polygonSymbol}?apikey=${polygonApiKey}`)
-            .then(r => r.ok ? r.json() : null)
-            .catch(() => null),
-            
-          // Live snapshot
-          fetch(`https://api.polygon.io/v2/snapshot/locale/global/markets/${type === 'crypto' ? 'crypto' : type === 'forex' ? 'fx' : 'stocks'}/tickers/${polygonSymbol}?apikey=${polygonApiKey}`)
-            .then(r => r.ok ? r.json() : null)
-            .catch(() => null),
-            
-          // Previous day for change calculation
-          fetch(`https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`)
-            .then(r => r.ok ? r.json() : null)
-            .catch(() => null)
-        ];
+        const promises = (() => {
+          if (type === 'forex') {
+            const [base, quote] = rawSymbol.split('/');
+            return [
+              // Forex last quote (v1 currencies endpoint)
+              fetch(`https://api.polygon.io/v1/last_quote/currencies/${base}/${quote}?apikey=${polygonApiKey}`)
+                .then(r => r.ok ? r.json() : null)
+                .catch(() => null),
+              // Forex snapshot
+              fetch(`https://api.polygon.io/v2/snapshot/locale/global/markets/fx/tickers/C:${base}${quote}?apikey=${polygonApiKey}`)
+                .then(r => r.ok ? r.json() : null)
+                .catch(() => null),
+              // Previous day close for reference
+              fetch(`https://api.polygon.io/v2/aggs/ticker/C:${base}${quote}/prev?adjusted=true&apikey=${polygonApiKey}`)
+                .then(r => r.ok ? r.json() : null)
+                .catch(() => null)
+            ];
+          }
+
+          // Stocks & Crypto
+          return [
+            // Real-time trade
+            fetch(`https://api.polygon.io/v2/last/trade/${polygonSymbol}?apikey=${polygonApiKey}`)
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null),
+            // Real-time quote
+            fetch(`https://api.polygon.io/v2/last/quote/${polygonSymbol}?apikey=${polygonApiKey}`)
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null),
+            // Snapshot
+            fetch(`https://api.polygon.io/v2/snapshot/locale/global/markets/${type === 'crypto' ? 'crypto' : 'stocks'}/tickers/${polygonSymbol}?apikey=${polygonApiKey}`)
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null),
+            // Previous day close
+            fetch(`https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`)
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null)
+          ];
+        })();
         
         const [tradeData, quoteData, snapshotData, prevData] = await Promise.all(promises);
         
-        console.log(`[POLYGON] Data sources for ${rawSymbol}:`, {
-          trade: !!tradeData?.results,
-          quote: !!quoteData?.results, 
-          snapshot: !!snapshotData?.results?.[0],
-          prev: !!prevData?.results?.[0]
-        });
+        console.log(`[POLYGON] Data sources for ${rawSymbol}:`, 
+          type === 'forex'
+            ? {
+                trade: false,
+                quote: !!(quoteData && (quoteData.last || quoteData?.results)),
+                snapshot: !!(snapshotData && (snapshotData.ticker || snapshotData?.results?.[0])),
+                prev: !!prevData?.results?.[0],
+              }
+            : {
+                trade: !!tradeData?.results,
+                quote: !!quoteData?.results,
+                snapshot: !!(snapshotData?.ticker || snapshotData?.results?.[0]),
+                prev: !!prevData?.results?.[0],
+              }
+        );
         
         let currentPrice = null;
         let prevClose = null;
@@ -379,25 +406,45 @@ serve(async (req) => {
         let timestamp = null;
         
         // Get the most recent price from available sources
-        if (tradeData?.results?.p) {
-          currentPrice = tradeData.results.p;
-          timestamp = tradeData.results.t;
-          console.log(`[POLYGON] Using trade price: ${currentPrice} @ ${new Date(timestamp)}`);
-        } else if (quoteData?.results?.bid && quoteData?.results?.ask) {
-          currentPrice = (quoteData.results.bid + quoteData.results.ask) / 2;
-          timestamp = quoteData.results.last_updated;
-          console.log(`[POLYGON] Using quote midpoint: ${currentPrice}`);
-        } else if (snapshotData?.results?.[0]) {
-          const snap = snapshotData.results[0];
-          currentPrice = snap.last_trade?.price || snap.value || snap.day?.c;
-          timestamp = snap.last_trade?.sip_timestamp || snap.updated;
-          console.log(`[POLYGON] Using snapshot price: ${currentPrice}`);
+        if (type === 'forex') {
+          if (quoteData?.last?.bid && quoteData?.last?.ask) {
+            currentPrice = (quoteData.last.bid + quoteData.last.ask) / 2;
+            timestamp = quoteData.last.timestamp || (quoteData.last.time as number) || Date.now();
+            console.log(`[POLYGON][FX] Using last_quote midpoint: ${currentPrice}`);
+          } else if (snapshotData?.ticker?.lastQuote?.bid && snapshotData?.ticker?.lastQuote?.ask) {
+            currentPrice = (snapshotData.ticker.lastQuote.bid + snapshotData.ticker.lastQuote.ask) / 2;
+            timestamp = snapshotData.ticker.lastQuote.timestamp || snapshotData.ticker.updated || Date.now();
+            console.log(`[POLYGON][FX] Using snapshot midpoint: ${currentPrice}`);
+          }
+        } else {
+          if (tradeData?.results?.p) {
+            currentPrice = tradeData.results.p;
+            timestamp = tradeData.results.t;
+            console.log(`[POLYGON] Using trade price: ${currentPrice} @ ${new Date(timestamp)}`);
+          } else if (quoteData?.results?.bid && quoteData?.results?.ask) {
+            currentPrice = (quoteData.results.bid + quoteData.results.ask) / 2;
+            timestamp = quoteData.results.last_updated;
+            console.log(`[POLYGON] Using quote midpoint: ${currentPrice}`);
+          } else if (snapshotData?.ticker) {
+            const snap = snapshotData.ticker;
+            currentPrice = snap.lastTrade?.price || snap.day?.c || snap.prevDay?.c;
+            timestamp = snap.lastTrade?.sip_timestamp || snap.updated || Date.now();
+            console.log(`[POLYGON] Using snapshot price: ${currentPrice}`);
+          } else if (snapshotData?.results?.[0]) {
+            const snap = snapshotData.results[0];
+            currentPrice = snap.last_trade?.price || snap.value || snap.day?.c;
+            timestamp = snap.last_trade?.sip_timestamp || snap.updated;
+            console.log(`[POLYGON] Using snapshot price (results[0]): ${currentPrice}`);
+          }
         }
         
         // Get previous close
         if (prevData?.results?.[0]) {
           prevClose = prevData.results[0].c;
           volume = prevData.results[0].v || 0;
+        } else if (snapshotData?.ticker?.prevDay?.c) {
+          prevClose = snapshotData.ticker.prevDay.c;
+          volume = snapshotData.ticker.day?.v || 0;
         } else if (snapshotData?.results?.[0]?.prev_day) {
           prevClose = snapshotData.results[0].prev_day.c;
           volume = snapshotData.results[0].day?.v || 0;
@@ -419,7 +466,7 @@ serve(async (req) => {
             price: Number(currentPrice.toFixed(4)),
             change: Number(change.toFixed(4)),
             changePercent: Number(changePercent.toFixed(2)),
-            volume: formatVolume(volume),
+            volume: type === "forex" ? "—" : formatVolume(volume),
             rsi: Math.floor(Math.random() * 40) + 30,
             aiSentiment,
             aiSummary,
@@ -455,7 +502,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       data: marketData,
       timestamp: new Date().toISOString(),
-      source: marketData.length > 0 && marketData.some(item => item.price > 0) ? 'polygon' : 'mock'
+      source: 'polygon'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
