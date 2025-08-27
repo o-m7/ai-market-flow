@@ -102,7 +102,7 @@ export function getSymbolsByMarketType(marketType: string): string[] {
     default:
       // Focus on crypto + forex only - show top symbols
       return [
-        ...MARKET_SYMBOLS.crypto.slice(0, 8),
+        ...MARKET_SYMBOLS.crypto.slice(0, 15),
         ...MARKET_SYMBOLS.forex.slice(0, 7)
       ];
   }

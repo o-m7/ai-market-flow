@@ -69,7 +69,11 @@ serve(async (req) => {
     const { symbols } = await req.json();
     console.log('Requested symbols:', symbols);
 
-    const defaultSymbols = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'AVAX/USD', 'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD'];
+    const defaultSymbols = [
+      'BTC/USD', 'ETH/USD', 'BNB/USD', 'XRP/USD', 'ADA/USD', 'SOL/USD', 'DOT/USD', 'MATIC/USD',
+      'AVAX/USD', 'LINK/USD', 'UNI/USD', 'ATOM/USD', 'ALGO/USD', 'VET/USD', 'ICP/USD',
+      'EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CHF', 'USD/CAD', 'NZD/USD'
+    ];
     const symbolsToFetch: string[] = (symbols && Array.isArray(symbols) && symbols.length > 0) ? symbols : defaultSymbols;
     
     console.log('Processing symbols:', symbolsToFetch);
@@ -344,18 +348,17 @@ serve(async (req) => {
         // Try multiple endpoints simultaneously for maximum real-time data
         const promises = (() => {
           if (type === 'forex') {
-            const [base, quote] = rawSymbol.split('/');
             return [
-              // Forex last quote (v1 currencies endpoint)
-              fetch(`https://api.polygon.io/v1/last_quote/currencies/${base}/${quote}?apikey=${polygonApiKey}`)
+              // Real-time quote for forex
+              fetch(`https://api.polygon.io/v2/last/quote/${polygonSymbol}?apikey=${polygonApiKey}`)
                 .then(r => r.ok ? r.json() : null)
                 .catch(() => null),
               // Forex snapshot
-              fetch(`https://api.polygon.io/v2/snapshot/locale/global/markets/fx/tickers/C:${base}${quote}?apikey=${polygonApiKey}`)
+              fetch(`https://api.polygon.io/v2/snapshot/locale/global/markets/fx/tickers/${polygonSymbol}?apikey=${polygonApiKey}`)
                 .then(r => r.ok ? r.json() : null)
                 .catch(() => null),
               // Previous day close for reference
-              fetch(`https://api.polygon.io/v2/aggs/ticker/C:${base}${quote}/prev?adjusted=true&apikey=${polygonApiKey}`)
+              fetch(`https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`)
                 .then(r => r.ok ? r.json() : null)
                 .catch(() => null)
             ];
@@ -407,14 +410,14 @@ serve(async (req) => {
         
         // Get the most recent price from available sources
         if (type === 'forex') {
-          if (quoteData?.last?.bid && quoteData?.last?.ask) {
-            currentPrice = (quoteData.last.bid + quoteData.last.ask) / 2;
-            timestamp = quoteData.last.timestamp || (quoteData.last.time as number) || Date.now();
-            console.log(`[POLYGON][FX] Using last_quote midpoint: ${currentPrice}`);
+          if (quoteData?.results?.bid && quoteData?.results?.ask) {
+            currentPrice = (quoteData.results.bid + quoteData.results.ask) / 2;
+            timestamp = quoteData.results.last_updated || Date.now();
+            console.log(`[POLYGON][FX] Using live quote midpoint: ${currentPrice}`);
           } else if (snapshotData?.ticker?.lastQuote?.bid && snapshotData?.ticker?.lastQuote?.ask) {
             currentPrice = (snapshotData.ticker.lastQuote.bid + snapshotData.ticker.lastQuote.ask) / 2;
             timestamp = snapshotData.ticker.lastQuote.timestamp || snapshotData.ticker.updated || Date.now();
-            console.log(`[POLYGON][FX] Using snapshot midpoint: ${currentPrice}`);
+            console.log(`[POLYGON][FX] Using snapshot quote midpoint: ${currentPrice}`);
           } else if (snapshotData?.ticker?.day?.c) {
             currentPrice = snapshotData.ticker.day.c;
             timestamp = snapshotData.ticker.updated || Date.now();
@@ -422,7 +425,11 @@ serve(async (req) => {
           } else if (snapshotData?.results?.[0]?.day?.c) {
             currentPrice = snapshotData.results[0].day.c;
             timestamp = snapshotData.results[0].updated || Date.now();
-            console.log(`[POLYGON][FX] Using snapshot results[0] day close: ${currentPrice}`);
+            console.log(`[POLYGON][FX] Using snapshot results day close: ${currentPrice}`);
+          } else if (snapshotData?.results?.[0]?.lastQuote?.bid && snapshotData?.results?.[0]?.lastQuote?.ask) {
+            currentPrice = (snapshotData.results[0].lastQuote.bid + snapshotData.results[0].lastQuote.ask) / 2;
+            timestamp = snapshotData.results[0].lastQuote.timestamp || snapshotData.results[0].updated || Date.now();
+            console.log(`[POLYGON][FX] Using results quote midpoint: ${currentPrice}`);
           }
         } else {
           if (tradeData?.results?.p) {
