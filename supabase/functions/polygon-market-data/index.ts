@@ -348,8 +348,13 @@ serve(async (req) => {
         // Try multiple endpoints simultaneously for maximum real-time data
         const promises = (() => {
           if (type === 'forex') {
+            const [base, quote] = rawSymbol.split('/');
             return [
-              // Real-time quote for forex
+              // v1 currencies last quote (reliable for FX)
+              fetch(`https://api.polygon.io/v1/last_quote/currencies/${base}/${quote}?apikey=${polygonApiKey}`)
+                .then(r => r.ok ? r.json() : null)
+                .catch(() => null),
+              // v2 last quote by ticker (some plans support this for FX tickers)
               fetch(`https://api.polygon.io/v2/last/quote/${polygonSymbol}?apikey=${polygonApiKey}`)
                 .then(r => r.ok ? r.json() : null)
                 .catch(() => null),
@@ -357,7 +362,7 @@ serve(async (req) => {
               fetch(`https://api.polygon.io/v2/snapshot/locale/global/markets/fx/tickers/${polygonSymbol}?apikey=${polygonApiKey}`)
                 .then(r => r.ok ? r.json() : null)
                 .catch(() => null),
-              // Previous day close for reference
+              // Previous day close for reference (may be unavailable for FX on some plans)
               fetch(`https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/prev?adjusted=true&apikey=${polygonApiKey}`)
                 .then(r => r.ok ? r.json() : null)
                 .catch(() => null)
@@ -410,10 +415,16 @@ serve(async (req) => {
         
         // Get the most recent price from available sources
         if (type === 'forex') {
+          // v2 last quote shape
           if (quoteData?.results?.bid && quoteData?.results?.ask) {
             currentPrice = (quoteData.results.bid + quoteData.results.ask) / 2;
             timestamp = quoteData.results.last_updated || Date.now();
-            console.log(`[POLYGON][FX] Using live quote midpoint: ${currentPrice}`);
+            console.log(`[POLYGON][FX] Using live quote midpoint (v2): ${currentPrice}`);
+          // v1 currencies last_quote shape
+          } else if (tradeData?.last?.bid && tradeData?.last?.ask) {
+            currentPrice = (tradeData.last.bid + tradeData.last.ask) / 2;
+            timestamp = tradeData.last.timestamp || tradeData.last.time || Date.now();
+            console.log(`[POLYGON][FX] Using last_quote midpoint (v1): ${currentPrice}`);
           } else if (snapshotData?.ticker?.lastQuote?.bid && snapshotData?.ticker?.lastQuote?.ask) {
             currentPrice = (snapshotData.ticker.lastQuote.bid + snapshotData.ticker.lastQuote.ask) / 2;
             timestamp = snapshotData.ticker.lastQuote.timestamp || snapshotData.ticker.updated || Date.now();
@@ -473,9 +484,9 @@ serve(async (req) => {
           prevClose = snapshotData.results[0].day.c;
         }
         
-        if (currentPrice && prevClose) {
-          const change = currentPrice - prevClose;
-          const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+        if (currentPrice) {
+          const change = prevClose ? (currentPrice - prevClose) : 0;
+          const changePercent = prevClose ? (prevClose !== 0 ? (change / prevClose) * 100 : 0) : 0;
           
           marketDataItem = {
             symbol: rawSymbol,
