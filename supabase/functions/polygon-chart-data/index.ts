@@ -19,6 +19,7 @@ interface ChartDataRequest {
   timeframe: string;
   asset?: 'stock' | 'crypto' | 'forex';
   limit?: number;
+  lite?: boolean;
 }
 
 serve(async (req) => {
@@ -39,12 +40,13 @@ serve(async (req) => {
       });
     }
 
-    const requestData: ChartDataRequest = await req.json();
+const requestData: ChartDataRequest = await req.json();
     const { 
       symbol: uiSymbol = "AAPL", 
       timeframe: tf = "1h", 
       asset = "stock",
-      limit = 300 
+      limit = 300,
+      lite = false 
     } = requestData;
 
     console.log(`Fetching ${asset} data for ${uiSymbol} (${tf}) with limit ${limit}`);
@@ -62,8 +64,9 @@ serve(async (req) => {
 
     // Compute dynamic lookback based on requested limit and timeframe
     const unitMs = span === "minute" ? 60_000 : span === "hour" ? 3_600_000 : 86_400_000;
-    const desiredBars = Math.max(limit ?? 300, 150);
-    const marketBuffer = asset === "stock" ? 3 : 2; // account for market closures/low-liquidity
+    const isLite = Boolean(lite);
+    const desiredBars = isLite ? Math.max(limit ?? 2, 2) : Math.max(limit ?? 300, 150);
+    const marketBuffer = isLite ? 1 : (asset === "stock" ? 3 : 2); // smaller buffer for lite/meta requests
     const lookbackMs = desiredBars * mult * unitMs * marketBuffer;
 
     const fromMs = nowMs - lookbackMs;
@@ -161,14 +164,23 @@ serve(async (req) => {
     let snapshotLastTrade: number | null = null;
     let snapshotTimeUTC: string | null = null;
 
+    // Prefer previous bar close if available (updates with every poll)
+    const prevBar = ohlcv.length >= 2 ? ohlcv[ohlcv.length - 2] : null;
+    if (prevBar) {
+      prevClose = prevBar.c ?? null;
+      prevTime = prevBar?.t ? new Date(prevBar.t).toISOString() : null;
+    }
+
     try {
-      // Previous close
-      const prevUrl = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/prev?adjusted=true&apiKey=${polygonApiKey}`;
-      const prevRes = await fetch(prevUrl, { headers: { "Cache-Control": "no-store" } });
-      if (prevRes.ok) {
-        const prev = await prevRes.json();
-        prevClose = prev?.results?.[0]?.c ?? null;
-        prevTime = prev?.results?.[0]?.t ? new Date(prev.results[0].t).toISOString() : null;
+      // Previous close (fallback to Polygon prev endpoint only if needed)
+      if (prevClose == null) {
+        const prevUrl = `https://api.polygon.io/v2/aggs/ticker/${providerSymbol}/prev?adjusted=true&apiKey=${polygonApiKey}`;
+        const prevRes = await fetch(prevUrl, { headers: { "Cache-Control": "no-store" } });
+        if (prevRes.ok) {
+          const prev = await prevRes.json();
+          prevClose = prev?.results?.[0]?.c ?? prevClose;
+          prevTime = prev?.results?.[0]?.t ? new Date(prev.results[0].t).toISOString() : prevTime;
+        }
       }
 
       // Current snapshot (for stocks/forex/crypto)

@@ -165,7 +165,8 @@ const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
             symbol: symbol,
             timeframe: timeframe === 'D' ? '1d' : (timeframe === '240' ? '4h' : `${timeframe}m`),
             asset: assetType.toLowerCase(),
-            limit: 1
+            limit: 2,
+            lite: true
           })
         });
         const data = await response.json();
