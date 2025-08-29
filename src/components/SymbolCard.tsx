@@ -98,15 +98,11 @@ export const SymbolCard = ({
           )}
         </div>
 
-        {aiSummary && (
-          <div className="bg-secondary/50 rounded-lg p-3 mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-muted-foreground">AI Analysis</span>
-              <Badge variant={getSentimentBadgeVariant(aiSentiment || 'neutral')} className="text-xs">
-                {(aiSentiment || 'neutral').toUpperCase()}
-              </Badge>
-            </div>
-            <p className="text-sm text-foreground line-clamp-2">{aiSummary}</p>
+        {aiSentiment && (
+          <div className="flex items-center justify-center mb-4">
+            <Badge variant={getSentimentBadgeVariant(aiSentiment)} className="text-xs">
+              {aiSentiment.toUpperCase()}
+            </Badge>
           </div>
         )}
 

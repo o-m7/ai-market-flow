@@ -2,7 +2,6 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const polygonApiKey = Deno.env.get('POLYGON_API_KEY');
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -255,79 +254,6 @@ serve(async (req) => {
       return volume.toString();
     };
 
-    const generateAISummary = async (symbol: string, price: number, change: number, changePercent: number): Promise<string> => {
-      if (!openAIApiKey) {
-        // Fallback to basic analysis if no OpenAI key
-        const sentiment = changePercent > 1 ? 'bullish' : changePercent < -1 ? 'bearish' : 'neutral';
-        const summaries = {
-          bullish: [
-            `Strong technical indicators suggest continued upward momentum. Support at $${(price * 0.95).toFixed(4)}.`,
-            `Breakout above key resistance levels. Positive momentum building.`,
-            `Technical analysis shows bullish pattern formation with increasing volume.`,
-            `RSI showing strength with room to run higher. Trend remains intact.`
-          ],
-          bearish: [
-            `Technical indicators showing weakness. Support under pressure at $${(price * 0.95).toFixed(4)}.`,
-            `Bearish divergence detected. Risk of further downside movement.`,
-            `Selling pressure increasing. Key support levels critical to hold.`,
-            `Volume confirmation on downside suggests continued weakness.`
-          ],
-          neutral: [
-            `Consolidating near key levels. Awaiting catalyst for next directional move.`,
-            `Trading within established range. Mixed signals from technical indicators.`,
-            `Sideways movement expected. Watch for breakout above resistance or below support.`,
-            `Balanced between buyers and sellers. Low volatility environment.`
-          ]
-        };
-        
-        const sentimentSummaries = summaries[sentiment as keyof typeof summaries] || summaries.neutral;
-        return sentimentSummaries[Math.floor(Math.random() * sentimentSummaries.length)];
-      }
-
-      try {
-        const assetType = symbol.includes('/') ? (symbol.includes('USD') && !symbol.startsWith('USD') ? 'cryptocurrency' : 'forex pair') : 'stock';
-        
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a professional financial analyst. Provide concise, actionable market analysis in 1-2 sentences.'
-              },
-              {
-                role: 'user',
-                content: `Analyze ${symbol} (${assetType}): Current price $${price}, change ${change.toFixed(4)} (${changePercent.toFixed(2)}%). Give brief technical outlook.`
-              }
-            ],
-            temperature: 0.7,
-            max_tokens: 100
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`OpenAI API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        return data.choices[0].message.content.trim();
-      } catch (error) {
-        console.error('Error generating AI summary:', error);
-        // Fallback to simple analysis
-        const sentiment = changePercent > 1 ? 'bullish' : changePercent < -1 ? 'bearish' : 'neutral';
-        return sentiment === 'bullish' 
-          ? `Strong momentum with ${changePercent.toFixed(2)}% gain. Watch for continuation above current levels.`
-          : sentiment === 'bearish'
-          ? `Downward pressure with ${changePercent.toFixed(2)}% decline. Key support levels under test.`
-          : `Consolidating around $${price.toFixed(4)}. Awaiting directional catalyst.`;
-      }
-    };
-
     const marketData: Array<any> = [];
     
     if (!polygonApiKey) {
@@ -490,7 +416,6 @@ serve(async (req) => {
           
           // Generate AI sentiment based on price change
           const aiSentiment = changePercent > 1 ? 'bullish' : changePercent < -1 ? 'bearish' : 'neutral';
-          const aiSummary = await generateAISummary(rawSymbol, currentPrice, change, changePercent);
           
           marketDataItem = {
             symbol: rawSymbol,
@@ -500,8 +425,7 @@ serve(async (req) => {
             changePercent: Number(changePercent.toFixed(2)),
             volume: type === 'forex' ? '—' : formatVolume(volume),
             lastUpdate: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
-            aiSentiment: aiSentiment as 'bullish' | 'bearish' | 'neutral',
-            aiSummary: aiSummary
+            aiSentiment: aiSentiment as 'bullish' | 'bearish' | 'neutral'
           };
           
           console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) @ ${marketDataItem.lastUpdate}`);
