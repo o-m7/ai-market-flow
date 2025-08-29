@@ -488,6 +488,10 @@ serve(async (req) => {
           const change = prevClose ? (currentPrice - prevClose) : 0;
           const changePercent = prevClose ? (prevClose !== 0 ? (change / prevClose) * 100 : 0) : 0;
           
+          // Generate AI sentiment based on price change
+          const aiSentiment = changePercent > 1 ? 'bullish' : changePercent < -1 ? 'bearish' : 'neutral';
+          const aiSummary = await generateAISummary(rawSymbol, currentPrice, change, changePercent);
+          
           marketDataItem = {
             symbol: rawSymbol,
             name: getMarketName(rawSymbol),
@@ -495,7 +499,9 @@ serve(async (req) => {
             change: Number(change.toFixed(4)),
             changePercent: Number(changePercent.toFixed(2)),
             volume: type === 'forex' ? '—' : formatVolume(volume),
-            lastUpdate: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString()
+            lastUpdate: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
+            aiSentiment: aiSentiment as 'bullish' | 'bearish' | 'neutral',
+            aiSummary: aiSummary
           };
           
           console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) @ ${marketDataItem.lastUpdate}`);
