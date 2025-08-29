@@ -43,7 +43,37 @@ export default function TechnicalChart({
   const [chartData, setChartData] = useState<LWBar[]>([]);
   const [chartMeta, setChartMeta] = useState<any>(null);
 
-  // Fetch chart data and notify parent with rate limiting
+// Function to detect asset type
+const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
+  const s = symbol.toUpperCase();
+
+  // Known forex pairs (expanded)
+  const FOREX_SET = new Set([
+    'EURUSD','GBPUSD','USDJPY','USDCHF','AUDUSD','USDCAD','NZDUSD',
+    'EURGBP','EURJPY','GBPJPY','AUDJPY','EURCHF','GBPCHF','CHFJPY',
+    'CADJPY','EURAUD','GBPAUD','AUDCHF','NZDJPY','EURCAD','GBPCAD',
+    'AUDCAD','EURNZD','GBPNZD','USDSEK','USDNOK','USDDKK','EURSEK',
+    'EURNOK','GBPSEK'
+  ]);
+  if (FOREX_SET.has(s)) return 'FOREX';
+
+  // Common crypto tickers
+  const isCrypto = (
+    s.includes('BTC') || s.includes('ETH') || s.includes('BNB') || s.includes('XRP') ||
+    s.includes('ADA') || s.includes('SOL') || s.includes('DOT') || s.includes('MATIC') ||
+    s.includes('AVAX') || s.includes('LINK') || s.includes('UNI') || s.includes('ATOM') ||
+    s.includes('ALGO') || s.includes('VET') || s.includes('ICP') || s.includes('FIL') ||
+    s.includes('THETA') || s.includes('TRX') || s.includes('ETC') || s.includes('XMR') ||
+    s.includes('BCH') || s.includes('LTC') || s.includes('DOGE') || s.includes('SHIB') ||
+    s.includes('NEAR') || s.includes('FTM') || s.includes('SAND') || s.includes('MANA') ||
+    s.includes('CRV') || s.includes('AAVE')
+  );
+  if (isCrypto) return 'CRYPTO';
+
+  return 'STOCK';
+};
+
+// Fetch chart data and notify parent with rate limiting
   useEffect(() => {
     const fetchChartData = async () => {
       try {
@@ -114,41 +144,58 @@ export default function TechnicalChart({
       }
     };
 
-    // Function to detect asset type
-    const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
-      const s = symbol.toUpperCase();
-
-      // Known forex pairs (expanded)
-      const FOREX_SET = new Set([
-        'EURUSD','GBPUSD','USDJPY','USDCHF','AUDUSD','USDCAD','NZDUSD',
-        'EURGBP','EURJPY','GBPJPY','AUDJPY','EURCHF','GBPCHF','CHFJPY',
-        'CADJPY','EURAUD','GBPAUD','AUDCHF','NZDJPY','EURCAD','GBPCAD',
-        'AUDCAD','EURNZD','GBPNZD','USDSEK','USDNOK','USDDKK','EURSEK',
-        'EURNOK','GBPSEK'
-      ]);
-      if (FOREX_SET.has(s)) return 'FOREX';
-
-      // Common crypto tickers
-      const isCrypto = (
-        s.includes('BTC') || s.includes('ETH') || s.includes('BNB') || s.includes('XRP') ||
-        s.includes('ADA') || s.includes('SOL') || s.includes('DOT') || s.includes('MATIC') ||
-        s.includes('AVAX') || s.includes('LINK') || s.includes('UNI') || s.includes('ATOM') ||
-        s.includes('ALGO') || s.includes('VET') || s.includes('ICP') || s.includes('FIL') ||
-        s.includes('THETA') || s.includes('TRX') || s.includes('ETC') || s.includes('XMR') ||
-        s.includes('BCH') || s.includes('LTC') || s.includes('DOGE') || s.includes('SHIB') ||
-        s.includes('NEAR') || s.includes('FTM') || s.includes('SAND') || s.includes('MANA') ||
-        s.includes('CRV') || s.includes('AAVE')
-      );
-      if (isCrypto) return 'CRYPTO';
-
-      return 'STOCK';
-    };
 
     fetchChartData();
     // Note: Intentionally exclude onDataChange to avoid re-fetch loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbol, timeframe]);
 
+
+  // Live meta (barLast & snapshot) refresher every 3 seconds
+  useEffect(() => {
+    let active = true;
+
+    const fetchMetaOnly = async () => {
+      try {
+        const assetType = getAssetType(symbol);
+        const response = await fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: symbol,
+            timeframe: timeframe === 'D' ? '1d' : (timeframe === '240' ? '4h' : `${timeframe}m`),
+            asset: assetType.toLowerCase(),
+            limit: 1
+          })
+        });
+        const data = await response.json();
+        if (!active) return;
+        if (data) {
+          setChartMeta({
+            provider: data.provider,
+            providerSymbol: data.providerSymbol,
+            asset: data.asset,
+            timeframe: data.timeframe,
+            source: data.source,
+            lastClose: data.lastClose,
+            lastTimeUTC: data.lastTimeUTC,
+            prevClose: data.prevClose,
+            prevTime: data.prevTime,
+            snapshotLastTrade: data.snapshotLastTrade,
+            snapshotTimeUTC: data.snapshotTimeUTC,
+            isDelayed: data.isLikelyDelayed,
+            meta: data.meta
+          });
+        }
+      } catch (_) {
+        // no-op
+      }
+    };
+
+    fetchMetaOnly();
+    const id = setInterval(fetchMetaOnly, 3000);
+    return () => { active = false; clearInterval(id); };
+  }, [symbol, timeframe]);
 
   // Initialize TradingView widget using iframe approach
   useEffect(() => {
