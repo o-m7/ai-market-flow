@@ -27,6 +27,12 @@ serve(async (req) => {
 
     const { searchParams } = new URL(req.url);
     const sym = searchParams.get('symbol') || 'AAPL';
+    const route = searchParams.get('route');
+    
+    // NEW: /inputs-for-ai route for AI debugging
+    if (route === 'inputs-for-ai') {
+      return await handleAIInputsDebug(sym);
+    }
     
     console.log(`Debug comparison for ${sym}`);
 
@@ -91,3 +97,69 @@ serve(async (req) => {
     });
   }
 });
+
+// NEW: Debug handler for AI inputs
+async function handleAIInputsDebug(symbol: string) {
+  try {
+    console.log(`[DEBUG] Generating AI inputs debug for ${symbol}`);
+    
+    // Get enriched features
+    const featuresResponse = await fetch('http://localhost:54321/functions/v1/polygon-market-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol,
+        market: 'forex',
+        tf: '1h'
+      })
+    });
+    
+    const features = featuresResponse.ok ? await featuresResponse.json() : null;
+    
+    // Get news risk
+    const [base, quote] = symbol.split('/');
+    const newsResponse = await fetch('http://localhost:54321/functions/v1/news-gate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        base: base || 'USD',
+        quote: quote || 'USD',
+        lookback_minutes: 30
+      })
+    });
+    
+    const news = newsResponse.ok ? await newsResponse.json() : null;
+    
+    // Construct exact payload that would be sent to ai-analyze
+    const aiPayload = {
+      symbol,
+      timeframe: '1h',
+      market: 'forex',
+      features,
+      news,
+      timestamp: new Date().toISOString()
+    };
+    
+    return new Response(JSON.stringify({
+      debug_type: 'ai_inputs',
+      symbol,
+      payload: aiPayload,
+      features_available: !!features,
+      news_available: !!news,
+      generated_at: new Date().toISOString()
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+    
+  } catch (error) {
+    console.error('[DEBUG] AI inputs error:', error);
+    return new Response(JSON.stringify({
+      error: error.message,
+      debug_type: 'ai_inputs',
+      symbol
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}

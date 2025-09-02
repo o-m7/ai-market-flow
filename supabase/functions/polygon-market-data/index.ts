@@ -63,10 +63,19 @@ serve(async (req) => {
   }
 
   try {
-    console.log('=== LIVE MARKET DATA REQUEST ===');
+    console.log('=== ENRICHED MARKET DATA REQUEST ===');
     
-    const { symbols } = await req.json();
-    console.log('Requested symbols:', symbols);
+    const body = await req.json();
+    const { symbols, symbol, market, tf } = body;
+    
+    // NEW: Handle single symbol enriched request
+    if (symbol && market && tf) {
+      console.log(`Enriched request for ${symbol} (${market}, ${tf})`);
+      return await handleEnrichedRequest(symbol, market, tf);
+    }
+    
+    // EXISTING: Handle batch symbols request for compatibility
+    console.log('Batch symbols request:', symbols);
 
     const defaultSymbols = [
       'BTC/USD', 'ETH/USD', 'BNB/USD', 'XRP/USD', 'ADA/USD', 'SOL/USD', 'DOT/USD', 'MATIC/USD',
@@ -475,3 +484,464 @@ serve(async (req) => {
     });
   }
 });
+
+// NEW: Enriched market data handler for single symbol with technical features
+async function handleEnrichedRequest(symbol: string, market: string, tf: string) {
+  console.log(`[ENRICHED] Processing ${symbol} (${market}) on ${tf} timeframe`);
+  
+  const { polygon: polygonSymbol, type } = getPolygonSymbol(symbol);
+  
+  try {
+    // Fetch live quotes and historical data in parallel
+    const [quoteData, candleData] = await Promise.all([
+      fetchLiveQuote(polygonSymbol, type, symbol),
+      fetchCandleData(polygonSymbol, tf, 200) // Get enough bars for higher TF analysis
+    ]);
+    
+    if (!quoteData.current) {
+      throw new Error(`No live data available for ${symbol}`);
+    }
+    
+    // Calculate enriched features
+    const features = await calculateEnrichedFeatures(
+      symbol, 
+      market, 
+      tf, 
+      quoteData, 
+      candleData
+    );
+    
+    return new Response(JSON.stringify(features), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+    
+  } catch (error) {
+    console.error(`[ENRICHED] Error for ${symbol}:`, error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      symbol,
+      market,
+      tf
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+// Enhanced quote fetcher with more data
+async function fetchLiveQuote(polygonSymbol: string, type: string, originalSymbol: string) {
+  const promises = [];
+  
+  if (type === 'forex') {
+    const [base, quote] = originalSymbol.split('/');
+    promises.push(
+      fetch(`https://api.polygon.io/v1/last_quote/currencies/${base}/${quote}?apikey=${polygonApiKey}`)
+        .then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`https://api.polygon.io/v2/last/quote/${polygonSymbol}?apikey=${polygonApiKey}`)
+        .then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`https://api.polygon.io/v2/snapshot/locale/global/markets/fx/tickers/${polygonSymbol}?apikey=${polygonApiKey}`)
+        .then(r => r.ok ? r.json() : null).catch(() => null)
+    );
+  } else {
+    promises.push(
+      fetch(`https://api.polygon.io/v2/last/trade/${polygonSymbol}?apikey=${polygonApiKey}`)
+        .then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`https://api.polygon.io/v2/last/quote/${polygonSymbol}?apikey=${polygonApiKey}`)
+        .then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`https://api.polygon.io/v2/snapshot/locale/global/markets/${type === 'crypto' ? 'crypto' : 'stocks'}/tickers/${polygonSymbol}?apikey=${polygonApiKey}`)
+        .then(r => r.ok ? r.json() : null).catch(() => null)
+    );
+  }
+  
+  const [tradeData, quoteData, snapshotData] = await Promise.all(promises);
+  
+  let current = null;
+  let bid = null;
+  let ask = null;
+  let bid_size = null;
+  let ask_size = null;
+  let timestamp = null;
+  
+  // Extract pricing data based on asset type
+  if (type === 'forex') {
+    if (quoteData?.results?.bid && quoteData?.results?.ask) {
+      bid = quoteData.results.bid;
+      ask = quoteData.results.ask;
+      current = (bid + ask) / 2;
+      timestamp = quoteData.results.last_updated;
+      bid_size = quoteData.results.bid_size;
+      ask_size = quoteData.results.ask_size;
+    } else if (tradeData?.last?.bid && tradeData?.last?.ask) {
+      bid = tradeData.last.bid;
+      ask = tradeData.last.ask;
+      current = (bid + ask) / 2;
+      timestamp = tradeData.last.timestamp;
+    } else if (snapshotData?.ticker?.lastQuote) {
+      const quote = snapshotData.ticker.lastQuote;
+      bid = quote.bid;
+      ask = quote.ask;
+      current = (bid + ask) / 2;
+      timestamp = quote.timestamp;
+      bid_size = quote.bid_size;
+      ask_size = quote.ask_size;
+    }
+  } else {
+    if (tradeData?.results?.p) {
+      current = tradeData.results.p;
+      timestamp = tradeData.results.t;
+    }
+    if (quoteData?.results) {
+      bid = quoteData.results.bid;
+      ask = quoteData.results.ask;
+      bid_size = quoteData.results.bid_size;
+      ask_size = quoteData.results.ask_size;
+      if (!current && bid && ask) current = (bid + ask) / 2;
+      if (!timestamp) timestamp = quoteData.results.last_updated;
+    }
+    if (!current && snapshotData?.ticker) {
+      current = snapshotData.ticker.lastTrade?.price || snapshotData.ticker.day?.c;
+      if (!timestamp) timestamp = snapshotData.ticker.updated;
+    }
+  }
+  
+  return {
+    current: current ? round5(current) : null,
+    bid: bid ? round5(bid) : null,
+    ask: ask ? round5(ask) : null,
+    bid_size,
+    ask_size,
+    timestamp: timestamp || Date.now(),
+    raw_data: { tradeData, quoteData, snapshotData }
+  };
+}
+
+// Fetch historical candle data
+async function fetchCandleData(polygonSymbol: string, timeframe: string, limit = 200) {
+  // Map timeframe to Polygon format
+  const tfMap: Record<string, string> = {
+    '1m': '1/minute',
+    '5m': '5/minute', 
+    '15m': '15/minute',
+    '30m': '30/minute',
+    '1h': '1/hour',
+    '4h': '4/hour',
+    '1d': '1/day',
+    'D': '1/day'
+  };
+  
+  const polygonTf = tfMap[timeframe] || '1/hour';
+  const fromDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 30 days ago
+  const toDate = new Date().toISOString().split('T')[0];
+  
+  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${polygonTf}/${fromDate}/${toDate}?adjusted=true&sort=asc&limit=${limit}&apikey=${polygonApiKey}`;
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    return (data.results || []).map((bar: any) => ({
+      t: bar.t,
+      o: round5(bar.o),
+      h: round5(bar.h),
+      l: round5(bar.l),
+      c: round5(bar.c),
+      v: bar.v
+    }));
+  } catch (error) {
+    console.error(`Failed to fetch candle data for ${polygonSymbol}:`, error);
+    return [];
+  }
+}
+
+// Calculate enriched features including technical analysis
+async function calculateEnrichedFeatures(
+  symbol: string,
+  market: string,
+  tf: string,
+  quoteData: any,
+  candleData: any[]
+) {
+  const now = new Date();
+  const priceAgeMs = quoteData.timestamp ? now.getTime() - quoteData.timestamp : 0;
+  
+  // Calculate spread and order flow
+  const spread = quoteData.bid && quoteData.ask ? round5(quoteData.ask - quoteData.bid) : null;
+  const quoteImbalance = (quoteData.bid_size && quoteData.ask_size) 
+    ? round5(quoteData.bid_size / (quoteData.bid_size + quoteData.ask_size))
+    : null;
+  
+  // Session detection
+  const session = getSessionUTC(now);
+  
+  // Technical indicators from candle data
+  let technical = null;
+  let atr14 = null;
+  let levels = { support: [], resistance: [], vwap: null };
+  let higherTimeframe = {};
+  
+  if (candleData.length >= 20) {
+    technical = calculateAllTechnicalIndicators(candleData);
+    atr14 = technical.atr14;
+    levels = {
+      support: findSupportResistanceLevels(candleData).support,
+      resistance: findSupportResistanceLevels(candleData).resistance,
+      vwap: technical.vwap
+    };
+    
+    // Calculate higher timeframe snapshots
+    if (candleData.length >= 50) {
+      const h4Data = candleData.filter((_, i) => i % 4 === 0); // Simplified 4h sampling
+      const dailyData = candleData.filter((_, i) => i % 24 === 0); // Simplified daily sampling
+      
+      if (h4Data.length >= 20) {
+        const h4Tech = calculateAllTechnicalIndicators(h4Data);
+        higherTimeframe.h4 = {
+          ema20: round5(h4Tech.ema20),
+          ema50: round5(h4Tech.ema50),
+          ema200: round5(h4Tech.ema200),
+          rsi14: round5(h4Tech.rsi14),
+          vwap: round5(h4Tech.vwap)
+        };
+      }
+      
+      if (dailyData.length >= 20) {
+        const dailyTech = calculateAllTechnicalIndicators(dailyData);
+        higherTimeframe.daily = {
+          ema20: round5(dailyTech.ema20),
+          ema50: round5(dailyTech.ema50), 
+          ema200: round5(dailyTech.ema200),
+          rsi14: round5(dailyTech.rsi14),
+          vwap: round5(dailyTech.vwap)
+        };
+      }
+    }
+  }
+  
+  return {
+    symbol,
+    market,
+    tf,
+    
+    // Live pricing
+    current: quoteData.current,
+    price_age_ms: priceAgeMs,
+    spread,
+    spread_percentile_30d: null, // TODO: Implement cache
+    stale: priceAgeMs > 1500,
+    
+    // Order flow
+    order_flow: {
+      quote_imbalance: quoteImbalance,
+      trade_imbalance: null // TODO: Implement for crypto
+    },
+    
+    // Volatility and session
+    volatility: {
+      atr14_1h: atr14,
+      atr_percentile_60d: null, // TODO: Implement cache
+      session
+    },
+    
+    // Higher timeframe context
+    higher_timeframe: higherTimeframe,
+    
+    // Support/resistance levels
+    levels,
+    
+    // Current timeframe technical indicators
+    technical: technical ? {
+      ema20: round5(technical.ema20),
+      ema50: round5(technical.ema50),
+      ema200: round5(technical.ema200),
+      rsi14: round5(technical.rsi14),
+      macd: {
+        line: round5(technical.macd.line),
+        signal: round5(technical.macd.signal),
+        hist: round5(technical.macd.hist)
+      },
+      atr14: round5(technical.atr14),
+      bb: {
+        mid: round5(technical.bb.mid),
+        upper: round5(technical.bb.upper),
+        lower: round5(technical.bb.lower)
+      }
+    } : null,
+    
+    // Metadata
+    timestamp: now.toISOString(),
+    candles_analyzed: candleData.length
+  };
+}
+
+// Import the shared utilities at the top of existing functions
+function round5(n: number): number {
+  return Number(n.toFixed(5));
+}
+
+function getSessionUTC(date: Date): "Asia" | "London" | "NY" {
+  const hour = date.getUTCHours();
+  
+  if (hour >= 22 || hour < 8) {
+    return "Asia";
+  } else if (hour >= 8 && hour < 16) {
+    return "London";
+  } else {
+    return "NY";
+  }
+}
+
+// Import technical analysis functions
+function calculateEMA(prices: number[], period: number): number {
+  if (prices.length < period) return prices[prices.length - 1] || 0;
+  
+  const multiplier = 2 / (period + 1);
+  let ema = prices.slice(0, period).reduce((sum, price) => sum + price, 0) / period;
+  
+  for (let i = period; i < prices.length; i++) {
+    ema = (prices[i] * multiplier) + (ema * (1 - multiplier));
+  }
+  
+  return ema;
+}
+
+function calculateRSI(prices: number[], period = 14): number {
+  if (prices.length < period + 1) return 50;
+  
+  let gains = 0;
+  let losses = 0;
+  
+  for (let i = 1; i <= period; i++) {
+    const change = prices[i] - prices[i - 1];
+    if (change > 0) {
+      gains += change;
+    } else {
+      losses -= change;
+    }
+  }
+  
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  
+  for (let i = period + 1; i < prices.length; i++) {
+    const change = prices[i] - prices[i - 1];
+    const gain = change > 0 ? change : 0;
+    const loss = change < 0 ? -change : 0;
+    
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+  }
+  
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+function calculateMACD(prices: number[]): { line: number; signal: number; hist: number } {
+  const ema12 = calculateEMA(prices, 12);
+  const ema26 = calculateEMA(prices, 26);
+  const macdLine = ema12 - ema26;
+  const recentPrices = prices.slice(-9);
+  const signal = calculateEMA(recentPrices.map(() => macdLine), 9);
+  const histogram = macdLine - signal;
+  
+  return { line: macdLine, signal, hist: histogram };
+}
+
+function calculateATR(candles: any[], period = 14): number {
+  if (candles.length < 2) return 0;
+  
+  const trueRanges: number[] = [];
+  
+  for (let i = 1; i < candles.length; i++) {
+    const high = candles[i].h;
+    const low = candles[i].l;
+    const prevClose = candles[i - 1].c;
+    
+    const tr = Math.max(
+      high - low,
+      Math.abs(high - prevClose),
+      Math.abs(low - prevClose)
+    );
+    
+    trueRanges.push(tr);
+  }
+  
+  const recentTRs = trueRanges.slice(-period);
+  return recentTRs.reduce((sum, tr) => sum + tr, 0) / recentTRs.length;
+}
+
+function calculateBB(prices: number[], period = 20, multiplier = 2): { mid: number; upper: number; lower: number } {
+  const recentPrices = prices.slice(-period);
+  const mid = recentPrices.reduce((sum, price) => sum + price, 0) / recentPrices.length;
+  
+  const variance = recentPrices.reduce((sum, price) => {
+    return sum + Math.pow(price - mid, 2);
+  }, 0) / recentPrices.length;
+  
+  const stdDev = Math.sqrt(variance);
+  
+  return {
+    mid,
+    upper: mid + (stdDev * multiplier),
+    lower: mid - (stdDev * multiplier)
+  };
+}
+
+function calculateVWAP(candles: any[]): number {
+  let totalVolume = 0;
+  let totalVolumePrice = 0;
+  
+  for (const candle of candles) {
+    const typical = (candle.h + candle.l + candle.c) / 3;
+    const volume = candle.v || 1;
+    
+    totalVolumePrice += typical * volume;
+    totalVolume += volume;
+  }
+  
+  return totalVolume > 0 ? totalVolumePrice / totalVolume : candles[candles.length - 1].c;
+}
+
+function calculateAllTechnicalIndicators(candles: any[]) {
+  const prices = candles.map(c => c.c);
+  
+  return {
+    ema20: calculateEMA(prices, 20),
+    ema50: calculateEMA(prices, 50),
+    ema200: calculateEMA(prices, 200),
+    rsi14: calculateRSI(prices, 14),
+    macd: calculateMACD(prices),
+    atr14: calculateATR(candles, 14),
+    bb: calculateBB(prices, 20, 2),
+    vwap: calculateVWAP(candles)
+  };
+}
+
+function findSupportResistanceLevels(candles: any[]): { support: number[], resistance: number[] } {
+  const highs = candles.map(c => c.h);
+  const lows = candles.map(c => c.l);
+  
+  const support: number[] = [];
+  const resistance: number[] = [];
+  
+  for (let i = 2; i < lows.length - 2; i++) {
+    if (lows[i] < lows[i-1] && lows[i] < lows[i-2] && 
+        lows[i] < lows[i+1] && lows[i] < lows[i+2]) {
+      support.push(round5(lows[i]));
+    }
+  }
+  
+  for (let i = 2; i < highs.length - 2; i++) {
+    if (highs[i] > highs[i-1] && highs[i] > highs[i-2] && 
+        highs[i] > highs[i+1] && highs[i] > highs[i+2]) {
+      resistance.push(round5(highs[i]));
+    }
+  }
+  
+  return {
+    support: support.sort((a, b) => b - a).slice(0, 3),
+    resistance: resistance.sort((a, b) => a - b).slice(0, 3)
+  };
+}

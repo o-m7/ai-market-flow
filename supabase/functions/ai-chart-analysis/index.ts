@@ -48,6 +48,24 @@ interface ChartAnalysisResult {
     factors: string[];
   };
   timestamp: string;
+  
+  // NEW: Trading overlays and badges
+  tradingOverlays?: {
+    entry?: number;
+    stop?: number;
+    targets?: number[];
+    horizontalLines?: Array<{
+      price: number;
+      label: string;
+      color: string;
+      style: 'solid' | 'dashed' | 'dotted';
+    }>;
+  };
+  riskBadges?: Array<{
+    type: 'EVENT_RISK' | 'HIGH_VOL' | 'SPREAD_WIDE' | 'STALE_DATA';
+    active: boolean;
+    reason?: string;
+  }>;
 }
 
 serve(async (req) => {
@@ -68,9 +86,9 @@ serve(async (req) => {
     console.log(`Screenshot provided: ${pageScreenshot ? 'Yes' : 'No'}`);
     console.log(`Chart data points: ${Array.isArray(chartData) ? chartData.length : 0}`);
 
-    // ALWAYS use the chart data provided from frontend - this ensures price consistency
+    // NEW: Get enriched features and AI analysis
     const analysis = (chartData && chartData.length > 0)
-      ? await generateHybridAnalysis(symbol, timeframe, analysisType, chartData, pageScreenshot)
+      ? await generateEnhancedHybridAnalysis(symbol, timeframe, analysisType, chartData, pageScreenshot)
       : await generateAIAgentAnalysis(symbol, timeframe, analysisType);
 
     return new Response(JSON.stringify({
@@ -276,7 +294,8 @@ Respond in JSON format:
   }
 }
 
-async function generateHybridAnalysis(
+// NEW: Enhanced analysis that integrates with enriched market data
+async function generateEnhancedHybridAnalysis(
   symbol: string,
   timeframe: string,
   analysisType: string,
@@ -464,6 +483,10 @@ OUTPUT FORMAT (JSON only):
       }
     };
 
+    // NEW: Generate trading overlays and risk badges
+    const overlays = generateTradingOverlays(safeAnalysis, analysisData, currentPrice);
+    const badges = generateRiskBadges(symbol, analysisData?.features);
+
     return {
       symbol,
       analysis: safeAnalysis.analysis,
@@ -474,7 +497,11 @@ OUTPUT FORMAT (JSON only):
       chartPatterns: safeAnalysis.chartPatterns,
       priceTargets: safeAnalysis.priceTargets,
       riskAssessment: safeAnalysis.riskAssessment,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      
+      // NEW: Enhanced overlays and badges
+      tradingOverlays: overlays,
+      riskBadges: badges
     };
   } catch (error) {
     console.error(`Hybrid analysis failed for ${symbol}:`, error);
@@ -766,7 +793,116 @@ IMPORTANT: Respond ONLY in valid JSON format with this exact structure:
         ],
         max_tokens: 3000
       }),
+});
+
+// NEW: Import overlay utilities
+function generateTradingOverlays(analysis: any, aiResult: any, currentPrice: number) {
+  const overlays: any = {
+    horizontalLines: []
+  };
+
+  // Add entry, stop, and target lines from AI analysis
+  if (aiResult?.trade_idea) {
+    const { entry, stop, targets } = aiResult.trade_idea;
+    
+    if (entry) {
+      overlays.entry = entry;
+      overlays.horizontalLines.push({
+        price: entry,
+        label: `Entry: ${entry.toFixed(5)}`,
+        color: '#2563eb',
+        style: 'solid'
+      });
+    }
+
+    if (stop) {
+      overlays.stop = stop;
+      overlays.horizontalLines.push({
+        price: stop,
+        label: `Stop: ${stop.toFixed(5)}`,
+        color: '#dc2626',
+        style: 'solid'
+      });
+    }
+
+    if (targets && targets.length > 0) {
+      overlays.targets = targets;
+      targets.forEach((target: number, index: number) => {
+        overlays.horizontalLines.push({
+          price: target,
+          label: `T${index + 1}: ${target.toFixed(5)}`,
+          color: '#16a34a',
+          style: index === 0 ? 'solid' : 'dashed'
+        });
+      });
+    }
+  }
+
+  // Add support and resistance levels
+  if (analysis.keyLevels) {
+    analysis.keyLevels.support?.forEach((level: number, index: number) => {
+      overlays.horizontalLines.push({
+        price: level,
+        label: `S${index + 1}: ${level.toFixed(5)}`,
+        color: '#059669',
+        style: 'dotted'
+      });
     });
+
+    analysis.keyLevels.resistance?.forEach((level: number, index: number) => {
+      overlays.horizontalLines.push({
+        price: level,
+        label: `R${index + 1}: ${level.toFixed(5)}`,
+        color: '#dc2626',
+        style: 'dotted'
+      });
+    });
+  }
+
+  return overlays;
+}
+
+function generateRiskBadges(symbol: string, features: any) {
+  const badges: Array<{
+    type: 'EVENT_RISK' | 'HIGH_VOL' | 'SPREAD_WIDE' | 'STALE_DATA';
+    active: boolean;
+    reason?: string;
+  }> = [];
+
+  if (!features) {
+    return badges;
+  }
+
+  badges.push({
+    type: 'EVENT_RISK',
+    active: features.news?.event_risk || false,
+    reason: features.news?.event_risk ? 
+      `${features.news.headline_hits_30m} risk headlines` : undefined
+  });
+
+  badges.push({
+    type: 'HIGH_VOL',
+    active: features.volatility?.atr_percentile_60d >= 0.8,
+    reason: features.volatility?.atr_percentile_60d >= 0.8 ? 
+      `High ATR percentile` : undefined
+  });
+
+  badges.push({
+    type: 'SPREAD_WIDE', 
+    active: features.spread_percentile_30d >= 0.8,
+    reason: features.spread_percentile_30d >= 0.8 ? 
+      `Wide spread percentile` : undefined
+  });
+
+  badges.push({
+    type: 'STALE_DATA',
+    active: features.stale || features.price_age_ms > 2000,
+    reason: features.stale ? 
+      `Price ${Math.round(features.price_age_ms / 1000)}s old` : undefined
+  });
+
+  return badges;
+}
 
     if (!response.ok) {
       const errorText = await response.text();

@@ -8,23 +8,56 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
 
-const analysisSchema = {
+// Deterministic rules and thresholds
+const THRESHOLDS = {
+  RSI_OVERBOUGHT: 70,
+  RSI_OVERSOLD: 30,
+  RSI_BULLISH_MIN: 35,
+  RSI_BEARISH_MIN: 65,
+  MACD_BULLISH_MIN: 0.00005,
+  MACD_BEARISH_MAX: -0.00005,
+  LEVEL_PROXIMITY_ATR_MULTIPLIER: 0.15,
+  STOP_ATR_MULTIPLIER: 0.25,
+  TARGET1_ATR_MULTIPLIER: 1,
+  TARGET2_ATR_MULTIPLIER: 2,
+  MIN_RR_RATIO: 1.5,
+  HIGH_ATR_PERCENTILE: 0.8,
+  LOW_ATR_PERCENTILE: 0.2,
+  ATR_VOLATILITY_MULTIPLIER: 1.5,
+  WIDE_SPREAD_PERCENTILE: 0.8,
+  IMBALANCE_STRONG_BUY_MAX: 0.35,
+  IMBALANCE_STRONG_SELL_MIN: 0.65,
+  BASE_CONFIDENCE: 50,
+  CONFLUENCE_BONUS: 10,
+  MAX_CONFLUENCE_BONUS: 30,
+  CONFLICT_PENALTY: 10,
+  HIGH_ATR_PENALTY: 15,
+  MAX_CONFIDENCE: 88
+} as const;
+
+function round5(n: number): number {
+  return Number(n.toFixed(5));
+}
+
+// OpenAI Function Schema for deterministic output
+const InstitutionalTaResultSchema = {
   name: "InstitutionalTaResult",
-  schema: {
+  description: "Institutional-grade technical analysis result with deterministic signals",
+  parameters: {
     type: "object",
     properties: {
-      summary: { type: "string" },
-      action: { type: "string", enum: ["buy","sell","hold"] },
-      action_text: { type: "string" },
-      outlook: { type: "string", enum: ["bullish","bearish","neutral"] },
+      summary: { type: "string", description: "Brief technical analysis summary" },
+      action: { type: "string", enum: ["buy", "sell", "hold"], description: "Trading action" },
+      action_text: { type: "string", description: "Action description starting with BUY/SELL/HOLD" },
+      outlook: { type: "string", enum: ["bullish", "bearish", "neutral"], description: "Market outlook" },
       levels: {
         type: "object",
         properties: {
-          support: { type: "array", items: { type: "number" } },
-          resistance: { type: "array", items: { type: "number" } },
-          vwap: { type: ["number","null"] }
+          support: { type: "array", items: { type: "number" }, description: "Support levels" },
+          resistance: { type: "array", items: { type: "number" }, description: "Resistance levels" },
+          vwap: { type: ["number", "null"], description: "VWAP level" }
         },
-        required: ["support","resistance"]
+        required: ["support", "resistance"]
       },
       fibonacci: {
         type: "object",
@@ -39,32 +72,34 @@ const analysisSchema = {
               "50.0": { type: "number" },
               "61.8": { type: "number" },
               "78.6": { type: "number" }
-            }
+            },
+            required: ["23.6", "38.2", "50.0", "61.8", "78.6"]
           },
           extensions: {
-            type: "object", 
+            type: "object",
             properties: {
               "127.2": { type: "number" },
               "161.8": { type: "number" }
-            }
+            },
+            required: ["127.2", "161.8"]
           },
-          direction: { type: "string", enum: ["up","down"] }
+          direction: { type: "string", enum: ["up", "down"] }
         },
-        required: ["pivot_high","pivot_low","retracements","extensions","direction"]
+        required: ["pivot_high", "pivot_low", "retracements", "extensions", "direction"]
       },
       trade_idea: {
         type: "object",
         properties: {
-          direction: { type: "string", enum: ["long","short","none"] },
+          direction: { type: "string", enum: ["long", "short", "none"] },
           entry: { type: "number" },
           stop: { type: "number" },
           targets: { type: "array", items: { type: "number" } },
           rationale: { type: "string" },
-          time_horizon: { type: "string", enum: ["scalp","intraday","swing","position"] },
-          setup_type: { type: "string", enum: ["breakout","pullback","mean_reversion","range","other"] },
+          time_horizon: { type: "string", enum: ["scalp", "intraday", "swing", "position"] },
+          setup_type: { type: "string", enum: ["breakout", "pullback", "mean_reversion", "range", "other"] },
           rr_estimate: { type: "number" }
         },
-        required: ["direction","entry","stop","targets","rationale","time_horizon","setup_type","rr_estimate"]
+        required: ["direction", "entry", "stop", "targets", "rationale", "time_horizon", "setup_type", "rr_estimate"]
       },
       technical: {
         type: "object",
@@ -79,7 +114,8 @@ const analysisSchema = {
               line: { type: "number" },
               signal: { type: "number" },
               hist: { type: "number" }
-            }
+            },
+            required: ["line", "signal", "hist"]
           },
           atr14: { type: "number" },
           bb: {
@@ -88,13 +124,14 @@ const analysisSchema = {
               mid: { type: "number" },
               upper: { type: "number" },
               lower: { type: "number" }
-            }
+            },
+            required: ["mid", "upper", "lower"]
           }
         },
-        required: ["ema20","ema50","ema200","rsi14","macd","atr14","bb"]
+        required: ["ema20", "ema50", "ema200", "rsi14", "macd", "atr14", "bb"]
       },
-      confidence_model: { type: "number" },
-      confidence_calibrated: { type: "number" },
+      confidence_model: { type: "number", minimum: 0, maximum: 100 },
+      confidence_calibrated: { type: "number", minimum: 0, maximum: 100 },
       evidence: { type: "array", items: { type: "string" } },
       risks: { type: "string" },
       timeframe_profile: {
@@ -106,15 +143,17 @@ const analysisSchema = {
               entry: { type: "number" },
               stop: { type: "number" },
               targets: { type: "array", items: { type: "number" } }
-            }
+            },
+            required: ["entry", "stop", "targets"]
           },
           intraday: {
-            type: "object", 
+            type: "object",
             properties: {
               entry: { type: "number" },
               stop: { type: "number" },
               targets: { type: "array", items: { type: "number" } }
-            }
+            },
+            required: ["entry", "stop", "targets"]
           },
           swing: {
             type: "object",
@@ -122,28 +161,21 @@ const analysisSchema = {
               entry: { type: "number" },
               stop: { type: "number" },
               targets: { type: "array", items: { type: "number" } }
-            }
+            },
+            required: ["entry", "stop", "targets"]
           }
-        }
+        },
+        required: ["scalp", "intraday", "swing"]
       },
       json_version: { type: "string" }
     },
-    required: ["summary","action","action_text","outlook","levels","fibonacci","trade_idea","technical","confidence_model","confidence_calibrated","evidence","risks","timeframe_profile","json_version"]
-  },
-  strict: true
+    required: [
+      "summary", "action", "action_text", "outlook", "levels", "fibonacci", 
+      "trade_idea", "technical", "confidence_model", "confidence_calibrated", 
+      "evidence", "risks", "timeframe_profile", "json_version"
+    ]
+  }
 };
-
-function sanitizeCandles(raw: any[], max = 200) {
-  const bars = (raw ?? []).slice(-max).map((b) => ({
-    t: Number(b.t), o: Number(b.o), h: Number(b.h),
-    l: Number(b.l), c: Number(b.c), v: Number(b.v ?? 0)
-  })).filter((b) =>
-    Number.isFinite(b.t) && Number.isFinite(b.o) &&
-    Number.isFinite(b.h) && Number.isFinite(b.l) &&
-    Number.isFinite(b.c) && Number.isFinite(b.v)
-  );
-  return bars;
-}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -152,293 +184,195 @@ serve(async (req) => {
   }
 
   try {
-    // Parse body first
     const body = await req.json().catch(() => ({}));
-    const { symbol, timeframe, market, candles, debug } = body || {};
-    const bars = sanitizeCandles(candles);
+    const { symbol, timeframe, market, features, news, debug } = body || {};
+
+    console.log(`[ai-analyze] NEW DETERMINISTIC ANALYSIS: ${symbol} (${timeframe}, ${market})`);
 
     // Debug endpoint
     if (debug === true) {
-      const envKeys = {
-        OPENAI_API_KEY: !!Deno.env.get('OPENAI_API_KEY'),
-        OPEN_AI_API_KEY: !!Deno.env.get('OPEN_AI_API_KEY'),
-        OPENAI: !!Deno.env.get('OPENAI'),
-        OPENAI_KEY: !!Deno.env.get('OPENAI_KEY'),
-      };
-      const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
-      
       return new Response(JSON.stringify({
-        envKeys,
-        headerKeyPresent: !!headerKey,
+        hasOpenAI: !!Deno.env.get('OPENAI_API_KEY'),
         symbol: symbol || null,
         timeframe: timeframe || null,
-        candleCount: bars.length,
+        market: market || null,
+        hasFeatures: !!features,
+        hasNews: !!news,
         analyzed_at: new Date().toISOString(),
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Get OpenAI API key - try multiple sources
-    let openaiApiKey =
-      Deno.env.get('OPENAI_API_KEY') ||
-      Deno.env.get('OPEN_AI_API_KEY') ||
-      Deno.env.get('OPENAI') ||
-      Deno.env.get('OPENAI_KEY') || '';
-
-    // Allow header override
+    // Get OpenAI API key
+    let openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     const headerKey = req.headers.get('x-openai-api-key') || req.headers.get('x-openai-key');
     if (headerKey) openaiApiKey = headerKey as string;
 
-    // Last-resort: scan all env vars for any OPENAI-like key
     if (!openaiApiKey) {
-      try {
-        // @ts-ignore Deno.env.toObject may not be typed in some runtimes
-        const envObj = (Deno.env as any)?.toObject?.() || {};
-        for (const [k, v] of Object.entries(envObj)) {
-          const K = k.toUpperCase();
-          if ((K.includes('OPENAI') && K.includes('KEY')) || K === 'OPENAI') {
-            if (typeof v === 'string' && v.trim()) {
-              openaiApiKey = v.trim();
-              console.log('[ai-analyze] Found OpenAI key in env var:', k);
-              break;
-            }
-          }
-        }
-      } catch (scanErr) {
-        console.log('[ai-analyze] Env scan not available:', (scanErr as any)?.message || scanErr);
-      }
-    }
-
-    console.log('[ai-analyze] Key sources:', {
-      env_OPENAI_API_KEY: !!Deno.env.get('OPENAI_API_KEY'),
-      header_override: !!headerKey,
-      scanned_any: !!openaiApiKey,
-      final_key_available: !!openaiApiKey
-    });
-
-    if (!openaiApiKey) {
-      console.error('[ai-analyze] No OpenAI API key found in environment or headers');
+      console.error('[ai-analyze] No OpenAI API key found');
       return new Response(JSON.stringify({ 
-        error: "OpenAI API key not configured. Please set OPENAI_API_KEY in Supabase secrets or provide via x-openai-api-key header." 
+        error: "OpenAI API key not configured. Please set OPENAI_API_KEY in Supabase secrets." 
       }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    if (!symbol || bars.length < 20) {
-      return new Response(JSON.stringify({ error: "symbol and >=20 candles required" }), {
+    if (!symbol || !features || !features.technical) {
+      return new Response(JSON.stringify({ 
+        error: "symbol, features, and features.technical are required" 
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    console.log(`[ai-analyze] Starting AI analysis for ${symbol} (${timeframe}) with ${bars.length} candles`);
+    console.log(`[ai-analyze] Processing with deterministic rules for ${symbol}`);
 
     const client = new OpenAI({ apiKey: openaiApiKey });
 
-    const institutionalPrompt = `You are an institutional-grade technical analysis engine.
-Use only the numeric data provided by the backend (symbol, timeframe, OHLCV candles, and any precomputed indicators).
-Be deterministic and consistent: given the same inputs, return the same outputs.
-Return ONLY JSON that matches the schema below — no extra prose.
+    // Create deterministic analysis prompt
+    const deterministicPrompt = `You are an institutional-grade technical analysis engine using STRICT deterministic rules.
 
-Requirements
+CRITICAL INSTRUCTIONS:
+- Use ONLY the provided numerical data
+- Apply rules in EXACT order specified
+- Return ONLY JSON matching the function schema
+- Round all prices to 5 decimal places
+- Use temperature=0 and top_p=0 for consistency
 
-Action words & decision
-Must produce an explicit decision and wording that starts with BUY, SELL, or HOLD.
-Use both directional terms and trader lingo: "action": "buy|sell|hold", "trade_idea.direction": "long|short|none", and an action_text that begins with BUY/SELL/HOLD followed by a one-line reason (e.g., BUY — Pullback to EMA50 with bullish RSI divergence).
-
-Detailed, efficient, number-driven analysis
-Base everything on the actual numbers provided. Never invent data.
-Include price action structure (HH/HL or LH/LL), EMA(20/50/200), SMA(50/200), RSI(14), MACD (line/signal/cross), ATR(14), Bollinger(20,2), VWAP (if provided), and volume cues (if provided).
-
-Fibonacci: compute retracements 23.6/38.2/50/61.8/78.6 and extensions 127.2/161.8 from the most recent valid swing:
-Identify the swing using the last N bars for the current timeframe:
-scalp (1m–15m): N=100,
-intraday (30m–4h): N=150, 
-swing (1D–1W): N=200.
-For an up-swing: pivotLow = min(low), pivotHigh = max(high) over N; retracements off that move.
-For a down-swing: pivotHigh then pivotLow similarly.
-
-Entries/stops/targets must be numeric, realistic, and tied to ATR, recent highs/lows, Fibs, or clear S/R.
-Provide why with concise bullet-style rationale that references concrete levels (e.g., "Close > EMA200 and EMA20>EMA50; RSI 62; MACD cross up; ATR supports 1.2× risk with 2.0× target").
-
-Confidence that's real (no 1%)
-Output two fields:
-confidence_model (0–100): your internal estimate based on signals.
-confidence_calibrated (0–100): apply this rubric to avoid trivial values:
-Start at 50.
-+8–12 each independent confluence (trend alignment across EMAs; momentum confirmation via RSI>60 or MACD cross with rising histogram; breakout close beyond structure; bounce off EMA50/200 with confirming candle; location vs. Bollinger bands). Max +30.
-−10 if conflicting signals (e.g., price > EMA20 but < EMA200).
-−10–20 if ATR is elevated vs. 30-bar median and stop would exceed 1×ATR.
-Cap at 88 unless backtest metadata explicitly authorizes 90–99.
-Never default to 1%. If mixed, return 55–65 or "action":"hold".
-
-Consistency
-Deterministic decisions: do not use randomness.
-Given identical inputs, produce identical outputs (same levels ± rounding).
-Prefer rule-based selection of swings/levels per the rules above.
-
-Timeframe-aware profiles
-Tailor analysis to the provided timeframe and produce a profile for trader types:
-scalp (1–15m): tighter stops (0.5–1.0× ATR), smaller targets (1.0–1.5× ATR), quick invalidation.
-intraday (30m–4h): stops ~1.0–1.5× ATR, targets 1.5–2.5× ATR.
-swing (1D–1W): stops ~1.5–2.5× ATR, targets 2–4× ATR; give Fib confluence with higher-TF EMAs/SR.
-If only one timeframe is provided, still include a short note on how the setup scales to other horizons.
-
+MARKET DATA:
 Symbol: ${symbol}
 Timeframe: ${timeframe}
 Market: ${market}
 
-OHLCV Data (t=timestamp_ms,o=open,h=high,l=low,c=close,v=volume):
-${JSON.stringify(bars.slice(-200))}
+FEATURES:
+${JSON.stringify(features, null, 2)}
 
-Return ONLY JSON matching this exact schema:
-{
-  "summary": "string",
-  "action": "buy|sell|hold",
-  "action_text": "string starting with BUY/SELL/HOLD",
-  "outlook": "bullish|bearish|neutral",
-  "levels": {
-    "support": [number],
-    "resistance": [number],
-    "vwap": null
-  },
-  "fibonacci": {
-    "pivot_high": number,
-    "pivot_low": number,
-    "retracements": {
-      "23.6": number,
-      "38.2": number,
-      "50.0": number,
-      "61.8": number,
-      "78.6": number
-    },
-    "extensions": {
-      "127.2": number,
-      "161.8": number
-    },
-    "direction": "up|down"
-  },
-  "trade_idea": {
-    "direction": "long|short|none",
-    "entry": number,
-    "stop": number,
-    "targets": [number],
-    "rationale": "string with bullet-like reasons",
-    "time_horizon": "scalp|intraday|swing|position",
-    "setup_type": "breakout|pullback|mean_reversion|range|other",
-    "rr_estimate": number
-  },
-  "technical": {
-    "ema20": number,
-    "ema50": number,
-    "ema200": number,
-    "rsi14": number,
-    "macd": { "line": number, "signal": number, "hist": number },
-    "atr14": number,
-    "bb": { "mid": number, "upper": number, "lower": number }
-  },
-  "confidence_model": number,
-  "confidence_calibrated": number,
-  "evidence": ["list confluences used"],
-  "risks": "string (e.g., news risk, mixed signals, high ATR)",
-  "timeframe_profile": {
-    "scalp": { "entry": number, "stop": number, "targets": [number] },
-    "intraday": { "entry": number, "stop": number, "targets": [number] },
-    "swing": { "entry": number, "stop": number, "targets": [number] }
-  },
-  "json_version": "1.0.0"
-}`;
+NEWS RISK:
+${JSON.stringify(news || { event_risk: false, headline_hits_30m: 0 }, null, 2)}
 
-    console.log('[ai-analyze] Calling OpenAI API with institutional-grade prompt...');
-    const r = await client.chat.completions.create({
+DETERMINISTIC RULE ORDER (apply sequentially):
+
+1. TREND ANALYSIS:
+   - Bullish: ema20 > ema50 > ema200
+   - Bearish: ema20 < ema50 < ema200
+   - Neutral: Otherwise
+
+2. MOMENTUM GATES:
+   - RSI: Overbought ≥70, Oversold ≤30
+   - MACD: Bullish >+0.00005, Bearish <-0.00005
+   - If atr_percentile_60d ≥0.8: multiply MACD thresholds by 1.5
+
+3. VWAP/BB BIAS:
+   - Above VWAP & BB mid: Bullish bias
+   - Below both: Bearish bias
+
+4. LEVEL PROXIMITY (within 0.15×ATR):
+   - Near support: |current - nearest_support| ≤ 0.15×atr14
+   - Near resistance: |current - nearest_resistance| ≤ 0.15×atr14
+
+5. SESSION/VOLATILITY FILTERS:
+   - Asia session + low ATR percentile (≤0.2): Suppress breakouts → HOLD
+   - High spread percentile (≥0.8) or stale=true: → HOLD
+
+6. ORDER FLOW FILTERS:
+   - quote_imbalance <0.35 (against buys) or >0.65 (against sells): → HOLD
+
+7. NEWS RISK GATE:
+   - event_risk=true: → HOLD
+
+8. SIGNAL DECISION:
+   - BUY: (trend not bearish) AND (MACD bullish OR RSI ≤35) AND near_support
+   - SELL: (trend not bullish) AND (MACD bearish OR RSI ≥65) AND near_resistance
+   - HOLD: Otherwise
+
+9. STOPS/TARGETS (mandatory):
+   - BUY stop: min(support) - 0.25×atr14
+   - SELL stop: max(resistance) + 0.25×atr14
+   - Targets: current ± {1×atr14, 2×atr14} in trade direction
+   - If RR to Target1 < 1.5: Override to HOLD
+
+10. CONFIDENCE CALCULATION:
+    - Start: 50
+    - +10 per confluence (trend+momentum+level alignment)
+    - -10 for conflicts, -15 for high ATR
+    - Cap at 88
+
+Apply these rules EXACTLY as specified. Generate Fibonacci levels from recent swing highs/lows.`;
+
+    console.log('[ai-analyze] Calling OpenAI with function calling...');
+    
+    const response = await client.chat.completions.create({
       model: "gpt-5-2025-08-07",
       messages: [
         { 
           role: "system", 
-          content: "You are an institutional-grade technical analysis engine. Analyze OHLCV data using strict numerical methods and return ONLY valid JSON with no additional text, explanations, or formatting. Be deterministic and consistent." 
+          content: "You are an institutional-grade technical analysis engine. Use ONLY provided data. Apply deterministic rules in exact order. Return ONLY JSON with no extra text. Be consistent - same inputs must produce same outputs." 
         },
         { 
           role: "user", 
-          content: institutionalPrompt 
+          content: deterministicPrompt 
         }
       ],
-      max_completion_tokens: 2000,
-      response_format: { type: "json_object" }
+      tools: [{ type: "function", function: InstitutionalTaResultSchema }],
+      tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
+      max_completion_tokens: 2000
     });
 
-    const out = r.choices?.[0]?.message?.content || "";
-    console.log('[ai-analyze] OpenAI response length:', out.length);
-    console.log('[ai-analyze] OpenAI raw response:', out.slice(0, 500) + (out.length > 500 ? '...' : ''));
+    const toolCall = response.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall || toolCall.function.name !== "InstitutionalTaResult") {
+      console.error('[ai-analyze] No valid function call returned');
+      return new Response(JSON.stringify({ 
+        error: "AI did not return valid function call" 
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     let parsed: any = null;
     try {
-      parsed = JSON.parse(out);
-      console.log('[ai-analyze] JSON parsed successfully');
-    } catch (e1) {
-      console.warn('[ai-analyze] JSON parse failed, attempting cleanup');
-      console.error('[ai-analyze] Parse error:', e1.message);
-      const start = out.indexOf('{');
-      const end = out.lastIndexOf('}');
-      if (start !== -1 && end !== -1 && end > start) {
-        try {
-          const jsonStr = out.slice(start, end + 1);
-          console.log('[ai-analyze] Attempting to parse extracted JSON:', jsonStr.slice(0, 200));
-          parsed = JSON.parse(jsonStr);
-          console.log('[ai-analyze] JSON cleanup succeeded');
-        } catch (e2) {
-          console.error('[ai-analyze] JSON cleanup failed:', e2.message);
-          console.error('[ai-analyze] Problematic content:', out.slice(0, 300));
-          return new Response(JSON.stringify({ 
-            error: "AI returned invalid JSON format",
-            details: out.slice(0, 200),
-            parseError: e2.message
-          }), {
-            status: 502,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-      } else {
-        console.error('[ai-analyze] No valid JSON found in response');
-        console.error('[ai-analyze] Full response:', out);
-        return new Response(JSON.stringify({ 
-          error: "AI did not return JSON",
-          response: out.slice(0, 200)
-        }), {
-          status: 502,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
+      parsed = JSON.parse(toolCall.function.arguments);
+      console.log('[ai-analyze] Function call parsed successfully');
+    } catch (e) {
+      console.error('[ai-analyze] Function arguments parse failed:', e);
+      return new Response(JSON.stringify({ 
+        error: "AI returned invalid function arguments",
+        details: toolCall.function.arguments.slice(0, 200)
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
-    
-    const result = { 
-      ...parsed, 
-      symbol, 
-      timeframe, 
+
+    // Validate and ensure all required fields
+    const result = {
+      ...parsed,
+      symbol,
+      timeframe,
+      market,
       json_version: "1.0.0",
       analyzed_at: new Date().toISOString(),
-      candles_analyzed: bars.length
+      input_features: features,
+      input_news: news || { event_risk: false, headline_hits_30m: 0 }
     };
 
-    console.log('[ai-analyze] Analysis completed successfully');
+    console.log(`[ai-analyze] Deterministic analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);
+    
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (e: any) {
     console.error('[ai-analyze] Error:', e);
-    const rawStatus = e?.status ?? e?.response?.status ?? 500;
-    let status = rawStatus;
-    if (rawStatus === 401 || rawStatus === 403) status = 401;
-    else if (rawStatus >= 500) status = 502;
+    const status = e?.status === 401 || e?.status === 403 ? 401 : 502;
 
-    const body = (e?.response && typeof e.response.text === "function")
-      ? await e.response.text().catch(() => "")
-      : (e?.message || "");
-
-    return new Response(JSON.stringify({ error: body || "Analysis failed" }), {
+    return new Response(JSON.stringify({ 
+      error: e?.message || "Analysis failed",
+      timestamp: new Date().toISOString()
+    }), {
       status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

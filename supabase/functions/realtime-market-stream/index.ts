@@ -118,7 +118,7 @@ async function startRealTimeUpdates(connection: ClientConnection) {
     } catch (error) {
       console.error("Error sending market updates:", error);
     }
-  }, 30000); // Update every 30 seconds
+  }, 2000); // Update every 2 seconds for enriched features
 
   // Clean up interval when connection closes
   connection.socket.addEventListener('close', () => {
@@ -131,36 +131,121 @@ async function fetchMarketUpdates(symbols: string[]) {
 
   for (const symbol of symbols.slice(0, 5)) { // Limit to 5 symbols to avoid rate limits
     try {
-      const response = await fetch(
-        `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${symbol}?apikey=${polygonApiKey}`
-      );
+      // NEW: Use enriched market data endpoint
+      const enrichedResponse = await fetch('http://localhost:54321/functions/v1/polygon-market-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol,
+          market: getMarketType(symbol),
+          tf: '1h' // Default timeframe for realtime
+        })
+      });
 
-      if (response.ok) {
-        const data = await response.json();
-        const ticker = data.results;
+      if (enrichedResponse.ok) {
+        const enrichedData = await enrichedResponse.json();
+        
+        // Include enriched features in broadcast
+        updates.push({
+          symbol,
+          price: enrichedData.current,
+          change: enrichedData.current && enrichedData.technical ? 
+            (enrichedData.current - enrichedData.technical.ema20) : 0,
+          changePercent: enrichedData.current && enrichedData.technical && enrichedData.technical.ema20 ? 
+            ((enrichedData.current - enrichedData.technical.ema20) / enrichedData.technical.ema20) * 100 : 0,
+          
+          // NEW: Include enriched features
+          features: {
+            spread: enrichedData.spread,
+            stale: enrichedData.stale,
+            session: enrichedData.volatility?.session,
+            rsi: enrichedData.technical?.rsi14,
+            atr: enrichedData.technical?.atr14,
+            trend: getTrendFromEMAs(enrichedData.technical),
+            levels: enrichedData.levels
+          },
+          
+          // Try to get news risk (optional)
+          news_risk: await getNewsRisk(symbol),
+          
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        // Fallback to basic data
+        const response = await fetch(
+          `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${symbol}?apikey=${polygonApiKey}`
+        );
 
-        if (ticker) {
-          const currentPrice = ticker.last_trade?.price || ticker.prevDay?.c || 0;
-          const previousClose = ticker.prevDay?.c || currentPrice;
-          const change = currentPrice - previousClose;
-          const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
+        if (response.ok) {
+          const data = await response.json();
+          const ticker = data.results;
 
-          updates.push({
-            symbol,
-            price: currentPrice,
-            change,
-            changePercent,
-            volume: ticker.prevDay?.v || 0,
-            timestamp: new Date().toISOString()
-          });
+          if (ticker) {
+            const currentPrice = ticker.last_trade?.price || ticker.prevDay?.c || 0;
+            const previousClose = ticker.prevDay?.c || currentPrice;
+            const change = currentPrice - previousClose;
+            const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
+
+            updates.push({
+              symbol,
+              price: currentPrice,
+              change,
+              changePercent,
+              volume: ticker.prevDay?.v || 0,
+              timestamp: new Date().toISOString()
+            });
+          }
         }
       }
     } catch (error) {
-      console.error(`Error fetching data for ${symbol}:`, error);
+      console.error(`Error fetching enriched data for ${symbol}:`, error);
     }
   }
 
   return updates;
+}
+
+function getMarketType(symbol: string): string {
+  if (symbol.includes('/')) {
+    if (symbol.includes('USD') || symbol.includes('EUR') || symbol.includes('GBP') || symbol.includes('JPY')) {
+      if (symbol.includes('BTC') || symbol.includes('ETH') || symbol.includes('CRYPTO')) {
+        return 'crypto';
+      }
+      return 'forex';
+    }
+  }
+  return 'stocks';
+}
+
+function getTrendFromEMAs(technical: any): string {
+  if (!technical) return 'neutral';
+  
+  const { ema20, ema50, ema200 } = technical;
+  if (ema20 > ema50 && ema50 > ema200) return 'bullish';
+  if (ema20 < ema50 && ema50 < ema200) return 'bearish';
+  return 'neutral';
+}
+
+async function getNewsRisk(symbol: string): Promise<any> {
+  try {
+    // Try to get news risk for the symbol's base currency
+    const base = symbol.split('/')[0] || 'USD';
+    const quote = symbol.split('/')[1] || 'USD';
+    
+    const response = await fetch('http://localhost:54321/functions/v1/news-gate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base, quote, lookback_minutes: 30 })
+    });
+    
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.log(`News risk unavailable for ${symbol}:`, error.message);
+  }
+  
+  return { event_risk: false, headline_hits_30m: 0 };
 }
 
 async function handleAnalysisRequest(connection: ClientConnection, request: any) {
