@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_metrics_log: {
+        Row: {
+          created_at: string
+          id: string
+          input: Json
+          metadata: Json | null
+          output: Json | null
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          input: Json
+          metadata?: Json | null
+          output?: Json | null
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          input?: Json
+          metadata?: Json | null
+          output?: Json | null
+          type?: string
+        }
+        Relationships: []
+      }
       subscribers: {
         Row: {
           created_at: string
