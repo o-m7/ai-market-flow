@@ -16,8 +16,21 @@ export interface MarketUpdate {
   price: number;
   change: number;
   changePercent: number;
-  volume: number;
+  volume?: number;
   timestamp: string;
+  features?: {
+    spread?: number;
+    stale?: boolean;
+    session?: string;
+    rsi?: number;
+    atr?: number;
+    trend?: string;
+    levels?: { support: number[]; resistance: number[] };
+  };
+  news_risk?: { 
+    event_risk: boolean; 
+    headline_hits_30m: number; 
+  };
 }
 
 interface RealtimeAnalysisState {

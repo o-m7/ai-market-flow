@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { 
   createChart, 
   ColorType, 
@@ -9,10 +9,13 @@ import {
   LineData,
   LineSeries,
   AreaSeries,
-  CandlestickSeries
+  CandlestickSeries,
+  IPriceLine
 } from 'lightweight-charts';
 import type { LWBar } from '../lib/marketData';
 import { fetchCandles, fetchQuote } from '../lib/marketData';
+import { Badge } from '@/components/ui/badge';
+import { AlertTriangle, TrendingUp, Clock, Zap } from 'lucide-react';
 
 type Props = {
   symbol: string;                // e.g., "AAPL", "X:BTCUSD", "C:EURUSD"
@@ -22,14 +25,42 @@ type Props = {
   series?: 'candles'|'line'|'area';
   live?: boolean;
   onDataChange?: (data: LWBar[]) => void;
+  tradingOverlays?: {
+    entry?: number;
+    stop?: number;
+    targets?: number[];
+    horizontalLines?: Array<{
+      price: number;
+      label: string;
+      color: string;
+      style: 'solid' | 'dashed' | 'dotted';
+    }>;
+  };
+  riskBadges?: Array<{
+    type: 'EVENT_RISK' | 'HIGH_VOL' | 'SPREAD_WIDE' | 'STALE_DATA';
+    active: boolean;
+    reason?: string;
+  }>;
 };
 
-export default function TVLightweightChart({ symbol, tf='1m', height=420, theme='light', series='candles', live=true, onDataChange }: Props) {
+export default function TVLightweightChart({ 
+  symbol, 
+  tf='1m', 
+  height=420, 
+  theme='light', 
+  series='candles', 
+  live=true, 
+  onDataChange,
+  tradingOverlays,
+  riskBadges 
+}: Props) {
   const ref = useRef<HTMLDivElement|null>(null);
   const chartRef = useRef<IChartApi|null>(null);
   const seriesRef = useRef<ISeriesApi<any> | null>(null);
   const lastBar = useRef<LWBar|undefined>();
   const dataRef = useRef<LWBar[]>([]);
+  const overlayLinesRef = useRef<IPriceLine[]>([]);
+  const [analysisData, setAnalysisData] = useState<any>(null);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -142,9 +173,107 @@ export default function TVLightweightChart({ symbol, tf='1m', height=420, theme=
         chart.remove();
         chartRef.current = null;
         seriesRef.current = null;
+        overlayLinesRef.current = [];
       }
     };
   }, [symbol, tf, height, theme, series, live]);
 
-  return <div ref={ref} style={{ width:'100%', height }} />;
+  // Add trading overlays when they change
+  useEffect(() => {
+    if (!chartRef.current || !seriesRef.current || !tradingOverlays) return;
+
+    // Clear existing overlay lines
+    overlayLinesRef.current.forEach(line => {
+      seriesRef.current?.removePriceLine(line);
+    });
+    overlayLinesRef.current = [];
+
+    // Add horizontal lines from trading overlays
+    if (tradingOverlays.horizontalLines) {
+      tradingOverlays.horizontalLines.forEach(line => {
+        const priceLine = seriesRef.current!.createPriceLine({
+          price: line.price,
+          color: line.color,
+          lineWidth: 2,
+          lineStyle: line.style === 'dashed' ? 1 : line.style === 'dotted' ? 2 : 0,
+          axisLabelVisible: true,
+          title: line.label,
+        });
+        overlayLinesRef.current.push(priceLine);
+      });
+    }
+
+  }, [tradingOverlays]);
+
+  // Fetch AI analysis for risk badges and overlays
+  useEffect(() => {
+    const fetchAnalysis = async () => {
+      try {
+        const response = await fetch(`https://ifetofkhyblyijghuwzs.functions.supabase.co/ai-chart-analysis`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol, timeframe: tf })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setAnalysisData(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch AI analysis:', error);
+      }
+    };
+
+    if (live) {
+      fetchAnalysis();
+      const interval = setInterval(fetchAnalysis, 30000); // Update every 30s
+      return () => clearInterval(interval);
+    }
+  }, [symbol, tf, live]);
+
+  const getRiskBadgeIcon = (type: string) => {
+    switch (type) {
+      case 'EVENT_RISK': return <AlertTriangle className="h-3 w-3" />;
+      case 'HIGH_VOL': return <TrendingUp className="h-3 w-3" />;
+      case 'STALE_DATA': return <Clock className="h-3 w-3" />;
+      case 'SPREAD_WIDE': return <Zap className="h-3 w-3" />;
+      default: return <AlertTriangle className="h-3 w-3" />;
+    }
+  };
+
+  const getRiskBadgeColor = (type: string) => {
+    switch (type) {
+      case 'EVENT_RISK': return 'destructive';
+      case 'HIGH_VOL': return 'secondary';
+      case 'STALE_DATA': return 'outline';
+      case 'SPREAD_WIDE': return 'secondary';
+      default: return 'secondary';
+    }
+  };
+
+  const activeBadges = riskBadges?.filter(badge => badge.active) || 
+                      analysisData?.riskBadges?.filter((badge: any) => badge.active) || [];
+
+  return (
+    <div className="relative">
+      <div ref={ref} style={{ width:'100%', height }} />
+      
+      {/* Risk badges overlay */}
+      {activeBadges.length > 0 && (
+        <div className="absolute top-2 left-2 flex flex-wrap gap-1 max-w-[200px]">
+          {activeBadges.map((badge: any, index: number) => (
+            <Badge
+              key={index}
+              variant={getRiskBadgeColor(badge.type) as any}
+              className="text-xs flex items-center gap-1"
+              title={badge.reason}
+            >
+              {getRiskBadgeIcon(badge.type)}
+              {badge.type.replace('_', ' ')}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
