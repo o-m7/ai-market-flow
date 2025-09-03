@@ -9,10 +9,31 @@ verify_jwt = false
 [functions.ai-generate-analysis]
 verify_jwt = false
 
+[functions.ai-market-analysis]
+verify_jwt = false
+
 [functions.binance-data]
 verify_jwt = false
 
+[functions.check-subscription]
+verify_jwt = false
+
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.customer-portal]
+verify_jwt = false
+
+[functions.finnhub-data]
+verify_jwt = false
+
+[functions.metrics-log]
+verify_jwt = false
+
 [functions.news-fetch]
+verify_jwt = false
+
+[functions.news-gate]
 verify_jwt = false
 
 [functions.news-insights]
@@ -27,17 +48,14 @@ verify_jwt = false
 [functions.polygon-debug]
 verify_jwt = false
 
-[functions.finnhub-data]
+[functions.polygon-market-data]
 verify_jwt = false
 
-[functions.polygon-market-data]
+[functions.polygon-search]
 verify_jwt = false
 
 [functions.realtime-market-stream]
 verify_jwt = false
 
 [functions.stock-analysis]
-verify_jwt = false
-
-[functions.ai-market-analysis]
 verify_jwt = false
