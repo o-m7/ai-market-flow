@@ -39,23 +39,34 @@ function round5(n: number): number {
   return Number(n.toFixed(5));
 }
 
-// OpenAI Function Schema for deterministic output
+// Enhanced OpenAI Function Schema for comprehensive institutional analysis
 const InstitutionalTaResultSchema = {
   name: "InstitutionalTaResult",
-  description: "Institutional-grade technical analysis result with deterministic signals",
+  description: "Comprehensive institutional-grade technical analysis with multiple strategies and quantitative metrics",
   parameters: {
     type: "object",
     properties: {
-      summary: { type: "string", description: "Brief technical analysis summary" },
-      action: { type: "string", enum: ["buy", "sell", "hold"], description: "Trading action" },
-      action_text: { type: "string", description: "Action description starting with BUY/SELL/HOLD" },
+      summary: { type: "string", description: "Comprehensive market structure and technical analysis summary" },
+      action: { type: "string", enum: ["buy", "sell", "hold"], description: "Primary trading action" },
+      action_text: { type: "string", description: "Detailed action description with rationale" },
       outlook: { type: "string", enum: ["bullish", "bearish", "neutral"], description: "Market outlook" },
+      market_structure: {
+        type: "object",
+        properties: {
+          trend_direction: { type: "string", enum: ["strong_bullish", "bullish", "neutral", "bearish", "strong_bearish"] },
+          market_phase: { type: "string", enum: ["trending", "range_bound", "consolidation", "breakout"] },
+          volatility_regime: { type: "string", enum: ["low", "normal", "high", "extreme"] },
+          session_context: { type: "string", description: "Session analysis and liquidity context" }
+        },
+        required: ["trend_direction", "market_phase", "volatility_regime", "session_context"]
+      },
       levels: {
         type: "object",
         properties: {
-          support: { type: "array", items: { type: "number" }, description: "Support levels" },
-          resistance: { type: "array", items: { type: "number" }, description: "Resistance levels" },
-          vwap: { type: ["number", "null"], description: "VWAP level" }
+          support: { type: "array", items: { type: "number" }, description: "Key support levels" },
+          resistance: { type: "array", items: { type: "number" }, description: "Key resistance levels" },
+          vwap: { type: ["number", "null"], description: "VWAP level" },
+          pivot_points: { type: "array", items: { type: "number" }, description: "Daily pivot points" }
         },
         required: ["support", "resistance"]
       },
@@ -79,13 +90,69 @@ const InstitutionalTaResultSchema = {
             type: "object",
             properties: {
               "127.2": { type: "number" },
-              "161.8": { type: "number" }
+              "161.8": { type: "number" },
+              "261.8": { type: "number" }
             },
-            required: ["127.2", "161.8"]
+            required: ["127.2", "161.8", "261.8"]
           },
-          direction: { type: "string", enum: ["up", "down"] }
+          direction: { type: "string", enum: ["up", "down"] },
+          confluence_zones: { type: "array", items: { type: "string" }, description: "Key Fibonacci confluence areas" }
         },
-        required: ["pivot_high", "pivot_low", "retracements", "extensions", "direction"]
+        required: ["pivot_high", "pivot_low", "retracements", "extensions", "direction", "confluence_zones"]
+      },
+      trading_strategies: {
+        type: "object",
+        properties: {
+          trend_following: {
+            type: "object",
+            properties: {
+              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              probability: { type: "number", minimum: 0, maximum: 100 },
+              rationale: { type: "string" }
+            },
+            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
+          },
+          mean_reversion: {
+            type: "object",
+            properties: {
+              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              probability: { type: "number", minimum: 0, maximum: 100 },
+              rationale: { type: "string" }
+            },
+            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
+          },
+          momentum: {
+            type: "object",
+            properties: {
+              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              probability: { type: "number", minimum: 0, maximum: 100 },
+              rationale: { type: "string" }
+            },
+            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
+          },
+          range_trading: {
+            type: "object",
+            properties: {
+              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              probability: { type: "number", minimum: 0, maximum: 100 },
+              rationale: { type: "string" }
+            },
+            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
+          }
+        },
+        required: ["trend_following", "mean_reversion", "momentum", "range_trading"]
       },
       trade_idea: {
         type: "object",
@@ -94,12 +161,14 @@ const InstitutionalTaResultSchema = {
           entry: { type: "number" },
           stop: { type: "number" },
           targets: { type: "array", items: { type: "number" } },
+          target_probabilities: { type: "array", items: { type: "number" }, description: "Probability of reaching each target" },
           rationale: { type: "string" },
           time_horizon: { type: "string", enum: ["scalp", "intraday", "swing", "position"] },
-          setup_type: { type: "string", enum: ["breakout", "pullback", "mean_reversion", "range", "other"] },
-          rr_estimate: { type: "number" }
+          setup_type: { type: "string", enum: ["breakout", "pullback", "mean_reversion", "range", "momentum", "trend_continuation"] },
+          rr_estimate: { type: "number" },
+          expected_value: { type: "number", description: "Expected value of the trade" }
         },
-        required: ["direction", "entry", "stop", "targets", "rationale", "time_horizon", "setup_type", "rr_estimate"]
+        required: ["direction", "entry", "stop", "targets", "target_probabilities", "rationale", "time_horizon", "setup_type", "rr_estimate", "expected_value"]
       },
       technical: {
         type: "object",
@@ -108,14 +177,16 @@ const InstitutionalTaResultSchema = {
           ema50: { type: "number" },
           ema200: { type: "number" },
           rsi14: { type: "number" },
+          rsi_divergence: { type: "string", description: "RSI divergence analysis" },
           macd: {
             type: "object",
             properties: {
               line: { type: "number" },
               signal: { type: "number" },
-              hist: { type: "number" }
+              hist: { type: "number" },
+              analysis: { type: "string", description: "MACD signal quality and context" }
             },
-            required: ["line", "signal", "hist"]
+            required: ["line", "signal", "hist", "analysis"]
           },
           atr14: { type: "number" },
           bb: {
@@ -123,17 +194,31 @@ const InstitutionalTaResultSchema = {
             properties: {
               mid: { type: "number" },
               upper: { type: "number" },
-              lower: { type: "number" }
+              lower: { type: "number" },
+              width: { type: "number" },
+              position: { type: "string", description: "Price position relative to bands" }
             },
-            required: ["mid", "upper", "lower"]
-          }
+            required: ["mid", "upper", "lower", "width", "position"]
+          },
+          volume_analysis: { type: "string", description: "Volume and order flow analysis" }
         },
-        required: ["ema20", "ema50", "ema200", "rsi14", "macd", "atr14", "bb"]
+        required: ["ema20", "ema50", "ema200", "rsi14", "rsi_divergence", "macd", "atr14", "bb", "volume_analysis"]
+      },
+      quantitative_metrics: {
+        type: "object",
+        properties: {
+          volatility_percentile: { type: "number" },
+          trend_strength: { type: "number", minimum: 0, maximum: 100 },
+          momentum_score: { type: "number", minimum: -100, maximum: 100 },
+          mean_reversion_probability: { type: "number", minimum: 0, maximum: 100 },
+          breakout_probability: { type: "number", minimum: 0, maximum: 100 }
+        },
+        required: ["volatility_percentile", "trend_strength", "momentum_score", "mean_reversion_probability", "breakout_probability"]
       },
       confidence_model: { type: "number", minimum: 0, maximum: 100 },
       confidence_calibrated: { type: "number", minimum: 0, maximum: 100 },
-      evidence: { type: "array", items: { type: "string" } },
-      risks: { type: "string" },
+      evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence for analysis" },
+      risks: { type: "string", description: "Risk assessment and mitigation strategies" },
       timeframe_profile: {
         type: "object",
         properties: {
@@ -142,27 +227,33 @@ const InstitutionalTaResultSchema = {
             properties: {
               entry: { type: "number" },
               stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } }
+              targets: { type: "array", items: { type: "number" } },
+              strategy: { type: "string" },
+              probability: { type: "number" }
             },
-            required: ["entry", "stop", "targets"]
+            required: ["entry", "stop", "targets", "strategy", "probability"]
           },
           intraday: {
             type: "object",
             properties: {
               entry: { type: "number" },
               stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } }
+              targets: { type: "array", items: { type: "number" } },
+              strategy: { type: "string" },
+              probability: { type: "number" }
             },
-            required: ["entry", "stop", "targets"]
+            required: ["entry", "stop", "targets", "strategy", "probability"]
           },
           swing: {
             type: "object",
             properties: {
               entry: { type: "number" },
               stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } }
+              targets: { type: "array", items: { type: "number" } },
+              strategy: { type: "string" },
+              probability: { type: "number" }
             },
-            required: ["entry", "stop", "targets"]
+            required: ["entry", "stop", "targets", "strategy", "probability"]
           }
         },
         required: ["scalp", "intraday", "swing"]
@@ -170,9 +261,9 @@ const InstitutionalTaResultSchema = {
       json_version: { type: "string" }
     },
     required: [
-      "summary", "action", "action_text", "outlook", "levels", "fibonacci", 
-      "trade_idea", "technical", "confidence_model", "confidence_calibrated", 
-      "evidence", "risks", "timeframe_profile", "json_version"
+      "summary", "action", "action_text", "outlook", "market_structure", "levels", "fibonacci", 
+      "trading_strategies", "trade_idea", "technical", "quantitative_metrics", 
+      "confidence_model", "confidence_calibrated", "evidence", "risks", "timeframe_profile", "json_version"
     ]
   }
 };
@@ -232,75 +323,85 @@ serve(async (req) => {
 
     const client = new OpenAI({ apiKey: openaiApiKey });
 
-    // Create deterministic analysis prompt
-    const deterministicPrompt = `You are an institutional-grade technical analysis engine using STRICT deterministic rules.
-
-CRITICAL INSTRUCTIONS:
-- Use ONLY the provided numerical data
-- Apply rules in EXACT order specified
-- Return ONLY JSON matching the function schema
-- Round all prices to 5 decimal places
-- Use temperature=0 and top_p=0 for consistency
+    // Create comprehensive institutional analysis prompt
+    const comprehensivePrompt = `You are an elite institutional trading desk providing multi-strategy quantitative analysis.
 
 MARKET DATA:
-Symbol: ${symbol}
-Timeframe: ${timeframe}
-Market: ${market}
+Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
 
-FEATURES:
+TECHNICAL FEATURES:
 ${JSON.stringify(features, null, 2)}
 
-NEWS RISK:
+NEWS/EVENT CONTEXT:
 ${JSON.stringify(news || { event_risk: false, headline_hits_30m: 0 }, null, 2)}
 
-DETERMINISTIC RULE ORDER (apply sequentially):
+ANALYSIS REQUIREMENTS - Provide COMPREHENSIVE institutional-grade analysis covering:
 
-1. TREND ANALYSIS:
-   - Bullish: ema20 > ema50 > ema200
-   - Bearish: ema20 < ema50 < ema200
-   - Neutral: Otherwise
+1. MARKET STRUCTURE ANALYSIS:
+   - Identify trend direction using EMAs (20/50/200 alignment)
+   - Market phase: Trending, Range-bound, Consolidation, Breakout
+   - Volatility regime: Low/Normal/High based on ATR percentiles
+   - Session analysis and liquidity considerations
 
-2. MOMENTUM GATES:
-   - RSI: Overbought ≥70, Oversold ≤30
-   - MACD: Bullish >+0.00005, Bearish <-0.00005
-   - If atr_percentile_60d ≥0.8: multiply MACD thresholds by 1.5
+2. QUANTITATIVE TECHNICAL ANALYSIS:
+   - RSI divergence patterns and momentum shifts
+   - MACD crossovers, histogram strength, and signal quality
+   - Bollinger Band position and squeeze/expansion signals
+   - VWAP deviation and mean reversion probabilities
+   - Volume profile and institutional order flow analysis
 
-3. VWAP/BB BIAS:
-   - Above VWAP & BB mid: Bullish bias
-   - Below both: Bearish bias
+3. FIBONACCI RETRACEMENT ANALYSIS:
+   - Calculate precise Fibonacci levels from significant swing high/low
+   - Identify key retracement zones (23.6%, 38.2%, 50%, 61.8%, 78.6%)
+   - Extension targets (127.2%, 161.8%) for breakout scenarios
+   - Confluence with other technical levels
 
-4. LEVEL PROXIMITY (within 0.15×ATR):
-   - Near support: |current - nearest_support| ≤ 0.15×atr14
-   - Near resistance: |current - nearest_resistance| ≤ 0.15×atr14
+4. MULTIPLE STRATEGY ASSESSMENT:
+   
+   A) TREND FOLLOWING STRATEGY:
+      - EMA alignment and momentum confirmation
+      - Breakout setups above resistance with volume
+      - Pullback entries to moving averages in trends
+      
+   B) MEAN REVERSION STRATEGY:
+      - Oversold/overbought conditions (RSI extremes)
+      - Bollinger Band touch reversals
+      - VWAP mean reversion trades
+      
+   C) MOMENTUM STRATEGY:
+      - MACD bullish/bearish crossovers
+      - RSI breakouts above 70 or below 30
+      - Volume confirmation on directional moves
+      
+   D) RANGE TRADING STRATEGY:
+      - Support/resistance level trades
+      - Range-bound oscillator signals
+      - Mean reversion within established ranges
 
-5. SESSION/VOLATILITY FILTERS:
-   - Asia session + low ATR percentile (≤0.2): Suppress breakouts → HOLD
-   - High spread percentile (≥0.8) or stale=true: → HOLD
+5. MULTI-TIMEFRAME ANALYSIS:
+   - Scalp (1-15min): Quick momentum plays, level bounces
+   - Intraday (30min-4h): Session-based trades, pattern completions  
+   - Swing (daily+): Multi-day position trades, trend following
 
-6. ORDER FLOW FILTERS:
-   - quote_imbalance <0.35 (against buys) or >0.65 (against sells): → HOLD
+6. RISK-REWARD SCENARIOS:
+   - Calculate precise stop-loss levels using ATR multiples
+   - Multiple profit targets with percentage allocations
+   - Position sizing recommendations based on volatility
+   - Worst-case and best-case scenario probabilities
 
-7. NEWS RISK GATE:
-   - event_risk=true: → HOLD
+7. QUANTITATIVE EDGE ANALYSIS:
+   - Probability estimates for directional moves
+   - Expected value calculations for trade setups
+   - Historical win rates for similar market conditions
+   - Risk-adjusted return expectations
 
-8. SIGNAL DECISION:
-   - BUY: (trend not bearish) AND (MACD bullish OR RSI ≤35) AND near_support
-   - SELL: (trend not bullish) AND (MACD bearish OR RSI ≥65) AND near_resistance
-   - HOLD: Otherwise
+8. INSTITUTIONAL PERSPECTIVE:
+   - Smart money flow indicators
+   - Level significance and institutional interest
+   - Market maker positioning insights
+   - Liquidity and slippage considerations
 
-9. STOPS/TARGETS (mandatory):
-   - BUY stop: min(support) - 0.25×atr14
-   - SELL stop: max(resistance) + 0.25×atr14
-   - Targets: current ± {1×atr14, 2×atr14} in trade direction
-   - If RR to Target1 < 1.5: Override to HOLD
-
-10. CONFIDENCE CALCULATION:
-    - Start: 50
-    - +10 per confluence (trend+momentum+level alignment)
-    - -10 for conflicts, -15 for high ATR
-    - Cap at 88
-
-Apply these rules EXACTLY as specified. Generate Fibonacci levels from recent swing highs/lows.`;
+PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, and multiple profit targets for each viable strategy. Include confidence intervals and probability assessments for each recommendation.`;
 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
@@ -313,7 +414,7 @@ Apply these rules EXACTLY as specified. Generate Fibonacci levels from recent sw
         },
         { 
           role: "user", 
-          content: deterministicPrompt 
+          content: comprehensivePrompt 
         }
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],

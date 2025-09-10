@@ -10,40 +10,93 @@ interface InstitutionalAnalysis {
   action: 'buy' | 'sell' | 'hold';
   action_text: string;
   outlook: 'bullish' | 'bearish' | 'neutral';
-  levels: { support: number[]; resistance: number[]; vwap?: number | null };
+  market_structure?: {
+    trend_direction: 'strong_bullish' | 'bullish' | 'neutral' | 'bearish' | 'strong_bearish';
+    market_phase: 'trending' | 'range_bound' | 'consolidation' | 'breakout';
+    volatility_regime: 'low' | 'normal' | 'high' | 'extreme';
+    session_context: string;
+  };
+  levels: { 
+    support: number[]; 
+    resistance: number[]; 
+    vwap?: number | null;
+    pivot_points?: number[];
+  };
   fibonacci: {
     pivot_high: number; pivot_low: number;
     retracements: { "23.6": number; "38.2": number; "50.0": number; "61.8": number; "78.6": number; };
-    extensions: { "127.2": number; "161.8": number; };
+    extensions: { "127.2": number; "161.8": number; "261.8"?: number; };
     direction: 'up' | 'down';
+    confluence_zones?: string[];
+  };
+  trading_strategies?: {
+    trend_following: StrategySetup;
+    mean_reversion: StrategySetup;
+    momentum: StrategySetup;
+    range_trading: StrategySetup;
   };
   trade_idea: {
     direction: 'long' | 'short' | 'none';
     entry: number; stop: number; targets: number[];
+    target_probabilities?: number[];
     rationale: string;
     time_horizon: 'scalp' | 'intraday' | 'swing' | 'position';
-    setup_type: 'breakout' | 'pullback' | 'mean_reversion' | 'range' | 'other';
+    setup_type: 'breakout' | 'pullback' | 'mean_reversion' | 'range' | 'momentum' | 'trend_continuation' | 'other';
     rr_estimate: number;
+    expected_value?: number;
   };
   technical: {
     ema20: number; ema50: number; ema200: number;
     rsi14: number;
-    macd: { line: number; signal: number; hist: number };
+    rsi_divergence?: string;
+    macd: { 
+      line: number; signal: number; hist: number;
+      analysis?: string;
+    };
     atr14: number;
-    bb: { mid: number; upper: number; lower: number };
+    bb: { 
+      mid: number; upper: number; lower: number;
+      width?: number;
+      position?: string;
+    };
+    volume_analysis?: string;
+  };
+  quantitative_metrics?: {
+    volatility_percentile: number;
+    trend_strength: number;
+    momentum_score: number;
+    mean_reversion_probability: number;
+    breakout_probability: number;
   };
   confidence_model: number;
   confidence_calibrated: number;
   evidence: string[];
   risks: string;
   timeframe_profile: {
-    scalp: { entry: number; stop: number; targets: number[] };
-    intraday: { entry: number; stop: number; targets: number[] };
-    swing: { entry: number; stop: number; targets: number[] };
+    scalp: TimeframeSetup;
+    intraday: TimeframeSetup;
+    swing: TimeframeSetup;
   };
   analyzed_at?: string;
   json_version?: string;
   _inputs?: { technical_used?: { lastClose?: number } };
+}
+
+interface StrategySetup {
+  setup_quality: 'excellent' | 'good' | 'fair' | 'poor' | 'invalid';
+  entry: number;
+  stop: number;
+  targets: number[];
+  probability: number;
+  rationale: string;
+}
+
+interface TimeframeSetup {
+  entry: number;
+  stop: number;
+  targets: number[];
+  strategy?: string;
+  probability?: number;
 }
 
 /* ---------- Safe helpers ---------- */
@@ -89,6 +142,7 @@ export function AiResult({ data }: { data: any }) {
       default:     return "bg-yellow-500 text-white hover:bg-yellow-600";
     }
   };
+  
   const getActionIcon = (action?: string) => {
     switch (action) {
       case "buy":  return <TrendingUp className="h-4 w-4" />;
@@ -96,12 +150,25 @@ export function AiResult({ data }: { data: any }) {
       default:     return <Minus className="h-4 w-4" />;
     }
   };
+  
   const formatPrice = (p: unknown) => safeNum(p, 4, "0.0000");
 
   const supports = Array.isArray(analysis?.levels?.support) ? analysis.levels.support : [];
   const resistances = Array.isArray(analysis?.levels?.resistance) ? analysis.levels.resistance : [];
+  const pivots = Array.isArray(analysis?.levels?.pivot_points) ? analysis.levels.pivot_points : [];
   const vwap = analysis?.levels?.vwap ?? null;
   const currentPrice = (data?._inputs?.technical_used?.lastClose as number) ?? undefined;
+
+  const getQualityColor = (quality?: string) => {
+    switch (quality) {
+      case "excellent": return "bg-green-600 text-white";
+      case "good": return "bg-green-500 text-white";
+      case "fair": return "bg-yellow-500 text-white";
+      case "poor": return "bg-orange-500 text-white";
+      case "invalid": return "bg-red-500 text-white";
+      default: return "bg-gray-500 text-white";
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -136,17 +203,144 @@ export function AiResult({ data }: { data: any }) {
         </CardContent>
       </Card>
 
-      {/* Trade Setup */}
+      {/* Market Structure Analysis */}
+      {analysis?.market_structure && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Market Structure Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">TREND</p>
+                <Badge variant="outline" className="mt-1">
+                  {safeUpper(analysis.market_structure.trend_direction?.replace('_', ' '))}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">PHASE</p>
+                <Badge variant="outline" className="mt-1">
+                  {safeUpper(analysis.market_structure.market_phase?.replace('_', ' '))}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">VOLATILITY</p>
+                <Badge variant="outline" className="mt-1">
+                  {safeUpper(analysis.market_structure.volatility_regime)}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">SESSION</p>
+                <p className="text-xs mt-1">{safeText(analysis.market_structure.session_context)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quantitative Metrics */}
+      {analysis?.quantitative_metrics && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Quantitative Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+              <div>
+                <p className="font-medium">Volatility %ile</p>
+                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.volatility_percentile, 1)}%</p>
+              </div>
+              <div>
+                <p className="font-medium">Trend Strength</p>
+                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.trend_strength, 0)}/100</p>
+              </div>
+              <div>
+                <p className="font-medium">Momentum</p>
+                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.momentum_score, 0)}</p>
+              </div>
+              <div>
+                <p className="font-medium">Mean Rev %</p>
+                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.mean_reversion_probability, 0)}%</p>
+              </div>
+              <div>
+                <p className="font-medium">Breakout %</p>
+                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.breakout_probability, 0)}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Trading Strategies */}
+      {analysis?.trading_strategies && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Multiple Strategy Analysis
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {Object.entries(analysis.trading_strategies).map(([strategyName, strategy]: [string, any]) => (
+              <div key={strategyName} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium capitalize">{strategyName.replace('_', ' ')} Strategy</h4>
+                  <div className="flex items-center gap-2">
+                    <Badge className={getQualityColor(strategy?.setup_quality)}>
+                      {safeUpper(strategy?.setup_quality)}
+                    </Badge>
+                    <Badge variant="outline">
+                      {safeNum(strategy?.probability, 0)}% Prob
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">ENTRY</p>
+                    <p className="font-mono text-xs">{formatPrice(strategy?.entry)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">STOP</p>
+                    <p className="font-mono text-xs text-red-600">{formatPrice(strategy?.stop)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">TARGETS</p>
+                    <p className="font-mono text-xs text-green-600">
+                      {Array.isArray(strategy?.targets) && strategy.targets.length
+                        ? strategy.targets.map((t: any) => formatPrice(t)).join(", ")
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground">R:R</p>
+                    <p className="font-mono text-xs">{strategy?.targets?.[0] && strategy?.stop && strategy?.entry ? 
+                      safeNum(Math.abs(strategy.targets[0] - strategy.entry) / Math.abs(strategy.entry - strategy.stop), 1) : "—"}:1</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">{safeText(strategy?.rationale)}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Enhanced Trade Setup */}
       {analysis?.trade_idea?.direction !== "none" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-4 w-4" />
-              Trade Setup — {safeUpper(analysis?.trade_idea?.setup_type?.replace?.("_", " "))}
+              Primary Trade Setup — {safeUpper(analysis?.trade_idea?.setup_type?.replace?.("_", " "))}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div>
                 <p className="text-xs font-medium text-muted-foreground">ENTRY</p>
                 <p className="font-mono text-sm">{formatPrice(analysis?.trade_idea?.entry)}</p>
@@ -156,7 +350,7 @@ export function AiResult({ data }: { data: any }) {
                 <p className="font-mono text-sm text-red-600">{formatPrice(analysis?.trade_idea?.stop)}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-muted-foreground">TARGET</p>
+                <p className="text-xs font-medium text-muted-foreground">TARGETS</p>
                 <p className="font-mono text-sm text-green-600">
                   {Array.isArray(analysis?.trade_idea?.targets) && analysis.trade_idea.targets.length
                     ? analysis.trade_idea.targets.map((t) => formatPrice(t)).join(", ")
@@ -167,7 +361,23 @@ export function AiResult({ data }: { data: any }) {
                 <p className="text-xs font-medium text-muted-foreground">R:R</p>
                 <p className="font-mono text-sm">{safeNum(analysis?.trade_idea?.rr_estimate, 1, "—")}:1</p>
               </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">EV</p>
+                <p className="font-mono text-sm">{safeNum(analysis?.trade_idea?.expected_value, 2, "—")}</p>
+              </div>
             </div>
+            {analysis?.trade_idea?.target_probabilities && (
+              <div className="mt-3">
+                <p className="text-xs font-medium text-muted-foreground mb-1">TARGET PROBABILITIES</p>
+                <div className="flex gap-2 text-xs">
+                  {analysis.trade_idea.target_probabilities.map((prob: number, idx: number) => (
+                    <Badge key={idx} variant="outline">
+                      T{idx + 1}: {safeNum(prob, 0)}%
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-1">RATIONALE</p>
               <p className="text-sm">{safeText(analysis?.trade_idea?.rationale)}</p>
@@ -181,7 +391,7 @@ export function AiResult({ data }: { data: any }) {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Technical Indicators */}
+        {/* Enhanced Technical Indicators */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -204,14 +414,39 @@ export function AiResult({ data }: { data: any }) {
               <div><p className="font-medium">BB Mid</p><p className="font-mono text-xs">{formatPrice(analysis?.technical?.bb?.mid)}</p></div>
               <div><p className="font-medium">BB Upper</p><p className="font-mono text-xs">{formatPrice(analysis?.technical?.bb?.upper)}</p></div>
               <div><p className="font-medium">BB Lower</p><p className="font-mono text-xs">{formatPrice(analysis?.technical?.bb?.lower)}</p></div>
-              <div><p className="font-medium">VWAP (30)</p><p className="font-mono text-xs">{vwap === null || vwap === undefined ? "—" : formatPrice(vwap)}</p></div>
+              <div><p className="font-medium">BB Width</p><p className="font-mono text-xs">{safeNum(analysis?.technical?.bb?.width, 4, "—")}</p></div>
+              <div><p className="font-medium">VWAP</p><p className="font-mono text-xs">{vwap === null || vwap === undefined ? "—" : formatPrice(vwap)}</p></div>
             </div>
+            {analysis?.technical?.rsi_divergence && (
+              <div className="mt-3 p-2 bg-muted rounded">
+                <p className="text-xs font-medium">RSI Analysis:</p>
+                <p className="text-xs text-muted-foreground">{analysis.technical.rsi_divergence}</p>
+              </div>
+            )}
+            {analysis?.technical?.macd?.analysis && (
+              <div className="mt-3 p-2 bg-muted rounded">
+                <p className="text-xs font-medium">MACD Analysis:</p>
+                <p className="text-xs text-muted-foreground">{analysis.technical.macd.analysis}</p>
+              </div>
+            )}
+            {analysis?.technical?.bb?.position && (
+              <div className="mt-3 p-2 bg-muted rounded">
+                <p className="text-xs font-medium">Bollinger Band Position:</p>
+                <p className="text-xs text-muted-foreground">{analysis.technical.bb.position}</p>
+              </div>
+            )}
+            {analysis?.technical?.volume_analysis && (
+              <div className="mt-3 p-2 bg-muted rounded">
+                <p className="text-xs font-medium">Volume & Order Flow:</p>
+                <p className="text-xs text-muted-foreground">{analysis.technical.volume_analysis}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Key Levels & Fibonacci */}
+        {/* Enhanced Key Levels & Fibonacci */}
         <Card>
-          <CardHeader><CardTitle>Key Levels & Fibonacci</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Enhanced Levels & Fibonacci</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -227,9 +462,17 @@ export function AiResult({ data }: { data: any }) {
                 </p>
               </div>
               {(vwap !== null && vwap !== undefined) && (
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-2">
                   <p className="font-medium text-sm">VWAP</p>
                   <p className="font-mono text-xs text-blue-600">{formatPrice(vwap)}</p>
+                </div>
+              )}
+              {(pivots.length > 0) && (
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-medium text-sm">Daily Pivots</p>
+                  <p className="font-mono text-xs text-purple-600">
+                    {pivots.map((p) => formatPrice(p)).join(", ")}
+                  </p>
                 </div>
               )}
             </div>
@@ -238,7 +481,7 @@ export function AiResult({ data }: { data: any }) {
 
             <div>
               <p className="font-medium text-sm mb-2">
-                Fibonacci ({safeUpper(analysis?.fibonacci?.direction)})
+                Fibonacci Analysis ({safeUpper(analysis?.fibonacci?.direction)})
               </p>
               <div className="space-y-1 text-xs">
                 <div className="grid grid-cols-2 gap-2">
@@ -258,8 +501,21 @@ export function AiResult({ data }: { data: any }) {
                   <div className="grid grid-cols-2 gap-1 font-mono">
                     <div>127.2%: {formatPrice(analysis?.fibonacci?.extensions?.["127.2"])}</div>
                     <div>161.8%: {formatPrice(analysis?.fibonacci?.extensions?.["161.8"])}</div>
+                    {analysis?.fibonacci?.extensions?.["261.8"] && (
+                      <div>261.8%: {formatPrice(analysis?.fibonacci?.extensions?.["261.8"])}</div>
+                    )}
                   </div>
                 </div>
+                {analysis?.fibonacci?.confluence_zones && analysis.fibonacci.confluence_zones.length > 0 && (
+                  <div className="mt-3 p-2 bg-muted rounded">
+                    <p className="font-medium mb-1">Key Confluence Zones:</p>
+                    <div className="space-y-1">
+                      {analysis.fibonacci.confluence_zones.map((zone, idx) => (
+                        <p key={idx} className="text-xs text-muted-foreground">• {zone}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -304,15 +560,20 @@ export function AiResult({ data }: { data: any }) {
         </Card>
       </div>
 
-      {/* Timeframe Profiles */}
+      {/* Enhanced Timeframe Profiles */}
       {analysis?.timeframe_profile && (
         <Card>
-          <CardHeader><CardTitle>Multi-Timeframe Analysis</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Enhanced Multi-Timeframe Analysis</CardTitle></CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {Object.entries(analysis.timeframe_profile).map(([tf, profile]: any) => (
-                <div key={tf} className="space-y-2">
-                  <h4 className="font-medium text-sm capitalize">{tf}</h4>
+                <div key={tf} className="space-y-2 border rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm capitalize">{tf}</h4>
+                    {profile?.probability && (
+                      <Badge variant="outline">{safeNum(profile.probability, 0)}%</Badge>
+                    )}
+                  </div>
                   <div className="text-xs space-y-1 font-mono">
                     <div>Entry: {formatPrice(profile?.entry)}</div>
                     <div>Stop: {formatPrice(profile?.stop)}</div>
@@ -320,6 +581,9 @@ export function AiResult({ data }: { data: any }) {
                       ? profile.targets.map((t: any) => formatPrice(t)).join(", ")
                       : "—"}</div>
                   </div>
+                  {profile?.strategy && (
+                    <p className="text-xs text-muted-foreground">Strategy: {profile.strategy}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -328,7 +592,7 @@ export function AiResult({ data }: { data: any }) {
       )}
 
       <div className="text-xs text-muted-foreground text-center">
-        Institutional Analysis • Version {safeText((data as any)?.json_version, "1.0.0")} • Generated: {new Date().toLocaleString()}
+        Comprehensive Institutional Analysis • Version {safeText((data as any)?.json_version, "2.0.0")} • Generated: {new Date().toLocaleString()}
       </div>
     </div>
   );
