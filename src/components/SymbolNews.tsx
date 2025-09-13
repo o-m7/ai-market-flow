@@ -27,6 +27,35 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Trusted news sources whitelist
+  const TRUSTED_SOURCES = new Set([
+    'Reuters',
+    'Bloomberg',
+    'MarketWatch', 
+    'Wall Street Journal',
+    'Financial Times',
+    'CNBC',
+    'Yahoo Finance',
+    'Investopedia',
+    'CoinDesk',
+    'Cointelegraph',
+    'The Block',
+    'Decrypt',
+    'Forbes',
+    'Fortune',
+    'Business Insider',
+    'Associated Press',
+    'newsBTC',
+    'Bitcoinist',
+    'U.Today',
+    'CryptoSlate',
+    'Barchart.com',
+    'Seeking Alpha',
+    'TradingView',
+    'Benzinga',
+    'Zacks Investment Research'
+  ]);
+
   useEffect(() => {
     const fetchNews = async () => {
       if (!symbol) return;
@@ -48,7 +77,16 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
 
         if (error) throw error;
         
-        setNews(data?.articles || []);
+        // Filter articles from trusted sources only
+        const allArticles = data?.articles || [];
+        const trustedArticles = allArticles.filter((article: any) => {
+          const sourceName = typeof article.source === 'string' 
+            ? article.source 
+            : article.source?.name || 'Unknown';
+          return TRUSTED_SOURCES.has(sourceName);
+        });
+        
+        setNews(trustedArticles);
       } catch (err) {
         console.error('Error fetching news:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch news');
@@ -133,7 +171,7 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No recent news found for {symbol}</p>
+          <p className="text-sm text-muted-foreground">No recent news found from trusted sources for {symbol}</p>
         </CardContent>
       </Card>
     );
@@ -144,8 +182,8 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Newspaper className="h-4 w-4" />
-          Market News - {symbol}
-          <Badge variant="secondary">{news.length} articles</Badge>
+          Trusted Market News - {symbol}
+          <Badge variant="secondary">{news.length} verified articles</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
