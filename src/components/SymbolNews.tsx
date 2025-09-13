@@ -153,7 +153,7 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
           <div key={typeof article.id === 'string' ? article.id : index} className="border rounded-lg p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <h3 className="font-medium text-sm leading-tight flex-1">
-                {article.title}
+                {typeof article.title === 'string' ? article.title : 'No title'}
               </h3>
               {article.image_url && (
                 <img 
@@ -168,7 +168,7 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
               <Clock className="h-3 w-3" />
               <span>{formatTimeAgo(article.published_at)}</span>
               <span>•</span>
-              <span>{article.source}</span>
+              <span>{typeof article.source === 'string' ? article.source : 'Unknown source'}</span>
               {article.relevance_score && (
                 <>
                   <span>•</span>
@@ -177,14 +177,14 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
                   </Badge>
                 </>
               )}
-              {article.sentiment && (
+              {article.sentiment && typeof article.sentiment === 'string' && (
                 <Badge variant="outline" className={`text-xs ${getSentimentColor(article.sentiment)}`}>
                   {article.sentiment}
                 </Badge>
               )}
             </div>
 
-            {article.content && (
+            {article.content && typeof article.content === 'string' && (
               <p className="text-sm text-muted-foreground line-clamp-2">
                 {article.content.substring(0, 150)}...
               </p>
