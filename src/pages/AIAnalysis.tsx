@@ -454,7 +454,7 @@ export const AIAnalysis = () => {
         {/* AI Analysis Results */}
         {analysis && (
           <div className="mt-8">
-            <AiResult data={analysis} />
+            <AiResult data={analysis} symbol={symbol} />
           </div>
         )}
 

@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { TrendingUp, TrendingDown, Minus, Target, Shield, Brain, BarChart3, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Target, Shield, Brain, BarChart3, Activity, Calculator } from "lucide-react";
+import { SymbolNews } from "@/components/SymbolNews";
 
 interface InstitutionalAnalysis {
   summary: string;
@@ -109,7 +110,12 @@ const safeNum   = (v: unknown, digits = 4, fb = "—") => {
 const isInstitutionalShape = (d: any) =>
   d && typeof d === "object" && !("error" in d) && d.fibonacci && d.technical && typeof d.confidence_calibrated !== "undefined";
 
-export function AiResult({ data }: { data: any }) {
+interface AiResultProps {
+  data: any;
+  symbol?: string;
+}
+
+export function AiResult({ data, symbol }: AiResultProps) {
   if (!data) return null;
 
   const isInstitutional = isInstitutionalShape(data);
@@ -241,36 +247,124 @@ export function AiResult({ data }: { data: any }) {
         </Card>
       )}
 
-      {/* Quantitative Metrics */}
+      {/* Enhanced Quantitative Analysis */}
       {analysis?.quantitative_metrics && (
-        <Card>
+        <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Quantitative Analysis
+              <Calculator className="h-5 w-5 text-primary" />
+              Advanced Quantitative Analysis
+              <Badge variant="outline" className="ml-auto bg-primary/10 text-primary border-primary/30">
+                Statistical Edge
+              </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-              <div>
-                <p className="font-medium">Volatility %ile</p>
-                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.volatility_percentile, 1)}%</p>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="text-center p-3 bg-card rounded-lg border">
+                <p className="text-xs font-medium text-muted-foreground mb-1">VOLATILITY PERCENTILE</p>
+                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.volatility_percentile, 1)}%</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {Number(analysis.quantitative_metrics.volatility_percentile) > 75 ? "High Vol Regime" :
+                   Number(analysis.quantitative_metrics.volatility_percentile) < 25 ? "Low Vol Regime" : "Normal Vol"}
+                </p>
               </div>
-              <div>
-                <p className="font-medium">Trend Strength</p>
-                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.trend_strength, 0)}/100</p>
+              <div className="text-center p-3 bg-card rounded-lg border">
+                <p className="text-xs font-medium text-muted-foreground mb-1">TREND STRENGTH</p>
+                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.trend_strength, 0)}/100</p>
+                <div className="w-full bg-muted rounded-full h-2 mt-2">
+                  <div 
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, Math.max(0, Number(analysis.quantitative_metrics.trend_strength) || 0))}%` }}
+                  />
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Momentum</p>
-                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.momentum_score, 0)}</p>
+              <div className="text-center p-3 bg-card rounded-lg border">
+                <p className="text-xs font-medium text-muted-foreground mb-1">MOMENTUM SCORE</p>
+                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.momentum_score, 0)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {Number(analysis.quantitative_metrics.momentum_score) > 0 ? "Bullish Momentum" : 
+                   Number(analysis.quantitative_metrics.momentum_score) < 0 ? "Bearish Momentum" : "Neutral"}
+                </p>
               </div>
-              <div>
-                <p className="font-medium">Mean Rev %</p>
-                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.mean_reversion_probability, 0)}%</p>
+              <div className="text-center p-3 bg-card rounded-lg border">
+                <p className="text-xs font-medium text-muted-foreground mb-1">MEAN REVERSION %</p>
+                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.mean_reversion_probability, 0)}%</p>
+                <div className="w-full bg-muted rounded-full h-2 mt-2">
+                  <div 
+                    className="bg-orange-500 h-2 rounded-full transition-all"
+                    style={{ width: `${Number(analysis.quantitative_metrics.mean_reversion_probability) || 0}%` }}
+                  />
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Breakout %</p>
-                <p className="font-mono text-xs">{safeNum(analysis.quantitative_metrics.breakout_probability, 0)}%</p>
+              <div className="text-center p-3 bg-card rounded-lg border">
+                <p className="text-xs font-medium text-muted-foreground mb-1">BREAKOUT PROBABILITY</p>
+                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.breakout_probability, 0)}%</p>
+                <div className="w-full bg-muted rounded-full h-2 mt-2">
+                  <div 
+                    className="bg-green-500 h-2 rounded-full transition-all"
+                    style={{ width: `${Number(analysis.quantitative_metrics.breakout_probability) || 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Statistical Profile
+                </h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span>Market Regime:</span>
+                    <span className="font-mono">
+                      {Number(analysis.quantitative_metrics.volatility_percentile) > 75 ? "High Volatility" :
+                       Number(analysis.quantitative_metrics.volatility_percentile) < 25 ? "Low Volatility" : "Normal"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Trend Quality:</span>
+                    <span className="font-mono">
+                      {Number(analysis.quantitative_metrics.trend_strength) > 70 ? "Strong" :
+                       Number(analysis.quantitative_metrics.trend_strength) > 40 ? "Moderate" : "Weak"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Price Action:</span>
+                    <span className="font-mono">
+                      {Number(analysis.quantitative_metrics.momentum_score) > 50 ? "Momentum Driven" : 
+                       Number(analysis.quantitative_metrics.mean_reversion_probability) > 60 ? "Mean Reverting" : "Mixed"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Trading Edge Metrics
+                </h4>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span>Breakout Edge:</span>
+                    <span className={`font-mono ${Number(analysis.quantitative_metrics.breakout_probability) > 60 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      {Number(analysis.quantitative_metrics.breakout_probability) > 60 ? 'Favorable' : 'Neutral'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Reversion Edge:</span>
+                    <span className={`font-mono ${Number(analysis.quantitative_metrics.mean_reversion_probability) > 60 ? 'text-orange-600' : 'text-muted-foreground'}`}>
+                      {Number(analysis.quantitative_metrics.mean_reversion_probability) > 60 ? 'Favorable' : 'Neutral'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Trend Edge:</span>
+                    <span className={`font-mono ${Number(analysis.quantitative_metrics.trend_strength) > 60 ? 'text-blue-600' : 'text-muted-foreground'}`}>
+                      {Number(analysis.quantitative_metrics.trend_strength) > 60 ? 'Favorable' : 'Neutral'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -590,6 +684,9 @@ export function AiResult({ data }: { data: any }) {
           </CardContent>
         </Card>
       )}
+
+      {/* Symbol-Specific News Section */}
+      {symbol && <SymbolNews symbol={symbol} />}
 
       <div className="text-xs text-muted-foreground text-center">
         Comprehensive Institutional Analysis • Version {safeText((data as any)?.json_version, "2.0.0")} • Generated: {new Date().toLocaleString()}
