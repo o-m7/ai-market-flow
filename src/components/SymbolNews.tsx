@@ -150,7 +150,7 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {news.map((article, index) => (
-          <div key={article.id || index} className="border rounded-lg p-4 space-y-3">
+          <div key={typeof article.id === 'string' ? article.id : index} className="border rounded-lg p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <h3 className="font-medium text-sm leading-tight flex-1">
                 {article.title}
