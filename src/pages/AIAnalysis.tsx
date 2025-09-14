@@ -246,7 +246,8 @@ export const AIAnalysis = () => {
         confidence_model: result.confidence_model,
         confidence_calibrated: result.confidence_calibrated,
         evidence: result.evidence,
-        timeframe_profile: result.timeframe_profile
+        timeframe_profile: result.timeframe_profile,
+        quantitative_metrics: result.quantitative_metrics
       };
 
       setAnalysis(analysisForDisplay);
