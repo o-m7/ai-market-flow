@@ -538,6 +538,68 @@ export function AiResult({ data, symbol }: AiResultProps) {
           </CardContent>
         </Card>
 
+        {/* Quantitative Analysis Block */}
+        {analysis?.quantitative_metrics && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calculator className="h-4 w-4" />
+                Quantitative Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">VOLATILITY</p>
+                  <p className="font-mono text-sm font-semibold">{safeNum(analysis.quantitative_metrics.volatility_percentile, 1)}%</p>
+                  <p className="text-xs text-muted-foreground">
+                    {Number(analysis.quantitative_metrics.volatility_percentile) > 75 ? "High" :
+                     Number(analysis.quantitative_metrics.volatility_percentile) < 25 ? "Low" : "Normal"}
+                  </p>
+                </div>
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">TREND</p>
+                  <p className="font-mono text-sm font-semibold">{safeNum(analysis.quantitative_metrics.trend_strength, 0)}/100</p>
+                  <div className="w-full bg-muted rounded-full h-1 mt-1">
+                    <div 
+                      className="bg-primary h-1 rounded-full transition-all"
+                      style={{ width: `${Math.min(100, Math.max(0, Number(analysis.quantitative_metrics.trend_strength) || 0))}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">MOMENTUM</p>
+                  <p className="font-mono text-sm font-semibold">{safeNum(analysis.quantitative_metrics.momentum_score, 0)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {Number(analysis.quantitative_metrics.momentum_score) > 0 ? "Bullish" : 
+                     Number(analysis.quantitative_metrics.momentum_score) < 0 ? "Bearish" : "Neutral"}
+                  </p>
+                </div>
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">MEAN REV</p>
+                  <p className="font-mono text-sm font-semibold">{safeNum(analysis.quantitative_metrics.mean_reversion_probability, 0)}%</p>
+                  <div className="w-full bg-muted rounded-full h-1 mt-1">
+                    <div 
+                      className="bg-orange-500 h-1 rounded-full transition-all"
+                      style={{ width: `${Number(analysis.quantitative_metrics.mean_reversion_probability) || 0}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">BREAKOUT</p>
+                  <p className="font-mono text-sm font-semibold">{safeNum(analysis.quantitative_metrics.breakout_probability, 0)}%</p>
+                  <div className="w-full bg-muted rounded-full h-1 mt-1">
+                    <div 
+                      className="bg-green-500 h-1 rounded-full transition-all"
+                      style={{ width: `${Number(analysis.quantitative_metrics.breakout_probability) || 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Enhanced Key Levels & Fibonacci */}
         <Card>
           <CardHeader><CardTitle>Enhanced Levels & Fibonacci</CardTitle></CardHeader>
