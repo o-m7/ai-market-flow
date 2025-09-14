@@ -11,7 +11,7 @@ interface NewsItem {
   title: string;
   content: string;
   url: string;
-  source: string;
+  source: string | { name: string; id?: string };
   published_at: string;
   sentiment?: string;
   relevance_score?: number;
@@ -77,13 +77,23 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
 
         if (error) throw error;
         
-        // Filter articles from trusted sources only
+        // Filter articles from trusted sources only - strict filtering
         const allArticles = data?.articles || [];
         const trustedArticles = allArticles.filter((article: any) => {
-          const sourceName = typeof article.source === 'string' 
-            ? article.source 
-            : article.source?.name || 'Unknown';
-          return TRUSTED_SOURCES.has(sourceName);
+          // Get source name with strict validation
+          let sourceName = '';
+          
+          if (typeof article.source === 'string') {
+            sourceName = article.source.trim();
+          } else if (article.source && typeof article.source.name === 'string') {
+            sourceName = article.source.name.trim();
+          }
+          
+          // Only include if source is in trusted list and not empty/unknown
+          return sourceName && 
+                 sourceName !== 'Unknown' && 
+                 sourceName !== '' && 
+                 TRUSTED_SOURCES.has(sourceName);
         });
         
         setNews(trustedArticles);
@@ -206,7 +216,9 @@ export function SymbolNews({ symbol }: SymbolNewsProps) {
               <Clock className="h-3 w-3" />
               <span>{formatTimeAgo(article.published_at)}</span>
               <span>•</span>
-              <span>{typeof article.source === 'string' ? article.source : 'Unknown source'}</span>
+              <span>{typeof article.source === 'string' ? article.source : 
+                     (article.source && typeof article.source === 'object' && article.source.name ? 
+                      article.source.name : 'Verified Source')}</span>
               {article.relevance_score && (
                 <>
                   <span>•</span>
