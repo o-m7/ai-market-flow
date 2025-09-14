@@ -248,7 +248,11 @@ export function AiResult({ data, symbol }: AiResultProps) {
       )}
 
       {/* Enhanced Quantitative Analysis */}
-      {analysis?.quantitative_metrics && (
+      {(() => {
+        console.log('Quantitative Debug - analysis:', analysis);
+        console.log('Quantitative Debug - quantitative_metrics:', analysis?.quantitative_metrics);
+        return analysis?.quantitative_metrics;
+      })() && (
         <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
