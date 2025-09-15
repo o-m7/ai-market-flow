@@ -97,7 +97,7 @@ function calculateTechnicalIndicators(candles: Array<{t:number,o:number,h:number
 
 // Simple EMA calculation
 function calculateEMA(values: number[], period: number): number {
-  if (values.length < period) return values[values.length - 1] || 0;
+  if (values.length === 0) return 0;
   
   const multiplier = 2 / (period + 1);
   let ema = values[0];
