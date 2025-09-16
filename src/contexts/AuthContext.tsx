@@ -32,10 +32,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSubscription = async () => {
     if (!session) {
+      console.log('RefreshSubscription: No session, setting subscription to null');
       setSubscription(null);
       return;
     }
 
+    console.log('RefreshSubscription: Calling check-subscription function...');
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription', {
         headers: {
@@ -43,10 +45,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
+      console.log('RefreshSubscription: Response received', { data, error });
+
       if (error) {
         console.error('Error checking subscription:', error);
         setSubscription({ subscribed: false, subscription_tier: null, subscription_end: null });
       } else {
+        console.log('RefreshSubscription: Setting subscription data:', data);
         setSubscription(data);
       }
     } catch (error) {
