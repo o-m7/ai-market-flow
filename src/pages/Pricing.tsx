@@ -312,7 +312,7 @@ export default function Pricing() {
             All plans include a 7-day free trial. Cancel anytime.
           </p>
           <p className="text-sm text-muted-foreground">
-            Need help choosing? Contact us at support@alphaedge.com
+            Need help choosing? Contact us at support@capvia.com
           </p>
         </div>
       </div>

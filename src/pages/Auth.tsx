@@ -154,7 +154,7 @@ export default function Auth() {
               </div>
             </div>
             <CardTitle className="text-2xl font-bold">
-              {planId ? `Subscribe to ${tierName}` : 'Welcome to Alphaedge'}
+              {planId ? `Subscribe to ${tierName}` : 'Welcome to Capvia'}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
               {planId 
@@ -339,7 +339,7 @@ export default function Auth() {
 
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Need help? Contact support at support@alphaedge.com
+            Need help? Contact support at support@capvia.com
           </p>
         </div>
       </div>

@@ -98,7 +98,7 @@ export const LoginDialog = ({ children }: LoginDialogProps) => {
       <DialogContent className="sm:max-w-[400px] bg-gradient-card border-border">
         <DialogHeader>
           <DialogTitle className="text-center text-xl font-bold">
-            Welcome to Alphaedge
+            Welcome to Capvia
           </DialogTitle>
         </DialogHeader>
         

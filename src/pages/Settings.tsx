@@ -754,7 +754,7 @@ export const Settings = () => {
                       <Button variant="outline" className="h-auto p-6 flex-col space-y-2">
                         <HelpCircle className="h-8 w-8 text-primary" />
                         <span className="font-medium">Documentation</span>
-                        <span className="text-sm text-muted-foreground">Learn how to use AlphaEdge</span>
+                        <span className="text-sm text-muted-foreground">Learn how to use Capvia</span>
                       </Button>
                       <Button variant="outline" className="h-auto p-6 flex-col space-y-2">
                         <Mail className="h-8 w-8 text-primary" />

@@ -14,7 +14,7 @@ export const Navigation = () => {
           <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
             <BarChart3 className="h-8 w-8 text-primary" />
             <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              AlphaEdge
+              Capvia
             </h1>
           </Link>
           
