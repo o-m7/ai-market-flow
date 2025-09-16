@@ -60,7 +60,10 @@ interface InstitutionalAnalysis {
       width?: number;
       position?: string;
     };
-    volume_analysis?: string;
+    volume_analysis?: {
+      obv: number;
+      volume_zscore_20: number;
+    };
   };
   quantitative_metrics?: {
     volatility_percentile: number;
@@ -532,7 +535,10 @@ export function AiResult({ data, symbol }: AiResultProps) {
             {analysis?.technical?.volume_analysis && (
               <div className="mt-3 p-2 bg-muted rounded">
                 <p className="text-xs font-medium">Volume & Order Flow:</p>
-                <p className="text-xs text-muted-foreground">{analysis.technical.volume_analysis}</p>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>OBV: {safeNum(analysis.technical.volume_analysis.obv, 2)}</p>
+                  <p>Volume Z-Score (20): {safeNum(analysis.technical.volume_analysis.volume_zscore_20, 2)}</p>
+                </div>
               </div>
             )}
           </CardContent>
