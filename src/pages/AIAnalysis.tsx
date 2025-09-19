@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Navigation } from "@/components/Navigation";
 import TechnicalChart from "@/components/TechnicalChart";
+import { OrderBookPanel } from "@/components/OrderBookPanel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -439,16 +440,24 @@ export const AIAnalysis = () => {
         </div>
 
         <div className="grid gap-6">
-          {/* Chart Section - Full Width */}
-          <div className="w-full">
-            <TechnicalChart 
-              symbol={symbol}
-              tf={timeframe}
-              height={600}
-              theme="light"
-              live
-              onDataChange={handleChartDataChange}
-            />
+          {/* Chart and Order Book Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Chart Section - 2/3 width on large screens */}
+            <div className="lg:col-span-2">
+              <TechnicalChart 
+                symbol={symbol}
+                tf={timeframe}
+                height={600}
+                theme="light"
+                live
+                onDataChange={handleChartDataChange}
+              />
+            </div>
+            
+            {/* Order Book Section - 1/3 width on large screens */}
+            <div className="lg:col-span-1">
+              <OrderBookPanel symbol={symbol} />
+            </div>
           </div>
         </div>
 
