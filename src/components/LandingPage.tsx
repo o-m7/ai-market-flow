@@ -1,7 +1,9 @@
-import { ArrowRight, BarChart3, Brain, TrendingUp, Shield, Zap, Users } from "lucide-react";
+import { ArrowRight, BarChart3, Brain, TrendingUp, Shield, Zap, Users, User, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { LoginDialog } from "@/components/auth/LoginDialog";
+import { Link } from "react-router-dom";
 
 export const LandingPage = () => {
   const { user, subscription } = useAuth();
@@ -18,9 +20,21 @@ export const LandingPage = () => {
           <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</a>
           <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
           <a href="#about" className="text-muted-foreground hover:text-foreground transition-colors">About</a>
-          <Button variant="outline" asChild>
-            <a href="/dashboard">Launch Platform</a>
-          </Button>
+          {user ? (
+            <Button variant="outline" asChild>
+              <Link to="/dashboard">
+                <User className="h-4 w-4 mr-2" />
+                Dashboard
+              </Link>
+            </Button>
+          ) : (
+            <LoginDialog>
+              <Button variant="outline">
+                <LogIn className="h-4 w-4 mr-2" />
+                Sign In
+              </Button>
+            </LoginDialog>
+          )}
         </div>
       </nav>
 
@@ -35,11 +49,19 @@ export const LandingPage = () => {
             Make smarter trading decisions with real-time AI analysis, advanced charting, and comprehensive market insights across stocks, crypto, forex, and indices.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button size="lg" className="text-lg px-8 py-6" asChild>
-              <a href="/dashboard" className="flex items-center">
-                Start Trading Now <ArrowRight className="ml-2 h-5 w-5" />
-              </a>
-            </Button>
+            {user ? (
+              <Button size="lg" className="text-lg px-8 py-6" asChild>
+                <Link to="/dashboard" className="flex items-center">
+                  Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            ) : (
+              <LoginDialog>
+                <Button size="lg" className="text-lg px-8 py-6 flex items-center">
+                  Start Trading Now <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </LoginDialog>
+            )}
             <Button variant="outline" size="lg" className="text-lg px-8 py-6">
               Watch Demo
             </Button>
@@ -145,11 +167,19 @@ export const LandingPage = () => {
             Join thousands of traders who are already using AI-powered insights to maximize their returns.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button size="lg" variant="secondary" className="text-lg px-8 py-6" asChild>
-              <a href="/dashboard" className="flex items-center">
-                Get Started Free <ArrowRight className="ml-2 h-5 w-5" />
-              </a>
-            </Button>
+            {user ? (
+              <Button size="lg" variant="secondary" className="text-lg px-8 py-6" asChild>
+                <Link to="/dashboard" className="flex items-center">
+                  Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            ) : (
+              <LoginDialog>
+                <Button size="lg" variant="secondary" className="text-lg px-8 py-6 flex items-center">
+                  Get Started Free <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </LoginDialog>
+            )}
             <Button size="lg" variant="outline" className="text-lg px-8 py-6 border-white text-white hover:bg-white hover:text-primary">
               Schedule Demo
             </Button>
