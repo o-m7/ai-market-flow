@@ -12,6 +12,12 @@ verify_jwt = false
 [functions.ai-market-analysis]
 verify_jwt = false
 
+[functions.news-signal-analysis]
+verify_jwt = false
+
+[functions.macro-market-analysis]
+verify_jwt = false
+
 [functions.binance-data]
 verify_jwt = false
 

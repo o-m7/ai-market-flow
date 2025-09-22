@@ -11,6 +11,7 @@ import { Alerts } from "./pages/Alerts";
 import { Settings } from "./pages/Settings";
 import Portfolio from "./pages/Portfolio";
 import AIAnalysis from "./pages/AIAnalysis";
+import QuantTrading from "./pages/QuantTrading";
 import News from "./pages/News";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -43,6 +44,11 @@ const App = () => (
             <Route path="/ai-analysis" element={
               <ProtectedRoute>
                 <AIAnalysis />
+              </ProtectedRoute>
+            } />
+            <Route path="/quant" element={
+              <ProtectedRoute>
+                <QuantTrading />
               </ProtectedRoute>
             } />
             <Route path="/news" element={<News />} />
