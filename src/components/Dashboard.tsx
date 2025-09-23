@@ -5,6 +5,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Navigation } from "@/components/Navigation";
 import { SymbolCard } from "@/components/SymbolCard";
 import { MarketFilters, type MarketFilters as MarketFiltersType } from "@/components/MarketFilters";
+import { MacroAnalysisWidget } from "@/components/MacroAnalysisWidget";
+import { NewsSignalWidget } from "@/components/NewsSignalWidget";
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
 import { RefreshCw } from "lucide-react";
@@ -61,6 +63,12 @@ export const Dashboard = () => {
         </header>
 
         <MarketFilters filters={filters} onFiltersChange={setFilters} />
+
+        {/* Analysis Widgets */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <MacroAnalysisWidget />
+          <NewsSignalWidget />
+        </div>
 
         {error && (
           <Alert className="mb-6">
