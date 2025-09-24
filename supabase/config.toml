@@ -63,6 +63,9 @@ verify_jwt = false
 [functions.polygon-search]
 verify_jwt = false
 
+[functions.quant-data]
+verify_jwt = false
+
 [functions.realtime-market-stream]
 verify_jwt = false
 

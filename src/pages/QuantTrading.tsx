@@ -246,7 +246,6 @@ export const QuantTrading = () => {
           </TabsContent>
 
 
-          {/* Analytics */}
           <TabsContent value="analytics">
             <Card>
               <CardHeader>
@@ -256,9 +255,20 @@ export const QuantTrading = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8">
-                  <BarChart3 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Performance charts and detailed analytics coming soon</p>
+                <div className="space-y-6">
+                  <div className="text-center py-4">
+                    <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground mb-4">Advanced quantitative analysis tools</p>
+                  </div>
+                  
+                  {/* Import and use the QuantCard component */}
+                  <div className="border rounded-lg p-1">
+                    <iframe 
+                      src="/quant-demo" 
+                      className="w-full h-[800px] border-0 rounded"
+                      title="Quantitative Analysis Demo"
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>

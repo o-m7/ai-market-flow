@@ -12,6 +12,7 @@ import { Settings } from "./pages/Settings";
 import Portfolio from "./pages/Portfolio";
 import AIAnalysis from "./pages/AIAnalysis";
 import QuantTrading from "./pages/QuantTrading";
+import QuantDemo from "./pages/QuantDemo";
 import News from "./pages/News";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
@@ -51,6 +52,7 @@ const App = () => (
                 <QuantTrading />
               </ProtectedRoute>
             } />
+            <Route path="/quant-demo" element={<QuantDemo />} />
             <Route path="/news" element={<News />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/markets/:assetType/:symbol" element={<SymbolDetail />} />
