@@ -10,17 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { 
-  TrendingUp, 
-  TrendingDown, 
   Activity, 
   BarChart3, 
   Settings, 
-  Play, 
-  Pause, 
-  RotateCcw,
   Calculator,
-  Zap,
-  Target
+  Zap
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -38,15 +32,6 @@ interface Strategy {
   };
 }
 
-interface Position {
-  symbol: string;
-  side: 'long' | 'short';
-  size: number;
-  entry_price: number;
-  current_price: number;
-  pnl: number;
-  pnl_percent: number;
-}
 
 const STRATEGY_TEMPLATES = [
   {
@@ -86,35 +71,6 @@ export const QuantTrading = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
-  const [isLiveTrading, setIsLiveTrading] = useState(false);
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [portfolioValue, setPortfolioValue] = useState(100000);
-  const [totalPnL, setTotalPnL] = useState(0);
-
-  // Mock positions for demo
-  useEffect(() => {
-    setPositions([
-      {
-        symbol: 'BTCUSD',
-        side: 'long',
-        size: 0.5,
-        entry_price: 63500,
-        current_price: 64200,
-        pnl: 350,
-        pnl_percent: 1.1
-      },
-      {
-        symbol: 'ETHUSD',
-        side: 'short',
-        size: 2.0,
-        entry_price: 4180,
-        current_price: 4150,
-        pnl: 60,
-        pnl_percent: 0.7
-      }
-    ]);
-    setTotalPnL(410);
-  }, []);
 
   const runBacktest = async (strategy: Strategy) => {
     toast({
@@ -143,13 +99,6 @@ export const QuantTrading = () => {
     }, 2000);
   };
 
-  const toggleLiveTrading = () => {
-    setIsLiveTrading(!isLiveTrading);
-    toast({
-      title: isLiveTrading ? "Live Trading Stopped" : "Live Trading Started",
-      description: isLiveTrading ? "Paper trading paused" : "Paper trading activated"
-    });
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -165,29 +114,16 @@ export const QuantTrading = () => {
                 Quantitative Trading
               </h1>
               <p className="text-muted-foreground">
-                Build, backtest, and deploy algorithmic trading strategies
+                Build, backtest, and analyze algorithmic trading strategies
               </p>
-            </div>
-            
-            {/* Portfolio Overview */}
-            <div className="flex items-center gap-4">
-              <Card className="p-4">
-                <div className="text-sm text-muted-foreground">Portfolio Value</div>
-                <div className="text-2xl font-bold">${portfolioValue.toLocaleString()}</div>
-                <div className={`text-sm flex items-center gap-1 ${totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {totalPnL >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                  ${Math.abs(totalPnL).toLocaleString()} ({((totalPnL/portfolioValue)*100).toFixed(2)}%)
-                </div>
-              </Card>
             </div>
           </div>
         </div>
 
         <Tabs defaultValue="strategies" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="strategies">Strategies</TabsTrigger>
             <TabsTrigger value="backtest">Backtest</TabsTrigger>
-            <TabsTrigger value="live">Live Trading</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
@@ -309,95 +245,6 @@ export const QuantTrading = () => {
             </Card>
           </TabsContent>
 
-          {/* Live Trading */}
-          <TabsContent value="live">
-            <div className="grid gap-6">
-              {/* Trading Controls */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5" />
-                    Live Paper Trading
-                  </CardTitle>
-                  <CardDescription>
-                    Test your strategies with real market data (paper money)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4">
-                    <Button 
-                      onClick={toggleLiveTrading}
-                      variant={isLiveTrading ? "destructive" : "default"}
-                      size="lg"
-                    >
-                      {isLiveTrading ? (
-                        <>
-                          <Pause className="h-4 w-4 mr-2" />
-                          Stop Trading
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4 mr-2" />
-                          Start Trading
-                        </>
-                      )}
-                    </Button>
-                    
-                    <Badge variant={isLiveTrading ? "default" : "secondary"}>
-                      {isLiveTrading ? "LIVE" : "PAUSED"}
-                    </Badge>
-                    
-                    <Select defaultValue="rsi_mean_reversion">
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Active Strategy" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STRATEGY_TEMPLATES.map((strategy) => (
-                          <SelectItem key={strategy.id} value={strategy.id}>
-                            {strategy.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Current Positions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Current Positions</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {positions.map((position, i) => (
-                      <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <Badge variant={position.side === 'long' ? 'default' : 'destructive'}>
-                            {position.side.toUpperCase()}
-                          </Badge>
-                          <div>
-                            <div className="font-semibold">{position.symbol}</div>
-                            <div className="text-sm text-muted-foreground">
-                              Size: {position.size} @ ${position.entry_price}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className={`font-semibold ${position.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            ${position.pnl > 0 ? '+' : ''}{position.pnl.toFixed(2)}
-                          </div>
-                          <div className={`text-sm ${position.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {position.pnl_percent > 0 ? '+' : ''}{position.pnl_percent.toFixed(2)}%
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
 
           {/* Analytics */}
           <TabsContent value="analytics">
