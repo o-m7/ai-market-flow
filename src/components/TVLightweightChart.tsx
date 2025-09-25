@@ -47,7 +47,7 @@ export default function TVLightweightChart({
   symbol, 
   tf='1m', 
   height=420, 
-  theme='light', 
+  theme='dark', 
   series='candles', 
   live=true, 
   onDataChange,

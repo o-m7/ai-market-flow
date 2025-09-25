@@ -448,7 +448,7 @@ export const AIAnalysis = () => {
                 symbol={symbol}
                 tf={timeframe}
                 height={600}
-                theme="light"
+                theme="dark"
                 live
                 onDataChange={handleChartDataChange}
               />

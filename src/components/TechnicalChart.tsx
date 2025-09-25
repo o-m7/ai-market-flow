@@ -32,7 +32,7 @@ export default function TechnicalChart({
   symbol, 
   tf='60', 
   height=500, 
-  theme='light', 
+  theme='dark', 
   live=true,
   onSymbolChange,
   onDataChange 
