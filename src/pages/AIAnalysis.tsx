@@ -119,6 +119,7 @@ export const AIAnalysis = () => {
   const [analysis, setAnalysis] = useState<any>(null);
   const [chartData, setChartData] = useState<LWBar[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [showOrderBook, setShowOrderBook] = useState(true);
   const chartRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -441,23 +442,40 @@ export const AIAnalysis = () => {
 
         <div className="grid gap-6">
           {/* Chart and Order Book Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Chart Section - 2/3 width on large screens */}
-            <div className="lg:col-span-2">
-              <TechnicalChart 
-                symbol={symbol}
-                tf={timeframe}
-                height={600}
-                theme="dark"
-                live
-                onDataChange={handleChartDataChange}
-              />
+          <div className={`grid grid-cols-1 gap-6 ${showOrderBook ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+            {/* Chart Section - Adjusts based on orderbook visibility */}
+            <div className={showOrderBook ? "lg:col-span-2" : "lg:col-span-1"}>
+              <div className="space-y-4">
+                {/* Chart Controls */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Live Chart Analysis</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowOrderBook(!showOrderBook)}
+                    className="border-primary/50 text-primary hover:bg-primary/10"
+                  >
+                    {showOrderBook ? 'Hide' : 'Show'} Order Book
+                  </Button>
+                </div>
+                
+                <TechnicalChart 
+                  symbol={symbol}
+                  tf={timeframe}
+                  height={600}
+                  theme="dark"
+                  live
+                  onDataChange={handleChartDataChange}
+                />
+              </div>
             </div>
             
-            {/* Order Book Section - 1/3 width on large screens */}
-            <div className="lg:col-span-1">
-              <OrderBookPanel symbol={symbol} />
-            </div>
+            {/* Order Book Section - Collapsible */}
+            {showOrderBook && (
+              <div className="lg:col-span-1">
+                <OrderBookPanel symbol={symbol} />
+              </div>
+            )}
           </div>
         </div>
 
