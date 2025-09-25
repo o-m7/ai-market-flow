@@ -611,8 +611,13 @@ export function AiResult({ data, symbol }: AiResultProps) {
                   <div className="mt-3 p-2 bg-muted rounded">
                     <p className="font-medium mb-1">Key Confluence Zones:</p>
                     <div className="space-y-1">
-                      {analysis.fibonacci.confluence_zones.map((zone, idx) => (
-                        <p key={idx} className="text-xs text-muted-foreground">• {zone}</p>
+                      {analysis.fibonacci.confluence_zones.map((zone: any, idx: number) => (
+                        <p key={idx} className="text-xs text-muted-foreground">
+                          • {typeof zone === 'string' ? zone : 
+                            (zone && typeof zone === 'object' && zone.center !== undefined) ? 
+                              `${formatPrice(zone.center)} (${zone.members || 'confluence'})` :
+                              String(zone)}
+                        </p>
                       ))}
                     </div>
                   </div>
