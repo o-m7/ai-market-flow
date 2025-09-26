@@ -76,7 +76,7 @@ export const MarketCard = ({
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold">
                   ${price?.toLocaleString(undefined, { 
-                    minimumFractionDigits: 2, 
+                    minimumFractionDigits: price > 1000 ? 0 : 2, 
                     maximumFractionDigits: price > 1000 ? 0 : 4 
                   })}
                 </span>
