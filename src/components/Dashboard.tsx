@@ -8,8 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Navigation } from "@/components/Navigation";
 import { MarketCard } from "@/components/MarketCard";
 import { MarketFilters, type MarketFilters as MarketFiltersType } from "@/components/MarketFilters";
-import { MacroAnalysisWidget } from "@/components/MacroAnalysisWidget";
-import { NewsSignalWidget } from "@/components/NewsSignalWidget";
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
 import { RefreshCw, TrendingUp, Activity, DollarSign, BarChart3 } from "lucide-react";
@@ -163,17 +161,6 @@ export const Dashboard = () => {
           <MarketFilters filters={filters} onFiltersChange={setFilters} />
         </motion.div>
 
-        {/* Analysis Widgets */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-        >
-          <MacroAnalysisWidget />
-          <NewsSignalWidget />
-        </motion.div>
-
         {error && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -189,7 +176,7 @@ export const Dashboard = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.3 }}
         >
           <Card>
             <CardHeader>
