@@ -1,19 +1,23 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Navigation } from "@/components/Navigation";
 import TechnicalChart from "@/components/TechnicalChart";
 import { OrderBookPanel } from "@/components/OrderBookPanel";
+import { AnalysisResults } from "@/components/AnalysisResults";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Loader2, TrendingUp, TrendingDown, Activity, Brain, BarChart3 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Loader2, TrendingUp, TrendingDown, Activity, Brain, BarChart3, Search, Settings, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { useAuth } from "@/contexts/AuthContext";
 import { type LWBar } from "@/features/ai/collectBars";
-import { AiResult } from "@/features/ai/Result";
 import { analyzeWithAI, type AnalysisRequest } from "@/features/ai/analyze";
 
 interface AnalysisResult {
@@ -119,7 +123,8 @@ export const AIAnalysis = () => {
   const [analysis, setAnalysis] = useState<any>(null);
   const [chartData, setChartData] = useState<LWBar[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [showOrderBook, setShowOrderBook] = useState(true);
+  const [showOrderBook, setShowOrderBook] = useState(false);
+  const [includeQuantData, setIncludeQuantData] = useState(true);
   const chartRef = useRef<any>(null);
   const { toast } = useToast();
 
@@ -282,246 +287,299 @@ export const AIAnalysis = () => {
     <div className="min-h-screen bg-background">
       <Navigation />
       
-      <div className="container mx-auto px-4 py-8 analysis-container">
-        {/* Header with Symbol Selector */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-                <Brain className="h-8 w-8 text-primary" />
-                AI Technical Analysis
-              </h1>
-              <p className="text-muted-foreground">
-                Professional analysis with live data, chart snapshots, and strict JSON validation
-              </p>
-            </div>
-            
-            {/* Symbol Selector */}
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant={getAssetType(symbol) === 'STOCK' ? 'default' : 'secondary'}>
-                    {getAssetType(symbol)}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    Live Market Data
-                  </span>
-                </div>
-                <Select value={symbol} onValueChange={setSymbol}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select Symbol" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    <div className="p-2">
-                      <div className="font-semibold text-sm mb-2 text-orange-600">₿ Crypto</div>
-                      {SYMBOL_CATEGORIES.Crypto.map((sym) => (
-                        <SelectItem key={sym} value={sym} className="pl-4">
-                          {sym}
-                        </SelectItem>
-                      ))}
-                    </div>
-                    <div className="p-2">
-                      <div className="font-semibold text-sm mb-2 text-blue-600">💱 Forex</div>
-                      {SYMBOL_CATEGORIES.Forex.map((sym) => (
-                        <SelectItem key={sym} value={sym} className="pl-4">
-                          {sym}
-                        </SelectItem>
-                      ))}
-                    </div>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <Select value={timeframe} onValueChange={(value: any) => setTimeframe(value)}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 Min</SelectItem>
-                  <SelectItem value="5">5 Min</SelectItem>
-                  <SelectItem value="15">15 Min</SelectItem>
-                  <SelectItem value="30">30 Min</SelectItem>
-                  <SelectItem value="60">1 Hour</SelectItem>
-                  <SelectItem value="240">4 Hours</SelectItem>
-                  <SelectItem value="D">1 Day</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <div className="flex items-center gap-2">
-                <Button 
-                  onClick={handleAnalysis} 
-                  disabled={loading || chartData.length < 30}
-                  className="min-w-[140px]"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Analyzing...
-                    </>
+      <div className="container mx-auto px-4 py-6">
+        {/* Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent flex items-center gap-3 mb-2">
+            <Brain className="h-8 w-8 text-primary" />
+            AI Technical Analysis
+          </h1>
+          <p className="text-muted-foreground">
+            Professional market analysis with institutional-grade AI and quantitative metrics
+          </p>
+        </motion.div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Panel - Analysis Controls */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+            className="lg:col-span-1"
+          >
+            <div className="sticky top-6 space-y-6">
+              {/* Symbol Input */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Market Symbol
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="symbol">Symbol</Label>
+                    <Select value={symbol} onValueChange={setSymbol}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Symbol" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-80">
+                        <div className="p-2">
+                          <div className="font-semibold text-sm mb-2 text-orange-600">₿ Crypto</div>
+                          {SYMBOL_CATEGORIES.Crypto.slice(0, 15).map((sym) => (
+                            <SelectItem key={sym} value={sym} className="pl-4">
+                              {sym}
+                            </SelectItem>
+                          ))}
+                        </div>
+                        <div className="p-2">
+                          <div className="font-semibold text-sm mb-2 text-blue-600">💱 Forex</div>
+                          {SYMBOL_CATEGORIES.Forex.slice(0, 15).map((sym) => (
+                            <SelectItem key={sym} value={sym} className="pl-4">
+                              {sym}
+                            </SelectItem>
+                          ))}
+                        </div>
+                      </SelectContent>
+                    </Select>
+                    <Badge variant={getAssetType(symbol) === 'STOCK' ? 'default' : 'secondary'} className="text-xs">
+                      {getAssetType(symbol)} Market
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="timeframe">Timeframe</Label>
+                    <Select value={timeframe} onValueChange={(value: any) => setTimeframe(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 Minute</SelectItem>
+                        <SelectItem value="5">5 Minutes</SelectItem>
+                        <SelectItem value="15">15 Minutes</SelectItem>
+                        <SelectItem value="30">30 Minutes</SelectItem>
+                        <SelectItem value="60">1 Hour</SelectItem>
+                        <SelectItem value="240">4 Hours</SelectItem>
+                        <SelectItem value="D">1 Day</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="quant-data"
+                      checked={includeQuantData}
+                      onCheckedChange={setIncludeQuantData}
+                    />
+                    <Label htmlFor="quant-data" className="text-sm">Include Quant Metrics</Label>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Analysis Control */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Analysis Control</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Button 
+                    onClick={handleAnalysis} 
+                    disabled={loading || chartData.length < 30}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Analyzing...
+                      </>
                     ) : (
                       <>
                         <Brain className="h-4 w-4 mr-2" />
-                        Generate Analysis
+                        Run AI Analysis
                       </>
                     )}
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowKeySettings(v => !v)}
-                  className="min-w-[110px]"
-                >
-                  {hasLocalKey ? 'AI Key: Set' : 'AI Key: Set Key'}
-                </Button>
-              </div>
-            </div>
-            
-            {/* Usage indicator for non-subscribed users */}
-            {user && !isSubscribed && !usageLoading && (
-              <div className="text-xs text-muted-foreground mb-2">
-                {usage.remainingAnalyses}/5 free analyses remaining today
-              </div>
-            )}
-          </div>
-          
-          {showKeySettings && (
-            <Card className="mb-4">
-              <CardContent className="pt-6">
-                <div className="flex flex-col md:flex-row items-center gap-3">
-                  <Input
-                    type="password"
-                    placeholder={hasLocalKey ? "Key stored in browser" : "Enter OpenAI API key (sk-...)"}
-                    value={openaiKey}
-                    onChange={(e) => setOpenaiKey(e.target.value)}
-                    className="md:flex-1"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => {
-                        try {
-                          window.localStorage?.setItem('OPENAI_API_KEY', openaiKey);
-                          setHasLocalKey(!!openaiKey);
-                          toast({ title: 'AI Key Saved', description: 'Your key is stored locally and will be used for analysis.' });
-                        } catch {
-                          toast({ title: 'Failed to Save', description: 'Could not access localStorage.', variant: 'destructive' });
-                        }
-                      }}
-                    >
-                      Save Key
-                    </Button>
-                    {hasLocalKey && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => {
-                          try {
-                            window.localStorage?.removeItem('OPENAI_API_KEY');
-                            setOpenaiKey('');
-                            setHasLocalKey(false);
-                            toast({ title: 'AI Key Cleared', description: 'Local key removed. Server key will be used if configured.' });
-                          } catch {}
-                        }}
-                      >
-                        Clear
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Your API key is stored only in your browser and sent securely to the Edge Function for analysis. It is not shared with other users.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+                  </Button>
 
-          {/* Data Echo */}
-          {chartData.length > 0 && (
-            <div className="text-xs text-muted-foreground mb-4 font-mono">
-              📊 {chartData.length} candles loaded • One source of truth: Chart data → AI analysis
-            </div>
-          )}
-        </div>
+                  {chartData.length > 0 && (
+                    <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2">
+                      📊 {chartData.length} data points loaded
+                    </div>
+                  )}
 
-        <div className="grid gap-6">
-          {/* Chart and Order Book Section */}
-          <div className={`grid grid-cols-1 gap-6 ${showOrderBook ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
-            {/* Chart Section - Adjusts based on orderbook visibility */}
-            <div className={showOrderBook ? "lg:col-span-2" : "lg:col-span-1"}>
-              <div className="space-y-4">
-                {/* Chart Controls */}
+                  {user && !isSubscribed && !usageLoading && (
+                    <div className="text-xs text-muted-foreground">
+                      {usage.remainingAnalyses}/5 free analyses remaining today
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* AI Settings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    AI Settings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowKeySettings(!showKeySettings)}
+                    className="w-full"
+                  >
+                    {hasLocalKey ? '✅ Custom AI Key Set' : 'Set Custom AI Key'}
+                  </Button>
+
+                  {showKeySettings && (
+                    <div className="space-y-2">
+                      <Input
+                        type="password"
+                        placeholder="Enter OpenAI API key (sk-...)"
+                        value={openaiKey}
+                        onChange={(e) => setOpenaiKey(e.target.value)}
+                        className="text-xs"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            try {
+                              window.localStorage?.setItem('OPENAI_API_KEY', openaiKey);
+                              setHasLocalKey(!!openaiKey);
+                              toast({ title: 'AI Key Saved', description: 'Stored locally for analysis.' });
+                            } catch {
+                              toast({ title: 'Failed to Save', variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          Save
+                        </Button>
+                        {hasLocalKey && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              try {
+                                window.localStorage?.removeItem('OPENAI_API_KEY');
+                                setOpenaiKey('');
+                                setHasLocalKey(false);
+                                toast({ title: 'AI Key Cleared' });
+                              } catch {}
+                            }}
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Key stored locally in browser only
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </motion.div>
+
+          {/* Right Panel - Chart and Results */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="lg:col-span-3 space-y-6"
+          >
+            {/* Chart Section */}
+            <Card>
+              <CardHeader>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Live Chart Analysis</h3>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Live Chart: {symbol}
+                  </CardTitle>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setShowOrderBook(!showOrderBook)}
-                    className="border-primary/50 text-primary hover:bg-primary/10"
                   >
                     {showOrderBook ? 'Hide' : 'Show'} Order Book
                   </Button>
                 </div>
-                
-                <TechnicalChart 
-                  symbol={symbol}
-                  tf={timeframe}
-                  height={600}
-                  theme="dark"
-                  live
-                  onDataChange={handleChartDataChange}
-                />
-              </div>
-            </div>
-            
-            {/* Order Book Section - Collapsible */}
-            {showOrderBook && (
-              <div className="lg:col-span-1">
-                <OrderBookPanel symbol={symbol} />
-              </div>
+              </CardHeader>
+              <CardContent>
+                <div className={`grid gap-4 ${showOrderBook ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+                  <div className={showOrderBook ? "lg:col-span-2" : "lg:col-span-1"}>
+                    <TechnicalChart 
+                      symbol={symbol}
+                      tf={timeframe}
+                      height={500}
+                      theme="dark"
+                      live
+                      onDataChange={handleChartDataChange}
+                    />
+                  </div>
+                  
+                  {showOrderBook && (
+                    <div className="lg:col-span-1">
+                      <OrderBookPanel symbol={symbol} />
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Results Section */}
+            {loading && (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center h-32">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Analyzing {chartData.length} candles for {symbol.toUpperCase()}...
+                  </p>
+                </CardContent>
+              </Card>
             )}
-          </div>
+
+            {aiError && (
+              <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-red-800 dark:text-red-400">
+                    <Activity className="h-4 w-4" />
+                    <span className="font-medium">Analysis Error</span>
+                  </div>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-2">{aiError}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {analysis && <AnalysisResults data={analysis} symbol={symbol} />}
+
+            {!analysis && !loading && !aiError && (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center h-64">
+                  <Brain className="h-16 w-16 text-muted-foreground mb-4 opacity-50" />
+                  <h3 className="text-lg font-semibold mb-2">Ready for Analysis</h3>
+                  <p className="text-muted-foreground text-center max-w-md">
+                    Configure your analysis parameters and click "Run AI Analysis" to get professional technical insights.
+                  </p>
+                  <div className="flex items-center gap-1 mt-4 text-sm text-muted-foreground">
+                    <span>Select symbol</span>
+                    <ChevronRight className="h-4 w-4" />
+                    <span>Choose timeframe</span>
+                    <ChevronRight className="h-4 w-4" />
+                    <span>Run analysis</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </motion.div>
         </div>
-
-        {/* AI Analysis Results */}
-        {analysis && (
-          <div className="mt-8">
-            <AiResult data={analysis} symbol={symbol} />
-          </div>
-        )}
-
-        {/* Error Display */}
-        {aiError && (
-          <Card className="mt-8 border-red-200 bg-red-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-red-800">
-                <Activity className="h-4 w-4" />
-                <span className="font-medium">Analysis Error</span>
-              </div>
-              <p className="text-sm text-red-700 mt-2">{aiError}</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <Card className="mt-8">
-            <CardContent className="flex flex-col items-center justify-center h-32">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Analyzing {chartData.length} candles for {symbol.toUpperCase()}...
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Empty State */}
-        {!analysis && !loading && !aiError && (
-          <Card className="mt-8">
-            <CardContent className="flex flex-col items-center justify-center h-64">
-              <Brain className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground text-center max-w-md">
-                Select a symbol above and click "Generate Analysis" to get AI-powered technical analysis.
-              </p>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
