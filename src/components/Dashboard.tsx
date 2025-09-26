@@ -10,6 +10,7 @@ import { MarketCard } from "@/components/MarketCard";
 import { MarketFilters, type MarketFilters as MarketFiltersType } from "@/components/MarketFilters";
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
+import { parseVolumeString } from "@/lib/volumeUtils";
 import { RefreshCw, TrendingUp, Activity, DollarSign, BarChart3 } from "lucide-react";
 
 export const Dashboard = () => {
@@ -46,7 +47,7 @@ export const Dashboard = () => {
     
     const positive = filteredData.filter(item => item.changePercent > 0).length;
     const negative = filteredData.filter(item => item.changePercent < 0).length;
-    const totalVolume = filteredData.reduce((sum, item) => sum + (Number(item.volume) || 0), 0);
+    const totalVolume = filteredData.reduce((sum, item) => sum + parseVolumeString(item.volume), 0);
     const avgRSI = filteredData.reduce((sum, item) => sum + (item.rsi || 50), 0) / filteredData.length;
     
     return { positive, negative, totalVolume, avgRSI };
@@ -215,7 +216,7 @@ export const Dashboard = () => {
                         price={item.price}
                         change={item.change}
                         changePercent={item.changePercent}
-                        volume={Number(item.volume) || 0}
+                        volume={item.volume}
                         rsi={item.rsi}
                         aiSentiment={item.aiSentiment}
                         aiSummary={item.aiSummary}

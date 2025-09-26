@@ -423,6 +423,13 @@ serve(async (req) => {
           const change = prevClose ? (currentPrice - prevClose) : 0;
           const changePercent = prevClose ? (prevClose !== 0 ? (change / prevClose) * 100 : 0) : 0;
           
+          // Debug logging for BNB specifically
+          if (rawSymbol === 'BNB/USD') {
+            console.log(`[POLYGON][BNB DEBUG] currentPrice: ${currentPrice}, prevClose: ${prevClose}, change: ${change}, changePercent: ${changePercent}`);
+            console.log(`[POLYGON][BNB DEBUG] prevData:`, prevData?.results?.[0]);
+            console.log(`[POLYGON][BNB DEBUG] snapshotData.ticker?.prevDay:`, snapshotData?.ticker?.prevDay);
+          }
+          
           // Generate AI sentiment based on price change
           const aiSentiment = changePercent > 1 ? 'bullish' : changePercent < -1 ? 'bearish' : 'neutral';
           

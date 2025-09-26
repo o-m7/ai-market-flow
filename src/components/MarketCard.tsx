@@ -10,7 +10,7 @@ interface MarketCardProps {
   price: number;
   change: number;
   changePercent: number;
-  volume?: number;
+  volume?: string | number;
   rsi?: number;
   aiSentiment?: 'bullish' | 'bearish' | 'neutral';
   aiSummary?: string;
@@ -118,12 +118,7 @@ export const MarketCard = ({
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">Volume</span>
                   <span className="text-sm font-medium">
-                    {volume > 1000000 
-                      ? `${(volume / 1000000).toFixed(1)}M`
-                      : volume > 1000 
-                      ? `${(volume / 1000).toFixed(1)}K`
-                      : volume.toLocaleString()
-                    }
+                    {typeof volume === 'string' ? volume : volume.toLocaleString()}
                   </span>
                 </div>
               )}
