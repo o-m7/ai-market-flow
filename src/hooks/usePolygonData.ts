@@ -48,7 +48,22 @@ export const usePolygonData = (symbols: string[], refreshInterval = 3000) => {
       }
 
       if (result.data) {
-        setData(result.data);
+        // Merge new data with existing data to prevent symbols from disappearing
+        setData(prevData => {
+          const newDataMap = new Map(result.data.map(item => [item.symbol, item]));
+          const mergedData = prevData.map(existingItem => 
+            newDataMap.get(existingItem.symbol) || existingItem
+          );
+          
+          // Add any completely new symbols
+          result.data.forEach(newItem => {
+            if (!prevData.some(existing => existing.symbol === newItem.symbol)) {
+              mergedData.push(newItem);
+            }
+          });
+          
+          return mergedData;
+        });
         setLastUpdated(result.timestamp);
       }
     } catch (err) {

@@ -460,10 +460,24 @@ serve(async (req) => {
     // Wait for all requests to complete
     const results = await Promise.all(batchPromises);
     
-    // Filter out null results and add to marketData
-    results.forEach(item => {
-      if (item) {
-        marketData.push(item);
+    // Ensure all requested symbols are included, even if they failed to fetch
+    symbols.forEach((symbol, index) => {
+      const result = results[index];
+      if (result) {
+        marketData.push(result);
+      } else {
+        // Create a placeholder entry for failed symbols to prevent disappearing
+        console.warn(`[POLYGON] ⚠️ Creating placeholder for failed symbol: ${symbol}`);
+        marketData.push({
+          symbol,
+          name: getMarketName(symbol),
+          price: 0,
+          change: 0,
+          changePercent: 0,
+          volume: '—',
+          lastUpdate: new Date().toISOString(),
+          aiSentiment: 'neutral' as 'neutral'
+        });
       }
     });
 
