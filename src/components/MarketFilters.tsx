@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 const marketTypes = [
+  { value: "all", label: "All Markets" },
   { value: "crypto", label: "Crypto" },
   { value: "forex", label: "Forex" },
 ];
