@@ -22,7 +22,7 @@ export const Settings = () => {
   // Get active tab from URL hash
   const getActiveTab = () => {
     const hash = window.location.hash.slice(1);
-    const validTabs = ['profile', 'notifications', 'preferences', 'apis', 'security', 'billing'];
+    const validTabs = ['profile', 'notifications', 'preferences', 'security', 'billing'];
     return validTabs.includes(hash) ? hash : 'profile';
   };
   
@@ -217,7 +217,6 @@ export const Settings = () => {
                     { id: 'notifications', label: 'Notifications', icon: Bell },
                     { id: 'preferences', label: 'Preferences', icon: Eye },
                     { id: 'security', label: 'Security', icon: Lock },
-                    { id: 'apis', label: 'API Keys', icon: Settings2 },
                     { id: 'help', label: 'Help & Support', icon: HelpCircle }
                   ].map((item) => {
                     const Icon = item.icon;
@@ -624,54 +623,6 @@ export const Settings = () => {
               </Card>
             )}
 
-            {/* API Keys */}
-            {activeTab === 'apis' && (
-              <div className="space-y-6">
-                <Card className="bg-gradient-card border-border">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>API Keys & Integrations</span>
-                      <Button size="sm" className="flex items-center gap-2">
-                        <Plus className="h-4 w-4" />
-                        Add API Key
-                      </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {/* API Key rows - keep existing implementation */}
-                      {[
-                        { name: 'TradingView API', desc: 'Real-time charting and market data', icon: Key },
-                        { name: 'Stripe API', desc: 'Payment processing and subscriptions', icon: CreditCard },
-                        { name: 'Alpha Vantage API', desc: 'Stock market data and indicators', icon: Key },
-                        { name: 'Polygon.io API', desc: 'Real-time and historical market data', icon: Key }
-                      ].map((api) => (
-                        <div key={api.name} className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <api.icon className="h-5 w-5 text-primary" />
-                            <div>
-                              <div className="font-medium">{api.name}</div>
-                              <div className="text-sm text-muted-foreground">{api.desc}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Input
-                              placeholder="Enter API key"
-                              type="password"
-                              className="w-40"
-                            />
-                            <Button size="sm" variant="outline">Save</Button>
-                            <Button size="sm" variant="ghost">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
 
             {/* Security */}
             {activeTab === 'security' && (

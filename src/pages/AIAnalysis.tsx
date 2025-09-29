@@ -128,18 +128,9 @@ export const AIAnalysis = () => {
   const chartRef = useRef<any>(null);
   const { toast } = useToast();
 
-  // Optional: allow a local OpenAI key for AI analysis (stored in browser)
+  // UI state management
   const [showKeySettings, setShowKeySettings] = useState(false);
-  const [openaiKey, setOpenaiKey] = useState<string>("");
-  const [hasLocalKey, setHasLocalKey] = useState<boolean>(false);
-
-  useEffect(() => {
-    try {
-      const k = window.localStorage?.getItem('OPENAI_API_KEY') || '';
-      setOpenaiKey(k);
-      setHasLocalKey(!!k);
-    } catch {}
-  }, []);
+  // Local state removed for cleaner interface
 
   const handleAnalysis = async () => {
     if (!user) {
@@ -436,61 +427,20 @@ export const AIAnalysis = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowKeySettings(!showKeySettings)}
-                    className="w-full"
-                  >
-                    {hasLocalKey ? '✅ Custom AI Key Set' : 'Set Custom AI Key'}
-                  </Button>
-
-                  {showKeySettings && (
-                    <div className="space-y-2">
-                      <Input
-                        type="password"
-                        placeholder="Enter OpenAI API key (sk-...)"
-                        value={openaiKey}
-                        onChange={(e) => setOpenaiKey(e.target.value)}
-                        className="text-xs"
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            try {
-                              window.localStorage?.setItem('OPENAI_API_KEY', openaiKey);
-                              setHasLocalKey(!!openaiKey);
-                              toast({ title: 'AI Key Saved', description: 'Stored locally for analysis.' });
-                            } catch {
-                              toast({ title: 'Failed to Save', variant: 'destructive' });
-                            }
-                          }}
-                        >
-                          Save
-                        </Button>
-                        {hasLocalKey && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              try {
-                                window.localStorage?.removeItem('OPENAI_API_KEY');
-                                setOpenaiKey('');
-                                setHasLocalKey(false);
-                                toast({ title: 'AI Key Cleared' });
-                              } catch {}
-                            }}
-                          >
-                            Clear
-                          </Button>
-                        )}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-mono-tabular text-terminal-accent">AI ANALYSIS ENGINE</div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-terminal-green rounded-full animate-pulse" />
+                        <span className="text-xs font-mono-tabular text-terminal-secondary">
+                          CLOUD AI READY
+                        </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Key stored locally in browser only
-                      </p>
                     </div>
-                  )}
+                    <div className="text-xs text-terminal-secondary font-mono-tabular">
+                      Advanced AI analysis powered by Lovable Cloud infrastructure
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>

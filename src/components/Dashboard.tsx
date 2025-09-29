@@ -108,11 +108,11 @@ export const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">GAINERS</div>
-                <div className="text-2xl font-mono-tabular font-bold text-terminal-green">
+                <div className="text-2xl font-mono-tabular font-bold text-bull">
                   {summaryStats.positive.toString().padStart(3, '0')}
                 </div>
               </div>
-              <TrendingUp className="h-6 w-6 text-terminal-green/30" />
+              <TrendingUp className="h-6 w-6 text-bull/30" />
             </div>
           </div>
           
@@ -120,11 +120,11 @@ export const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">LOSERS</div>
-                <div className="text-2xl font-mono-tabular font-bold text-terminal-red">
+                <div className="text-2xl font-mono-tabular font-bold text-bear">
                   {summaryStats.negative.toString().padStart(3, '0')}
                 </div>
               </div>
-              <TrendingUp className="h-6 w-6 text-terminal-red/30 rotate-180" />
+              <TrendingUp className="h-6 w-6 text-bear/30 rotate-180" />
             </div>
           </div>
           

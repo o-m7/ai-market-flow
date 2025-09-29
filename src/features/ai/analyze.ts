@@ -14,12 +14,7 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
 
   // Optional: allow overriding OpenAI key via browser (for debugging)
   try {
-    if (typeof window !== 'undefined') {
-      const urlKey = new URLSearchParams(window.location.search).get('openai');
-      const storedKey = window.localStorage?.getItem('OPENAI_API_KEY');
-      const k = urlKey || storedKey;
-      if (k) headers['x-openai-api-key'] = k;
-    }
+    // Use Lovable Cloud AI - no API key needed
   } catch {}
 
   if (ENV.API_URL) {

@@ -32,17 +32,17 @@ export const MarketCard = ({
 
   const getSentimentColor = () => {
     switch (aiSentiment) {
-      case 'bullish': return 'text-green-500';
-      case 'bearish': return 'text-red-500';
-      default: return 'text-muted-foreground';
+      case 'bullish': return 'text-bull';
+      case 'bearish': return 'text-bear';
+      default: return 'text-neutral';
     }
   };
 
   const getRSIColor = () => {
-    if (!rsi) return 'text-muted-foreground';
-    if (rsi > 70) return 'text-red-500';
-    if (rsi < 30) return 'text-green-500';
-    return 'text-muted-foreground';
+    if (!rsi) return 'text-neutral';
+    if (rsi > 70) return 'text-bear';
+    if (rsi < 30) return 'text-bull';
+    return 'text-neutral';
   };
 
   return (
@@ -63,9 +63,9 @@ export const MarketCard = ({
               </div>
               <div className="flex items-center">
                 {isPositive ? (
-                  <div className="text-terminal-green">▲</div>
+                  <div className="text-bull">▲</div>
                 ) : (
-                  <div className="text-terminal-red">▼</div>
+                  <div className="text-bear">▼</div>
                 )}
               </div>
             </div>
@@ -82,14 +82,14 @@ export const MarketCard = ({
               </div>
               <div className="flex items-center gap-2 mt-1">
                 <span className={`font-mono-tabular text-sm ${
-                  isPositive ? 'text-terminal-green' : 'text-terminal-red'
+                  isPositive ? 'text-bull' : 'text-bear'
                 }`}>
                   {isPositive ? '+' : ''}{change?.toFixed(2)}
                 </span>
                 <div className={`px-1.5 py-0.5 text-xs font-mono-tabular border ${
                   isPositive 
-                    ? 'text-terminal-green border-terminal-green/30 bg-terminal-green/5' 
-                    : 'text-terminal-red border-terminal-red/30 bg-terminal-red/5'
+                    ? 'text-bull border-bull/30 bg-bull/5' 
+                    : 'text-bear border-bear/30 bg-bear/5'
                 }`}>
                   {isPositive ? '+' : ''}{changePercent?.toFixed(2)}%
                 </div>

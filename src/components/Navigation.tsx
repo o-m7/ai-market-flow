@@ -1,4 +1,4 @@
-import { Bell, User, BarChart3, Star, Settings, LogOut, Settings2, Brain } from "lucide-react";
+import { Bell, User, BarChart3, Settings, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SearchBar } from "@/components/SearchBar";
@@ -23,35 +23,34 @@ export const Navigation = () => {
             </div>
           </Link>
           
-          {/* Terminal-style Navigation */}
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav className="hidden md:flex items-center space-x-2">
             <Link 
               to="/portfolio" 
-              className="flex items-center space-x-2 px-4 py-2 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border"
+              className="flex items-center space-x-2 px-3 py-1.5 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border text-sm"
             >
               <BarChart3 className="h-3 w-3" />
-              <span className="text-sm">PORTFOLIO</span>
+              <span>PORTFOLIO</span>
             </Link>
             <Link 
               to="/ai-analysis" 
-              className="flex items-center space-x-2 px-4 py-2 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border"
+              className="flex items-center space-x-2 px-3 py-1.5 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border text-sm"
             >
               <Brain className="h-3 w-3" />
-              <span className="text-sm">AI ANALYSIS</span>
+              <span>AI ANALYSIS</span>
             </Link>
             <Link 
               to="/news" 
-              className="flex items-center space-x-2 px-4 py-2 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border"
+              className="flex items-center space-x-2 px-3 py-1.5 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border text-sm"
             >
               <Bell className="h-3 w-3" />
-              <span className="text-sm">NEWS</span>
+              <span>NEWS</span>
             </Link>
             <Link 
               to="/alerts" 
-              className="flex items-center space-x-2 px-4 py-2 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border"
+              className="flex items-center space-x-2 px-3 py-1.5 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border text-sm"
             >
               <Bell className="h-3 w-3" />
-              <span className="text-sm">ALERTS</span>
+              <span>ALERTS</span>
             </Link>
           </nav>
         </div>
@@ -61,40 +60,14 @@ export const Navigation = () => {
           <SearchBar />
         </div>
 
-        {/* Terminal Actions */}
-        <div className="flex items-center space-x-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker border border-transparent hover:border-terminal-border font-mono-tabular" 
-            asChild
+        <div className="flex items-center space-x-3">
+          <Link 
+            to="/settings" 
+            className="flex items-center space-x-2 px-3 py-1.5 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border text-sm"
           >
-            <Link to="/alerts">
-              <Bell className="h-4 w-4 mr-1" />
-              <span className="text-xs">ALERTS</span>
-            </Link>
-          </Button>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker border border-transparent hover:border-terminal-border font-mono-tabular"
-              >
-                <User className="h-4 w-4 mr-1" />
-                <span className="text-xs">USER</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-terminal border-terminal-border rounded-none">
-              <DropdownMenuItem asChild className="font-mono-tabular">
-                <Link to="/settings" className="flex items-center text-terminal-foreground hover:text-terminal-accent">
-                  <Settings className="h-3 w-3 mr-2" />
-                  SETTINGS
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            <Settings className="h-3 w-3" />
+            <span>SETTINGS</span>
+          </Link>
         </div>
       </div>
     </nav>
