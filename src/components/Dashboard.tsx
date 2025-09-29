@@ -20,14 +20,21 @@ export const Dashboard = () => {
     timeframe: "1d"
   });
 
-  const symbols = useMemo(() => getSymbolsByMarketType(filters.marketType), [filters.marketType]);
+  const symbols = useMemo(() => {
+    const result = getSymbolsByMarketType(filters.marketType);
+    console.log('Dashboard symbols for market type', filters.marketType, ':', result);
+    return result;
+  }, [filters.marketType]);
   const { data, loading, error, lastUpdated, refetch } = usePolygonData(symbols, 3000); // Live updates every 3 seconds
 
   // Filter data based on trend
   const filteredData = useMemo(() => {
+    console.log('Raw data received:', data.map(item => `${item.symbol} (${item.name})`));
+    console.log('Current trend filter:', filters.trend);
+    
     if (filters.trend === "all") return data;
     
-    return data.filter(item => {
+    const result = data.filter(item => {
       switch (filters.trend) {
         case "bullish":
           return item.changePercent > 0;
@@ -39,6 +46,9 @@ export const Dashboard = () => {
           return true;
       }
     });
+    
+    console.log('Filtered data:', result.map(item => `${item.symbol} (${item.changePercent}%)`));
+    return result;
   }, [data, filters.trend]);
 
   // Calculate summary statistics
