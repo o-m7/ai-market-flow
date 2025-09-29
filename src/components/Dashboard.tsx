@@ -11,7 +11,7 @@ import { MarketFilters, type MarketFilters as MarketFiltersType } from "@/compon
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
 import { parseVolumeString } from "@/lib/volumeUtils";
-import { RefreshCw, TrendingUp, TrendingDown, Activity, DollarSign, BarChart3 } from "lucide-react";
+import { RefreshCw, TrendingUp, Activity, DollarSign, BarChart3 } from "lucide-react";
 
 export const Dashboard = () => {
   const [filters, setFilters] = useState<MarketFiltersType>({
@@ -124,7 +124,7 @@ export const Dashboard = () => {
                   {summaryStats.negative.toString().padStart(3, '0')}
                 </div>
               </div>
-              <TrendingDown className="h-6 w-6 text-terminal-red/30" />
+              <TrendingUp className="h-6 w-6 text-terminal-red/30 rotate-180" />
             </div>
           </div>
           
