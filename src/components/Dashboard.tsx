@@ -11,7 +11,7 @@ import { MarketFilters, type MarketFilters as MarketFiltersType } from "@/compon
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
 import { parseVolumeString } from "@/lib/volumeUtils";
-import { RefreshCw, TrendingUp, Activity, DollarSign, BarChart3 } from "lucide-react";
+import { RefreshCw, TrendingUp, TrendingDown, Activity, DollarSign, BarChart3 } from "lucide-react";
 
 export const Dashboard = () => {
   const [filters, setFilters] = useState<MarketFiltersType>({
@@ -54,110 +54,116 @@ export const Dashboard = () => {
   }, [filteredData]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-terminal text-terminal-foreground">
       <Navigation />
 
-      <main className="container mx-auto px-4 py-6 space-y-6">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
-        >
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              Market Intelligence Dashboard
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Real-time market analysis • {filteredData.length} symbols tracked • Live data feed
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            {lastUpdated && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-xs text-muted-foreground bg-muted/30 px-3 py-1 rounded-full"
+      {/* Bloomberg-style terminal header */}
+      <div className="bg-terminal-darker border-b border-terminal-border animate-scanline">
+        <div className="container mx-auto px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div>
+                <h1 className="text-xl font-mono-tabular font-bold text-terminal-accent">
+                  CAPVIA TERMINAL
+                </h1>
+                <div className="flex items-center gap-4 text-xs text-terminal-secondary font-mono-tabular">
+                  <span>LIVE</span>
+                  <span className="animate-pulse text-terminal-green">●</span>
+                  <span>{filteredData.length} SYMBOLS</span>
+                  <span>|</span>
+                  <span>MARKET DATA</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {lastUpdated && (
+                <div className="text-xs text-terminal-secondary font-mono-tabular bg-terminal-darker/50 px-3 py-1 rounded border border-terminal-border">
+                  {new Date(lastUpdated).toLocaleTimeString()}
+                </div>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={refetch} 
+                className="border-terminal-border bg-terminal-darker text-terminal-foreground hover:bg-terminal-border/20 font-mono-tabular"
               >
-                Last update: {new Date(lastUpdated).toLocaleTimeString()}
-              </motion.div>
-            )}
-            <Button variant="outline" size="sm" onClick={refetch} className="gap-2">
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                REFRESH
+              </Button>
+            </div>
           </div>
-        </motion.div>
+        </div>
+      </div>
 
-        {/* Market Overview Stats */}
+      <main className="container mx-auto px-6 py-6 space-y-6">
+        {/* Terminal-style Market Overview Grid */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+          className="grid grid-cols-4 gap-4"
         >
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Gainers</p>
-                  <p className="text-2xl font-bold text-green-500">{summaryStats.positive}</p>
+          <div className="bg-terminal-darker border border-terminal-border rounded-none p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">GAINERS</div>
+                <div className="text-2xl font-mono-tabular font-bold text-terminal-green">
+                  {summaryStats.positive.toString().padStart(3, '0')}
                 </div>
-                <TrendingUp className="h-8 w-8 text-green-500/30" />
               </div>
-            </CardContent>
-          </Card>
+              <TrendingUp className="h-6 w-6 text-terminal-green/30" />
+            </div>
+          </div>
           
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Losers</p>
-                  <p className="text-2xl font-bold text-red-500">{summaryStats.negative}</p>
+          <div className="bg-terminal-darker border border-terminal-border rounded-none p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">LOSERS</div>
+                <div className="text-2xl font-mono-tabular font-bold text-terminal-red">
+                  {summaryStats.negative.toString().padStart(3, '0')}
                 </div>
-                <TrendingUp className="h-8 w-8 text-red-500/30 rotate-180" />
               </div>
-            </CardContent>
-          </Card>
+              <TrendingDown className="h-6 w-6 text-terminal-red/30" />
+            </div>
+          </div>
           
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Avg RSI</p>
-                  <p className="text-2xl font-bold">{summaryStats.avgRSI.toFixed(1)}</p>
+          <div className="bg-terminal-darker border border-terminal-border rounded-none p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">AVG RSI</div>
+                <div className="text-2xl font-mono-tabular font-bold text-terminal-accent">
+                  {summaryStats.avgRSI.toFixed(1).padStart(5, ' ')}
                 </div>
-                <Activity className="h-8 w-8 text-primary/30" />
               </div>
-            </CardContent>
-          </Card>
+              <Activity className="h-6 w-6 text-terminal-accent/30" />
+            </div>
+          </div>
           
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Volume</p>
-                  <p className="text-2xl font-bold">
-                    {summaryStats.totalVolume > 1000000000 
-                      ? `${(summaryStats.totalVolume / 1000000000).toFixed(1)}B`
-                      : summaryStats.totalVolume > 1000000 
-                      ? `${(summaryStats.totalVolume / 1000000).toFixed(1)}M`
-                      : `${(summaryStats.totalVolume / 1000).toFixed(1)}K`
-                    }
-                  </p>
+          <div className="bg-terminal-darker border border-terminal-border rounded-none p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">VOLUME</div>
+                <div className="text-2xl font-mono-tabular font-bold text-terminal-accent">
+                  {summaryStats.totalVolume > 1000000000 
+                    ? `${(summaryStats.totalVolume / 1000000000).toFixed(1)}B`
+                    : summaryStats.totalVolume > 1000000 
+                    ? `${(summaryStats.totalVolume / 1000000).toFixed(1)}M`
+                    : `${(summaryStats.totalVolume / 1000).toFixed(1)}K`
+                  }
                 </div>
-                <BarChart3 className="h-8 w-8 text-primary/30" />
               </div>
-            </CardContent>
-          </Card>
+              <BarChart3 className="h-6 w-6 text-terminal-accent/30" />
+            </div>
+          </div>
         </motion.div>
 
-        {/* Filters */}
+        {/* Terminal Filters */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
+          className="bg-terminal-darker border border-terminal-border p-4"
         >
           <MarketFilters filters={filters} onFiltersChange={setFilters} />
         </motion.div>
@@ -166,49 +172,51 @@ export const Dashboard = () => {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
+            className="bg-terminal-red/10 border border-terminal-red/50 p-4 rounded-none"
           >
-            <Alert className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-              <AlertDescription className="text-red-800 dark:text-red-400">{error}</AlertDescription>
-            </Alert>
+            <div className="text-terminal-red font-mono-tabular text-sm">ERROR: {error}</div>
           </motion.div>
         )}
 
-        {/* Market Cards Grid */}
+        {/* Terminal Market Data Grid */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
         >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Live Market Data
-                <span className="text-sm font-normal text-muted-foreground ml-auto">
-                  {filteredData.length} symbols
+          <div className="bg-terminal-darker border border-terminal-border">
+            <div className="bg-terminal border-b border-terminal-border p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="font-mono-tabular font-bold text-terminal-accent">LIVE MARKET DATA</span>
+                </div>
+                <span className="text-xs font-mono-tabular text-terminal-secondary">
+                  {filteredData.length} SYMBOLS TRACKED
                 </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+              </div>
+            </div>
+            
+            <div className="p-4">
               {loading && filteredData.length === 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1">
                   {Array.from({ length: 8 }).map((_, i) => (
-                    <Skeleton key={i} className="h-64 rounded-lg" />
+                    <div key={i} className="bg-terminal border border-terminal-border h-32 animate-pulse" />
                   ))}
                 </div>
               ) : filteredData.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-terminal-secondary">
                   <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                  <p>No symbols match the current filters</p>
+                  <div className="font-mono-tabular">NO DATA MATCHING FILTERS</div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1">
                   {filteredData.map((item, index) => (
                     <motion.div
                       key={item.symbol}
-                      initial={{ opacity: 0, y: 20 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.05 * index }}
+                      transition={{ delay: 0.02 * index }}
                     >
                       <MarketCard
                         symbol={item.symbol}
@@ -225,8 +233,8 @@ export const Dashboard = () => {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </motion.div>
       </main>
     </div>

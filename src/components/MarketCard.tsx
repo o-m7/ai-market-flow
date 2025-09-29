@@ -47,104 +47,89 @@ export const MarketCard = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      whileHover={{ scale: 1.02, transition: { duration: 0.1 } }}
       className="h-full"
     >
       <Link to={`/ai-analysis?symbol=${symbol}`} className="block h-full">
-        <Card className="h-full hover:shadow-lg transition-all duration-200 border-border/50 hover:border-primary/30">
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-lg font-semibold">{symbol}</CardTitle>
-                <p className="text-sm text-muted-foreground truncate">{name}</p>
+        <div className="h-full bg-terminal border border-terminal-border hover:border-terminal-accent/50 transition-all duration-200 hover:bg-terminal-darker/50">
+          {/* Header */}
+          <div className="bg-terminal-darker border-b border-terminal-border p-3">
+            <div className="flex items-center justify-between">
+              <div className="font-mono-tabular">
+                <div className="text-sm font-bold text-terminal-accent">{symbol}</div>
+                <div className="text-xs text-terminal-secondary truncate">{name}</div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center">
                 {isPositive ? (
-                  <ArrowUpRight className="h-4 w-4 text-green-500" />
+                  <div className="text-terminal-green">▲</div>
                 ) : (
-                  <ArrowDownRight className="h-4 w-4 text-red-500" />
+                  <div className="text-terminal-red">▼</div>
                 )}
               </div>
             </div>
-          </CardHeader>
+          </div>
           
-          <CardContent className="space-y-4">
-            {/* Price Section */}
-            <div className="space-y-1">
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold">
-                  ${price?.toLocaleString(undefined, { 
-                    minimumFractionDigits: price > 1000 ? 0 : 2, 
-                    maximumFractionDigits: price > 1000 ? 0 : 4 
-                  })}
-                </span>
+          <div className="p-3 space-y-3">
+            {/* Price Section - Terminal Style */}
+            <div>
+              <div className="font-mono-tabular text-lg font-bold text-terminal-foreground">
+                {price > 1000 
+                  ? price.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                  : price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+                }
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-medium ${
-                  isPositive ? 'text-green-500' : 'text-red-500'
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`font-mono-tabular text-sm ${
+                  isPositive ? 'text-terminal-green' : 'text-terminal-red'
                 }`}>
                   {isPositive ? '+' : ''}{change?.toFixed(2)}
                 </span>
-                <Badge 
-                  variant={isPositive ? 'default' : 'destructive'}
-                  className={`text-xs ${
-                    isPositive 
-                      ? 'bg-green-500/10 text-green-500 border-green-500/20' 
-                      : 'bg-red-500/10 text-red-500 border-red-500/20'
-                  }`}
-                >
+                <div className={`px-1.5 py-0.5 text-xs font-mono-tabular border ${
+                  isPositive 
+                    ? 'text-terminal-green border-terminal-green/30 bg-terminal-green/5' 
+                    : 'text-terminal-red border-terminal-red/30 bg-terminal-red/5'
+                }`}>
                   {isPositive ? '+' : ''}{changePercent?.toFixed(2)}%
-                </Badge>
+                </div>
               </div>
             </div>
 
-            {/* Indicators Section */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border/50">
+            {/* Terminal Data Grid */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
               {rsi && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1">
-                    <Activity className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">RSI</span>
-                  </div>
-                  <span className={`text-sm font-medium ${getRSIColor()}`}>
+                <div className="bg-terminal-darker/50 border border-terminal-border/50 p-2">
+                  <div className="text-terminal-secondary font-mono-tabular">RSI</div>
+                  <div className={`font-mono-tabular font-bold ${getRSIColor()}`}>
                     {rsi.toFixed(1)}
-                  </span>
+                  </div>
                 </div>
               )}
               
               {volume && (
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground">Volume</span>
-                  <span className="text-sm font-medium">
+                <div className="bg-terminal-darker/50 border border-terminal-border/50 p-2">
+                  <div className="text-terminal-secondary font-mono-tabular">VOL</div>
+                  <div className="font-mono-tabular font-bold text-terminal-foreground">
                     {typeof volume === 'string' ? volume : volume.toLocaleString()}
-                  </span>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* AI Sentiment */}
+            {/* AI Signal - Terminal Style */}
             {aiSentiment && (
-              <div className="pt-2 border-t border-border/50">
+              <div className="border-t border-terminal-border/50 pt-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">AI Signal</span>
-                  <Badge 
-                    variant="outline" 
-                    className={`text-xs capitalize ${getSentimentColor()} border-current/20`}
-                  >
-                    {aiSentiment}
-                  </Badge>
+                  <span className="text-xs text-terminal-secondary font-mono-tabular">AI</span>
+                  <div className={`px-2 py-1 text-xs font-mono-tabular border ${getSentimentColor()} border-current/30 bg-current/5`}>
+                    {aiSentiment.toUpperCase()}
+                  </div>
                 </div>
-                {aiSummary && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {aiSummary}
-                  </p>
-                )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </Link>
     </motion.div>
   );

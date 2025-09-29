@@ -7,60 +7,90 @@ import { Link } from "react-router-dom";
 export const Navigation = () => {
 
   return (
-    <nav className="bg-gradient-card border-b border-border px-6 py-4">
-      <div className="flex items-center justify-between">
-        {/* Logo */}
+    <nav className="bg-terminal border-b border-terminal-border shadow-terminal">
+      <div className="flex items-center justify-between px-6 py-3">
+        {/* Bloomberg-style Logo */}
         <div className="flex items-center space-x-8">
-          <Link to="/dashboard" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-            <BarChart3 className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Capvia
-            </h1>
+          <Link to="/dashboard" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
+            <div className="bg-terminal-accent text-terminal p-2 rounded-none">
+              <BarChart3 className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-mono-tabular font-bold text-terminal-accent">
+                CAPVIA
+              </h1>
+              <div className="text-xs text-terminal-secondary font-mono-tabular">TERMINAL</div>
+            </div>
           </Link>
           
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link to="/portfolio" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
-              <BarChart3 className="h-4 w-4" />
-              <span>Portfolio</span>
+          {/* Terminal-style Navigation */}
+          <nav className="hidden md:flex items-center space-x-1">
+            <Link 
+              to="/portfolio" 
+              className="flex items-center space-x-2 px-4 py-2 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border"
+            >
+              <BarChart3 className="h-3 w-3" />
+              <span className="text-sm">PORTFOLIO</span>
             </Link>
-            <Link to="/ai-analysis" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
-              <Brain className="h-4 w-4" />
-              <span>AI Analysis</span>
+            <Link 
+              to="/ai-analysis" 
+              className="flex items-center space-x-2 px-4 py-2 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border"
+            >
+              <Brain className="h-3 w-3" />
+              <span className="text-sm">AI ANALYSIS</span>
             </Link>
-            <Link to="/news" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
-              <Bell className="h-4 w-4" />
-              <span>News</span>
+            <Link 
+              to="/news" 
+              className="flex items-center space-x-2 px-4 py-2 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border"
+            >
+              <Bell className="h-3 w-3" />
+              <span className="text-sm">NEWS</span>
             </Link>
-            <Link to="/alerts" className="flex items-center space-x-1 text-muted-foreground hover:text-foreground transition-colors">
-              <Bell className="h-4 w-4" />
-              <span>Alerts</span>
+            <Link 
+              to="/alerts" 
+              className="flex items-center space-x-2 px-4 py-2 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker transition-all font-mono-tabular border border-transparent hover:border-terminal-border"
+            >
+              <Bell className="h-3 w-3" />
+              <span className="text-sm">ALERTS</span>
             </Link>
           </nav>
         </div>
 
-        {/* Search Bar */}
-        <SearchBar />
+        {/* Terminal Search */}
+        <div className="flex-1 max-w-md mx-8">
+          <SearchBar />
+        </div>
 
-        {/* Actions */}
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" asChild>
+        {/* Terminal Actions */}
+        <div className="flex items-center space-x-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker border border-transparent hover:border-terminal-border font-mono-tabular" 
+            asChild
+          >
             <Link to="/alerts">
-              <Bell className="h-5 w-5" />
+              <Bell className="h-4 w-4 mr-1" />
+              <span className="text-xs">ALERTS</span>
             </Link>
           </Button>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                <User className="h-5 w-5" />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker border border-transparent hover:border-terminal-border font-mono-tabular"
+              >
+                <User className="h-4 w-4 mr-1" />
+                <span className="text-xs">USER</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover border-border">
-              <DropdownMenuItem asChild>
-                <Link to="/settings" className="flex items-center">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
+            <DropdownMenuContent align="end" className="bg-terminal border-terminal-border rounded-none">
+              <DropdownMenuItem asChild className="font-mono-tabular">
+                <Link to="/settings" className="flex items-center text-terminal-foreground hover:text-terminal-accent">
+                  <Settings className="h-3 w-3 mr-2" />
+                  SETTINGS
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuContent>

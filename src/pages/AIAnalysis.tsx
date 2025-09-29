@@ -284,25 +284,30 @@ export const AIAnalysis = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-terminal text-terminal-foreground">
       <Navigation />
       
-      <div className="container mx-auto px-4 py-6">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent flex items-center gap-3 mb-2">
-            <Brain className="h-8 w-8 text-primary" />
-            AI Technical Analysis
-          </h1>
-          <p className="text-muted-foreground">
-            Professional market analysis with institutional-grade AI and quantitative metrics
-          </p>
-        </motion.div>
-
+      {/* Bloomberg-style AI Analysis Header */}
+      <div className="bg-terminal-darker border-b border-terminal-border animate-scanline">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-mono-tabular font-bold text-terminal-accent flex items-center gap-3">
+                <Brain className="h-6 w-6" />
+                AI TECHNICAL ANALYSIS
+              </h1>
+              <div className="text-xs text-terminal-secondary font-mono-tabular mt-1">
+                INSTITUTIONAL-GRADE AI • QUANTITATIVE METRICS • REAL-TIME ANALYSIS
+              </div>
+            </div>
+            <div className="text-xs font-mono-tabular text-terminal-secondary">
+              <div>CURRENT SESSION: {new Date().toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="container mx-auto px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Panel - Analysis Controls */}
           <motion.div
@@ -311,113 +316,116 @@ export const AIAnalysis = () => {
             transition={{ delay: 0.1 }}
             className="lg:col-span-1"
           >
-            <div className="sticky top-6 space-y-6">
-              {/* Symbol Input */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
+            <div className="sticky top-6 space-y-4">
+              {/* Terminal Symbol Input */}
+              <div className="bg-terminal border border-terminal-border">
+                <div className="bg-terminal-darker border-b border-terminal-border p-3">
+                  <div className="font-mono-tabular text-sm font-bold text-terminal-accent flex items-center gap-2">
                     <Search className="h-4 w-4" />
-                    Market Symbol
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+                    MARKET SYMBOL
+                  </div>
+                </div>
+                <div className="p-3 space-y-3">
                   <div className="space-y-2">
-                    <Label htmlFor="symbol">Symbol</Label>
+                    <Label htmlFor="symbol" className="font-mono-tabular text-xs text-terminal-secondary">SYMBOL</Label>
                     <Select value={symbol} onValueChange={setSymbol}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Symbol" />
+                      <SelectTrigger className="bg-terminal-darker border-terminal-border rounded-none font-mono-tabular">
+                        <SelectValue placeholder="SELECT SYMBOL" />
                       </SelectTrigger>
-                      <SelectContent className="max-h-80">
+                      <SelectContent className="bg-terminal border-terminal-border rounded-none max-h-80">
                         <div className="p-2">
-                          <div className="font-semibold text-sm mb-2 text-orange-600">₿ Crypto</div>
+                          <div className="font-mono-tabular text-xs mb-2 text-terminal-green">₿ CRYPTO</div>
                           {SYMBOL_CATEGORIES.Crypto.slice(0, 15).map((sym) => (
-                            <SelectItem key={sym} value={sym} className="pl-4">
+                            <SelectItem key={sym} value={sym} className="font-mono-tabular">
                               {sym}
                             </SelectItem>
                           ))}
                         </div>
                         <div className="p-2">
-                          <div className="font-semibold text-sm mb-2 text-blue-600">💱 Forex</div>
+                          <div className="font-mono-tabular text-xs mb-2 text-terminal-accent">💱 FOREX</div>
                           {SYMBOL_CATEGORIES.Forex.slice(0, 15).map((sym) => (
-                            <SelectItem key={sym} value={sym} className="pl-4">
+                            <SelectItem key={sym} value={sym} className="font-mono-tabular">
                               {sym}
                             </SelectItem>
                           ))}
                         </div>
                       </SelectContent>
                     </Select>
-                    <Badge variant={getAssetType(symbol) === 'STOCK' ? 'default' : 'secondary'} className="text-xs">
-                      {getAssetType(symbol)} Market
-                    </Badge>
+                    <div className="bg-terminal-darker/50 border border-terminal-border/50 p-2">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary">MARKET TYPE</div>
+                      <div className="text-xs font-mono-tabular text-terminal-accent">{getAssetType(symbol)} MARKET</div>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="timeframe">Timeframe</Label>
+                    <Label htmlFor="timeframe" className="font-mono-tabular text-xs text-terminal-secondary">TIMEFRAME</Label>
                     <Select value={timeframe} onValueChange={(value: any) => setTimeframe(value)}>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-terminal-darker border-terminal-border rounded-none font-mono-tabular">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 Minute</SelectItem>
-                        <SelectItem value="5">5 Minutes</SelectItem>
-                        <SelectItem value="15">15 Minutes</SelectItem>
-                        <SelectItem value="30">30 Minutes</SelectItem>
-                        <SelectItem value="60">1 Hour</SelectItem>
-                        <SelectItem value="240">4 Hours</SelectItem>
-                        <SelectItem value="D">1 Day</SelectItem>
+                      <SelectContent className="bg-terminal border-terminal-border rounded-none">
+                        <SelectItem value="1" className="font-mono-tabular">1 MINUTE</SelectItem>
+                        <SelectItem value="5" className="font-mono-tabular">5 MINUTES</SelectItem>
+                        <SelectItem value="15" className="font-mono-tabular">15 MINUTES</SelectItem>
+                        <SelectItem value="30" className="font-mono-tabular">30 MINUTES</SelectItem>
+                        <SelectItem value="60" className="font-mono-tabular">1 HOUR</SelectItem>
+                        <SelectItem value="240" className="font-mono-tabular">4 HOURS</SelectItem>
+                        <SelectItem value="D" className="font-mono-tabular">1 DAY</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 p-2 bg-terminal-darker/50 border border-terminal-border/50">
                     <Switch
                       id="quant-data"
                       checked={includeQuantData}
                       onCheckedChange={setIncludeQuantData}
                     />
-                    <Label htmlFor="quant-data" className="text-sm">Include Quant Metrics</Label>
+                    <Label htmlFor="quant-data" className="font-mono-tabular text-xs text-terminal-secondary">QUANT METRICS</Label>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              {/* Analysis Control */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Analysis Control</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+              {/* Terminal Analysis Control */}
+              <div className="bg-terminal border border-terminal-border">
+                <div className="bg-terminal-darker border-b border-terminal-border p-3">
+                  <div className="font-mono-tabular text-sm font-bold text-terminal-accent">ANALYSIS CONTROL</div>
+                </div>
+                <div className="p-3 space-y-3">
                   <Button 
                     onClick={handleAnalysis} 
                     disabled={loading || chartData.length < 30}
-                    className="w-full"
+                    className="w-full bg-terminal-accent hover:bg-terminal-accent/80 text-terminal border-none rounded-none font-mono-tabular"
                     size="lg"
                   >
                     {loading ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Analyzing...
+                        ANALYZING...
                       </>
                     ) : (
                       <>
                         <Brain className="h-4 w-4 mr-2" />
-                        Run AI Analysis
+                        RUN AI ANALYSIS
                       </>
                     )}
                   </Button>
 
                   {chartData.length > 0 && (
-                    <div className="text-xs text-muted-foreground bg-muted/30 rounded p-2">
-                      📊 {chartData.length} data points loaded
+                    <div className="bg-terminal-darker/50 border border-terminal-border/50 p-2">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary">DATA POINTS</div>
+                      <div className="text-sm font-mono-tabular text-terminal-green">{chartData.length}</div>
                     </div>
                   )}
 
                   {user && !isSubscribed && !usageLoading && (
-                    <div className="text-xs text-muted-foreground">
-                      {usage.remainingAnalyses}/5 free analyses remaining today
+                    <div className="bg-terminal-darker/50 border border-terminal-border/50 p-2">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary">REMAINING</div>
+                      <div className="text-sm font-mono-tabular text-terminal-accent">{usage.remainingAnalyses}/5</div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* AI Settings */}
               <Card>
