@@ -29,6 +29,7 @@ export const usePolygonData = (symbols: string[], refreshInterval = 3000) => {
   const fetchMarketData = async () => {
     try {
       setError(null);
+      console.log('Fetching market data for symbols:', symbols);
       
       const { data: response, error: functionError } = await supabase.functions.invoke(
         'polygon-market-data',
@@ -48,22 +49,13 @@ export const usePolygonData = (symbols: string[], refreshInterval = 3000) => {
       }
 
       if (result.data) {
-        // Merge new data with existing data to prevent symbols from disappearing
-        setData(prevData => {
-          const newDataMap = new Map(result.data.map(item => [item.symbol, item]));
-          const mergedData = prevData.map(existingItem => 
-            newDataMap.get(existingItem.symbol) || existingItem
-          );
-          
-          // Add any completely new symbols
-          result.data.forEach(newItem => {
-            if (!prevData.some(existing => existing.symbol === newItem.symbol)) {
-              mergedData.push(newItem);
-            }
-          });
-          
-          return mergedData;
-        });
+        console.log('API returned data for symbols:', result.data.map(item => item.symbol));
+        
+        // Only show data that matches current symbols filter - NO MERGING
+        const filteredData = result.data.filter(item => symbols.includes(item.symbol));
+        console.log('Filtered data to match current symbols:', filteredData.map(item => item.symbol));
+        
+        setData(filteredData);
         setLastUpdated(result.timestamp);
       }
     } catch (err) {
