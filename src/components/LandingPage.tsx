@@ -13,7 +13,7 @@ export const LandingPage = () => {
     <div className="min-h-screen bg-background">
       {/* Animated Background Grid */}
       <div className="fixed inset-0 terminal-grid animate-terminal-grid pointer-events-none" />
-      <div className="fixed top-0 left-0 w-full h-px bg-primary/30 animate-scanline pointer-events-none" />
+      <div className="fixed top-0 left-0 w-full h-px bg-primary/30 pointer-events-none opacity-0" />
 
       {/* Navigation */}
       <nav className="relative border-b border-border/50 bg-card/80 backdrop-blur-sm">
