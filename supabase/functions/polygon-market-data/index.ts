@@ -273,7 +273,7 @@ serve(async (req) => {
     console.log('✅ Using Polygon API for live market data');
 
     // Process symbols with batch requests for better performance
-    const batchPromises = symbolsToFetch.slice(0, 10).map(async (rawSymbol) => {
+    const batchPromises = symbolsToFetch.map(async (rawSymbol) => {
       try {
         const { polygon: polygonSymbol, type } = getPolygonSymbol(rawSymbol);
         console.log(`[POLYGON] Processing ${rawSymbol} -> ${polygonSymbol} (${type})`);
