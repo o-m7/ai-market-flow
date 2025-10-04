@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.macro-market-analysis]
 verify_jwt = false
 
+[functions.market-sentiment]
+verify_jwt = false
+
 [functions.binance-data]
 verify_jwt = false
 

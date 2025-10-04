@@ -10,7 +10,9 @@ import { MarketCard } from "@/components/MarketCard";
 import { MarketFilters, type MarketFilters as MarketFiltersType } from "@/components/MarketFilters";
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
-import { RefreshCw, TrendingUp, Activity, DollarSign, BarChart3 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { RefreshCw, TrendingUp, Activity, DollarSign, BarChart3, TrendingDown } from "lucide-react";
+import { useEffect } from "react";
 
 export const Dashboard = () => {
   const [filters, setFilters] = useState<MarketFiltersType>({
@@ -50,20 +52,47 @@ export const Dashboard = () => {
     return result;
   }, [data, filters.trend]);
 
+  // AI-powered market sentiment
+  const [sentiment, setSentiment] = useState<{
+    sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+    fearGreedIndex: number;
+    analysis: string;
+  } | null>(null);
+  const [sentimentLoading, setSentimentLoading] = useState(false);
+
+  // Fetch market sentiment when data changes
+  useEffect(() => {
+    const fetchSentiment = async () => {
+      if (!filteredData.length || sentimentLoading) return;
+      
+      setSentimentLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('market-sentiment', {
+          body: { marketData: filteredData }
+        });
+
+        if (error) throw error;
+        setSentiment(data);
+      } catch (err) {
+        console.error('Error fetching sentiment:', err);
+      } finally {
+        setSentimentLoading(false);
+      }
+    };
+
+    // Debounce sentiment updates
+    const timer = setTimeout(fetchSentiment, 2000);
+    return () => clearTimeout(timer);
+  }, [filteredData]);
+
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
-    if (!filteredData.length) return { positive: 0, negative: 0, avgRSI: 0 };
+    if (!filteredData.length) return { positive: 0, negative: 0 };
     
     const positive = filteredData.filter(item => item.changePercent > 0).length;
     const negative = filteredData.filter(item => item.changePercent < 0).length;
     
-    // Only calculate average RSI from items that actually have RSI values
-    const itemsWithRSI = filteredData.filter(item => item.rsi !== undefined && item.rsi !== null);
-    const avgRSI = itemsWithRSI.length > 0
-      ? itemsWithRSI.reduce((sum, item) => sum + item.rsi!, 0) / itemsWithRSI.length
-      : 0;
-    
-    return { positive, negative, avgRSI };
+    return { positive, negative };
   }, [filteredData]);
 
   return (
@@ -144,12 +173,50 @@ export const Dashboard = () => {
           <div className="bg-terminal-darker border border-terminal-border rounded-none p-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">AVG RSI</div>
-                <div className="text-2xl font-mono-tabular font-bold text-terminal-accent">
-                  {summaryStats.avgRSI.toFixed(1).padStart(5, ' ')}
-                </div>
+                <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">SENTIMENT</div>
+                {sentimentLoading ? (
+                  <div className="text-2xl font-mono-tabular font-bold text-terminal-secondary animate-pulse">
+                    ---
+                  </div>
+                ) : (
+                  <div className={`text-2xl font-mono-tabular font-bold ${
+                    sentiment?.sentiment === 'BULLISH' ? 'text-terminal-green' : 
+                    sentiment?.sentiment === 'BEARISH' ? 'text-terminal-red' : 
+                    'text-terminal-secondary'
+                  }`}>
+                    {sentiment?.sentiment || 'NEUTRAL'}
+                  </div>
+                )}
               </div>
-              <Activity className="h-6 w-6 text-terminal-accent/30" />
+              {sentiment?.sentiment === 'BULLISH' ? (
+                <TrendingUp className="h-6 w-6 text-terminal-green/30" />
+              ) : sentiment?.sentiment === 'BEARISH' ? (
+                <TrendingDown className="h-6 w-6 text-terminal-red/30" />
+              ) : (
+                <Activity className="h-6 w-6 text-terminal-accent/30" />
+              )}
+            </div>
+          </div>
+
+          <div className="bg-terminal-darker border border-terminal-border rounded-none p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">FEAR/GREED</div>
+                {sentimentLoading ? (
+                  <div className="text-2xl font-mono-tabular font-bold text-terminal-secondary animate-pulse">
+                    --
+                  </div>
+                ) : (
+                  <div className={`text-2xl font-mono-tabular font-bold ${
+                    (sentiment?.fearGreedIndex || 0) >= 70 ? 'text-terminal-green' :
+                    (sentiment?.fearGreedIndex || 0) <= 30 ? 'text-terminal-red' :
+                    'text-terminal-secondary'
+                  }`}>
+                    {sentiment?.fearGreedIndex || 50}
+                  </div>
+                )}
+              </div>
+              <BarChart3 className="h-6 w-6 text-terminal-accent/30" />
             </div>
           </div>
         </motion.div>
