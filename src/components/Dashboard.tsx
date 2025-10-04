@@ -56,7 +56,12 @@ export const Dashboard = () => {
     
     const positive = filteredData.filter(item => item.changePercent > 0).length;
     const negative = filteredData.filter(item => item.changePercent < 0).length;
-    const avgRSI = filteredData.reduce((sum, item) => sum + (item.rsi || 50), 0) / filteredData.length;
+    
+    // Only calculate average RSI from items that actually have RSI values
+    const itemsWithRSI = filteredData.filter(item => item.rsi !== undefined && item.rsi !== null);
+    const avgRSI = itemsWithRSI.length > 0
+      ? itemsWithRSI.reduce((sum, item) => sum + item.rsi!, 0) / itemsWithRSI.length
+      : 0;
     
     return { positive, negative, avgRSI };
   }, [filteredData]);
