@@ -8,6 +8,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Simple in-memory cache to prevent rate limiting
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 10000; // 10 seconds cache
+
+function getCached(key: string) {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    console.log(`[CACHE HIT] ${key}`);
+    return cached.data;
+  }
+  return null;
+}
+
+function setCache(key: string, data: any) {
+  cache.set(key, { data, timestamp: Date.now() });
+  // Clean up old entries
+  if (cache.size > 100) {
+    const oldestKey = Array.from(cache.keys())[0];
+    cache.delete(oldestKey);
+  }
+}
+
 interface PolygonQuote {
   ticker: string;
   last_quote?: {
@@ -274,8 +296,15 @@ serve(async (req) => {
 
     // Process symbols with batch requests - add delays to avoid rate limiting
     const batchPromises = symbolsToFetch.map(async (rawSymbol, index) => {
-      // Add staggered delay to avoid rate limiting (50ms per symbol)
-      await new Promise(resolve => setTimeout(resolve, index * 50));
+      // Check cache first
+      const cacheKey = `market_${rawSymbol}`;
+      const cachedData = getCached(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+      
+      // Add staggered delay to avoid rate limiting (100ms per symbol)
+      await new Promise(resolve => setTimeout(resolve, index * 100));
       
       try {
         const { polygon: polygonSymbol, type } = getPolygonSymbol(rawSymbol);
@@ -406,24 +435,31 @@ serve(async (req) => {
         if (prevData?.results?.[0]) {
           prevClose = prevData.results[0].c;
           volume = prevData.results[0].v || 0;
+          console.log(`[POLYGON][${rawSymbol}] Volume from prevData: ${volume}`);
         } else if (snapshotData?.ticker?.prevDay?.c) {
           prevClose = snapshotData.ticker.prevDay.c;
           volume = snapshotData.ticker.day?.v || snapshotData.ticker.prevDay?.v || 0;
+          console.log(`[POLYGON][${rawSymbol}] Volume from snapshot.ticker: ${volume}`);
         } else if (snapshotData?.results?.[0]?.prev_day) {
           prevClose = snapshotData.results[0].prev_day.c;
           volume = snapshotData.results[0].day?.v || snapshotData.results[0].prev_day?.v || 0;
+          console.log(`[POLYGON][${rawSymbol}] Volume from snapshot.results: ${volume}`);
         } else if (type === 'forex' && snapshotData?.ticker?.day?.o) {
           prevClose = snapshotData.ticker.day.o;
           volume = snapshotData.ticker.day?.v || 0;
+          console.log(`[POLYGON][${rawSymbol}] Volume from forex snapshot.ticker.day: ${volume}`);
         } else if (snapshotData?.ticker?.day?.c) {
           prevClose = snapshotData.ticker.day.c;
           volume = snapshotData.ticker.day?.v || 0;
+          console.log(`[POLYGON][${rawSymbol}] Volume from snapshot.ticker.day: ${volume}`);
         } else if (type === 'forex' && snapshotData?.results?.[0]?.day?.o) {
           prevClose = snapshotData.results[0].day.o;
           volume = snapshotData.results[0].day?.v || 0;
+          console.log(`[POLYGON][${rawSymbol}] Volume from forex snapshot.results.day: ${volume}`);
         } else if (snapshotData?.results?.[0]?.day?.c) {
           prevClose = snapshotData.results[0].day.c;
           volume = snapshotData.results[0].day?.v || 0;
+          console.log(`[POLYGON][${rawSymbol}] Volume from snapshot.results.day: ${volume}`);
         }
         
         if (currentPrice) {
@@ -451,7 +487,10 @@ serve(async (req) => {
             aiSentiment: aiSentiment as 'bullish' | 'bearish' | 'neutral'
           };
           
-          console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) @ ${marketDataItem.lastUpdate}`);
+          // Cache the successful result
+          setCache(`market_${rawSymbol}`, marketDataItem);
+          
+          console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) vol: ${formatVolume(volume)} @ ${marketDataItem.lastUpdate}`);
         } else {
           console.warn(`[POLYGON] ⚠️ No live data available for ${rawSymbol}`);
         }

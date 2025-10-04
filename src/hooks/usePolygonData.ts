@@ -20,7 +20,7 @@ interface PolygonDataResponse {
   error?: string;
 }
 
-export const usePolygonData = (symbols: string[], refreshInterval = 5000) => {
+export const usePolygonData = (symbols: string[], refreshInterval = 15000) => {
   const [data, setData] = useState<MarketSymbol[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
