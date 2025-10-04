@@ -272,8 +272,11 @@ serve(async (req) => {
 
     console.log('✅ Using Polygon API for live market data');
 
-    // Process symbols with batch requests for better performance
-    const batchPromises = symbolsToFetch.map(async (rawSymbol) => {
+    // Process symbols with batch requests - add delays to avoid rate limiting
+    const batchPromises = symbolsToFetch.map(async (rawSymbol, index) => {
+      // Add staggered delay to avoid rate limiting (50ms per symbol)
+      await new Promise(resolve => setTimeout(resolve, index * 50));
+      
       try {
         const { polygon: polygonSymbol, type } = getPolygonSymbol(rawSymbol);
         console.log(`[POLYGON] Processing ${rawSymbol} -> ${polygonSymbol} (${type})`);
@@ -399,24 +402,28 @@ serve(async (req) => {
           }
         }
         
-        // Get previous close
+        // Get previous close and volume
         if (prevData?.results?.[0]) {
           prevClose = prevData.results[0].c;
           volume = prevData.results[0].v || 0;
         } else if (snapshotData?.ticker?.prevDay?.c) {
           prevClose = snapshotData.ticker.prevDay.c;
-          volume = snapshotData.ticker.day?.v || 0;
+          volume = snapshotData.ticker.day?.v || snapshotData.ticker.prevDay?.v || 0;
         } else if (snapshotData?.results?.[0]?.prev_day) {
           prevClose = snapshotData.results[0].prev_day.c;
-          volume = snapshotData.results[0].day?.v || 0;
+          volume = snapshotData.results[0].day?.v || snapshotData.results[0].prev_day?.v || 0;
         } else if (type === 'forex' && snapshotData?.ticker?.day?.o) {
           prevClose = snapshotData.ticker.day.o;
+          volume = snapshotData.ticker.day?.v || 0;
         } else if (snapshotData?.ticker?.day?.c) {
           prevClose = snapshotData.ticker.day.c;
+          volume = snapshotData.ticker.day?.v || 0;
         } else if (type === 'forex' && snapshotData?.results?.[0]?.day?.o) {
           prevClose = snapshotData.results[0].day.o;
+          volume = snapshotData.results[0].day?.v || 0;
         } else if (snapshotData?.results?.[0]?.day?.c) {
           prevClose = snapshotData.results[0].day.c;
+          volume = snapshotData.results[0].day?.v || 0;
         }
         
         if (currentPrice) {
@@ -439,7 +446,7 @@ serve(async (req) => {
             price: Number(currentPrice.toFixed(4)),
             change: Number(change.toFixed(4)),
             changePercent: Number(changePercent.toFixed(2)),
-            volume: type === 'forex' ? '—' : formatVolume(volume),
+            volume: volume > 0 ? formatVolume(volume) : '—',
             lastUpdate: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
             aiSentiment: aiSentiment as 'bullish' | 'bearish' | 'neutral'
           };
@@ -460,24 +467,12 @@ serve(async (req) => {
     // Wait for all requests to complete
     const results = await Promise.all(batchPromises);
     
-    // Ensure all requested symbols are included, even if they failed to fetch
-    symbols.forEach((symbol, index) => {
-      const result = results[index];
-      if (result) {
+    // Only include symbols that successfully returned data (no 0 prices)
+    results.forEach((result) => {
+      if (result && result.price > 0) {
         marketData.push(result);
-      } else {
-        // Create a placeholder entry for failed symbols to prevent disappearing
-        console.warn(`[POLYGON] ⚠️ Creating placeholder for failed symbol: ${symbol}`);
-        marketData.push({
-          symbol,
-          name: getMarketName(symbol),
-          price: 0,
-          change: 0,
-          changePercent: 0,
-          volume: '—',
-          lastUpdate: new Date().toISOString(),
-          aiSentiment: 'neutral' as 'neutral'
-        });
+      } else if (result) {
+        console.warn(`[POLYGON] ⚠️ Skipping ${result.symbol} - no valid price data (rate limited or unavailable)`);
       }
     });
 
