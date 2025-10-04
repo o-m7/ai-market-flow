@@ -278,7 +278,7 @@ export const AIAnalysis = () => {
       <Navigation />
       
       {/* Bloomberg-style AI Analysis Header */}
-      <div className="bg-terminal-darker border-b border-terminal-border animate-scanline">
+      <div className="bg-terminal-darker border-b border-terminal-border">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
