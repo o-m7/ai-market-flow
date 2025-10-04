@@ -7,7 +7,8 @@ export interface MarketSymbol {
   price: number;
   change: number;
   changePercent: number;
-  volume: string;
+  high24h: number;
+  low24h: number;
   rsi?: number;
   aiSentiment?: 'bullish' | 'bearish' | 'neutral';
   aiSummary?: string;

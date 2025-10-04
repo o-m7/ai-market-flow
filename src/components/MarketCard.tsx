@@ -10,7 +10,8 @@ interface MarketCardProps {
   price: number;
   change: number;
   changePercent: number;
-  volume?: string | number;
+  high24h?: number;
+  low24h?: number;
   rsi?: number;
   aiSentiment?: 'bullish' | 'bearish' | 'neutral';
   aiSummary?: string;
@@ -22,9 +23,10 @@ export const MarketCard = ({
   price, 
   change, 
   changePercent, 
-  volume, 
+  high24h,
+  low24h,
   rsi, 
-  aiSentiment, 
+  aiSentiment,
   aiSummary 
 }: MarketCardProps) => {
   const isPositive = changePercent > 0;
@@ -107,11 +109,12 @@ export const MarketCard = ({
                 </div>
               )}
               
-              {volume && (
+              {high24h !== undefined && low24h !== undefined && (
                 <div className="bg-terminal-darker/50 border border-terminal-border/50 p-2">
-                  <div className="text-terminal-secondary font-mono-tabular">VOL</div>
-                  <div className="font-mono-tabular font-bold text-terminal-foreground">
-                    {typeof volume === 'string' ? volume : volume.toLocaleString()}
+                  <div className="text-terminal-secondary font-mono-tabular">24H</div>
+                  <div className="font-mono-tabular font-bold">
+                    <div className="text-terminal-green text-[10px]">${high24h.toFixed(4)}</div>
+                    <div className="text-terminal-red text-[10px]">${low24h.toFixed(4)}</div>
                   </div>
                 </div>
               )}

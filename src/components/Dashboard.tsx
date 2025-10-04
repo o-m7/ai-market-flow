@@ -10,7 +10,6 @@ import { MarketCard } from "@/components/MarketCard";
 import { MarketFilters, type MarketFilters as MarketFiltersType } from "@/components/MarketFilters";
 import { usePolygonData } from "@/hooks/usePolygonData";
 import { getSymbolsByMarketType } from "@/lib/marketSymbols";
-import { parseVolumeString } from "@/lib/volumeUtils";
 import { RefreshCw, TrendingUp, Activity, DollarSign, BarChart3 } from "lucide-react";
 
 export const Dashboard = () => {
@@ -53,14 +52,13 @@ export const Dashboard = () => {
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
-    if (!filteredData.length) return { positive: 0, negative: 0, totalVolume: 0, avgRSI: 0 };
+    if (!filteredData.length) return { positive: 0, negative: 0, avgRSI: 0 };
     
     const positive = filteredData.filter(item => item.changePercent > 0).length;
     const negative = filteredData.filter(item => item.changePercent < 0).length;
-    const totalVolume = filteredData.reduce((sum, item) => sum + parseVolumeString(item.volume), 0);
     const avgRSI = filteredData.reduce((sum, item) => sum + (item.rsi || 50), 0) / filteredData.length;
     
-    return { positive, negative, totalVolume, avgRSI };
+    return { positive, negative, avgRSI };
   }, [filteredData]);
 
   return (
@@ -149,23 +147,6 @@ export const Dashboard = () => {
               <Activity className="h-6 w-6 text-terminal-accent/30" />
             </div>
           </div>
-          
-          <div className="bg-terminal-darker border border-terminal-border rounded-none p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs text-terminal-secondary font-mono-tabular mb-1">VOLUME</div>
-                <div className="text-2xl font-mono-tabular font-bold text-terminal-accent">
-                  {summaryStats.totalVolume > 1000000000 
-                    ? `${(summaryStats.totalVolume / 1000000000).toFixed(1)}B`
-                    : summaryStats.totalVolume > 1000000 
-                    ? `${(summaryStats.totalVolume / 1000000).toFixed(1)}M`
-                    : `${(summaryStats.totalVolume / 1000).toFixed(1)}K`
-                  }
-                </div>
-              </div>
-              <BarChart3 className="h-6 w-6 text-terminal-accent/30" />
-            </div>
-          </div>
         </motion.div>
 
         {/* Terminal Filters */}
@@ -234,7 +215,8 @@ export const Dashboard = () => {
                         price={item.price}
                         change={item.change}
                         changePercent={item.changePercent}
-                        volume={item.volume}
+                        high24h={item.high24h}
+                        low24h={item.low24h}
                         rsi={item.rsi}
                         aiSentiment={item.aiSentiment}
                         aiSummary={item.aiSummary}

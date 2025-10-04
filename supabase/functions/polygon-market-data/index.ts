@@ -366,6 +366,8 @@ serve(async (req) => {
         let currentPrice = null;
         let prevClose = null;
         let volume = 0;
+        let high24h = 0;
+        let low24h = 0;
         let timestamp = null;
         
         // Get the most recent price from available sources
@@ -419,42 +421,43 @@ serve(async (req) => {
           }
         }
         
-        // Get previous close and volume - ONLY from Polygon API, NO FALLBACKS
+        // Get previous close and 24h high/low - ONLY from Polygon API
         if (prevData?.results?.[0]) {
           prevClose = prevData.results[0].c;
-          volume = prevData.results[0].v ?? 0;
-          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: prevData.results[0].v = ${prevData.results[0].v} (RAW FROM API)`);
+          high24h = prevData.results[0].h ?? 0;
+          low24h = prevData.results[0].l ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ 24h Range from prevData: H=${high24h} L=${low24h} (RAW FROM API)`);
         } else if (snapshotData?.ticker?.prevDay?.c) {
           prevClose = snapshotData.ticker.prevDay.c;
-          const dayVol = snapshotData.ticker.day?.v;
-          const prevDayVol = snapshotData.ticker.prevDay?.v;
-          volume = dayVol ?? prevDayVol ?? 0;
-          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: snapshot.ticker day=${dayVol}, prevDay=${prevDayVol} (RAW FROM API)`);
+          high24h = snapshotData.ticker.day?.h ?? snapshotData.ticker.prevDay?.h ?? 0;
+          low24h = snapshotData.ticker.day?.l ?? snapshotData.ticker.prevDay?.l ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ 24h Range from snapshot.ticker: H=${high24h} L=${low24h} (RAW FROM API)`);
         } else if (snapshotData?.results?.[0]?.prev_day) {
           prevClose = snapshotData.results[0].prev_day.c;
-          const dayVol = snapshotData.results[0].day?.v;
-          const prevDayVol = snapshotData.results[0].prev_day?.v;
-          volume = dayVol ?? prevDayVol ?? 0;
-          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: snapshot.results day=${dayVol}, prevDay=${prevDayVol} (RAW FROM API)`);
+          high24h = snapshotData.results[0].day?.h ?? snapshotData.results[0].prev_day?.h ?? 0;
+          low24h = snapshotData.results[0].day?.l ?? snapshotData.results[0].prev_day?.l ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ 24h Range from snapshot.results: H=${high24h} L=${low24h} (RAW FROM API)`);
         } else if (type === 'forex' && snapshotData?.ticker?.day?.o) {
           prevClose = snapshotData.ticker.day.o;
-          volume = snapshotData.ticker.day?.v ?? 0;
-          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: forex snapshot.ticker.day.v = ${snapshotData.ticker.day?.v} (RAW FROM API)`);
+          high24h = snapshotData.ticker.day?.h ?? 0;
+          low24h = snapshotData.ticker.day?.l ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ 24h Range from forex snapshot.ticker.day: H=${high24h} L=${low24h} (RAW FROM API)`);
         } else if (snapshotData?.ticker?.day?.c) {
           prevClose = snapshotData.ticker.day.c;
-          volume = snapshotData.ticker.day?.v ?? 0;
-          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: snapshot.ticker.day.v = ${snapshotData.ticker.day?.v} (RAW FROM API)`);
+          high24h = snapshotData.ticker.day?.h ?? 0;
+          low24h = snapshotData.ticker.day?.l ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ 24h Range from snapshot.ticker.day: H=${high24h} L=${low24h} (RAW FROM API)`);
         } else if (type === 'forex' && snapshotData?.results?.[0]?.day?.o) {
           prevClose = snapshotData.results[0].day.o;
-          volume = snapshotData.results[0].day?.v ?? 0;
-          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: forex snapshot.results.day.v = ${snapshotData.results[0].day?.v} (RAW FROM API)`);
+          high24h = snapshotData.results[0].day?.h ?? 0;
+          low24h = snapshotData.results[0].day?.l ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ 24h Range from forex snapshot.results.day: H=${high24h} L=${low24h} (RAW FROM API)`);
         } else if (snapshotData?.results?.[0]?.day?.c) {
           prevClose = snapshotData.results[0].day.c;
-          volume = snapshotData.results[0].day?.v ?? 0;
-          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: snapshot.results.day.v = ${snapshotData.results[0].day?.v} (RAW FROM API)`);
+          high24h = snapshotData.results[0].day?.h ?? 0;
+          low24h = snapshotData.results[0].day?.l ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ 24h Range from snapshot.results.day: H=${high24h} L=${low24h} (RAW FROM API)`);
         }
-        
-        console.log(`[POLYGON][${rawSymbol}] FINAL VOLUME VALUE: ${volume} (${volume === 0 ? 'Polygon returned 0 or no volume data' : 'Valid volume from Polygon'})`);
         
         if (currentPrice) {
           const change = prevClose ? (currentPrice - prevClose) : 0;
@@ -476,12 +479,13 @@ serve(async (req) => {
             price: Number(currentPrice.toFixed(4)),
             change: Number(change.toFixed(4)),
             changePercent: Number(changePercent.toFixed(2)),
-            volume: volume.toString(), // RAW REAL volume number from Polygon API - NO FORMATTING, NO MOCK
+            high24h: Number(high24h.toFixed(4)),
+            low24h: Number(low24h.toFixed(4)),
             lastUpdate: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
             aiSentiment: aiSentiment as 'bullish' | 'bearish' | 'neutral'
           };
           
-          console.log(`[POLYGON] ✓ REAL DATA: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) vol: ${volume} (RAW FROM POLYGON API) @ ${marketDataItem.lastUpdate}`);
+          console.log(`[POLYGON] ✓ REAL DATA: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) 24h Range: ${low24h}-${high24h} @ ${marketDataItem.lastUpdate}`);
         } else {
           console.warn(`[POLYGON] ⚠️ No live data available for ${rawSymbol}`);
         }
