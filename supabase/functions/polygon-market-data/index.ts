@@ -8,27 +8,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Simple in-memory cache to prevent rate limiting
-const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 10000; // 10 seconds cache
-
-function getCached(key: string) {
-  const cached = cache.get(key);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    console.log(`[CACHE HIT] ${key}`);
-    return cached.data;
-  }
-  return null;
-}
-
-function setCache(key: string, data: any) {
-  cache.set(key, { data, timestamp: Date.now() });
-  // Clean up old entries
-  if (cache.size > 100) {
-    const oldestKey = Array.from(cache.keys())[0];
-    cache.delete(oldestKey);
-  }
-}
+// REMOVED CACHE - No caching to ensure fresh data every time
+// No cache means no possibility of mock/stale data
 
 interface PolygonQuote {
   ticker: string;
@@ -294,17 +275,10 @@ serve(async (req) => {
 
     console.log('✅ Using Polygon API for live market data');
 
-    // Process symbols with batch requests - add delays to avoid rate limiting
+    // Process symbols with batch requests - NO CACHE, fresh data every time
     const batchPromises = symbolsToFetch.map(async (rawSymbol, index) => {
-      // Check cache first
-      const cacheKey = `market_${rawSymbol}`;
-      const cachedData = getCached(cacheKey);
-      if (cachedData) {
-        return cachedData;
-      }
-      
-      // Add staggered delay to avoid rate limiting (100ms per symbol)
-      await new Promise(resolve => setTimeout(resolve, index * 100));
+      // Add staggered delay to avoid rate limiting (150ms per symbol for safety)
+      await new Promise(resolve => setTimeout(resolve, index * 150));
       
       try {
         const { polygon: polygonSymbol, type } = getPolygonSymbol(rawSymbol);
@@ -502,15 +476,12 @@ serve(async (req) => {
             price: Number(currentPrice.toFixed(4)),
             change: Number(change.toFixed(4)),
             changePercent: Number(changePercent.toFixed(2)),
-            volume: volume.toString(), // RAW volume number from Polygon, no formatting
+            volume: volume.toString(), // RAW REAL volume number from Polygon API - NO FORMATTING, NO MOCK
             lastUpdate: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
             aiSentiment: aiSentiment as 'bullish' | 'bearish' | 'neutral'
           };
           
-          // Cache the successful result
-          setCache(`market_${rawSymbol}`, marketDataItem);
-          
-          console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) vol: ${volume} @ ${marketDataItem.lastUpdate}`);
+          console.log(`[POLYGON] ✓ REAL DATA: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) vol: ${volume} (RAW FROM POLYGON API) @ ${marketDataItem.lastUpdate}`);
         } else {
           console.warn(`[POLYGON] ⚠️ No live data available for ${rawSymbol}`);
         }

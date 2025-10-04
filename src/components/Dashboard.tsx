@@ -25,7 +25,7 @@ export const Dashboard = () => {
     console.log('Dashboard symbols for market type', filters.marketType, ':', result);
     return result;
   }, [filters.marketType]);
-  const { data, loading, error, lastUpdated, refetch } = usePolygonData(symbols, 3000); // Live updates every 3 seconds
+  const { data, loading, error, lastUpdated, refetch } = usePolygonData(symbols, 10000); // 10 second refresh - no cache, fresh data
 
   // Filter data based on trend
   const filteredData = useMemo(() => {
