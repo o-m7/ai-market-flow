@@ -359,7 +359,21 @@ serve(async (req) => {
         
         const [tradeData, quoteData, snapshotData, prevData] = await Promise.all(promises);
         
-        console.log(`[POLYGON] Data sources for ${rawSymbol}:`, 
+        // LOG RAW API RESPONSES FOR VOLUME VERIFICATION
+        console.log(`[POLYGON][${rawSymbol}] RAW API RESPONSES:`);
+        if (prevData?.results?.[0]) {
+          console.log(`  - prevData volume: ${prevData.results[0].v}`);
+        }
+        if (snapshotData?.ticker) {
+          console.log(`  - snapshot.ticker.day volume: ${snapshotData.ticker.day?.v}`);
+          console.log(`  - snapshot.ticker.prevDay volume: ${snapshotData.ticker.prevDay?.v}`);
+        }
+        if (snapshotData?.results?.[0]) {
+          console.log(`  - snapshot.results[0].day volume: ${snapshotData.results[0].day?.v}`);
+          console.log(`  - snapshot.results[0].prev_day volume: ${snapshotData.results[0].prev_day?.v}`);
+        }
+        
+        console.log(`[POLYGON] Data sources for ${rawSymbol}:`,
           type === 'forex'
             ? {
                 trade: false,
@@ -431,36 +445,42 @@ serve(async (req) => {
           }
         }
         
-        // Get previous close and volume
+        // Get previous close and volume - ONLY from Polygon API, NO FALLBACKS
         if (prevData?.results?.[0]) {
           prevClose = prevData.results[0].c;
-          volume = prevData.results[0].v || 0;
-          console.log(`[POLYGON][${rawSymbol}] Volume from prevData: ${volume}`);
+          volume = prevData.results[0].v ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: prevData.results[0].v = ${prevData.results[0].v} (RAW FROM API)`);
         } else if (snapshotData?.ticker?.prevDay?.c) {
           prevClose = snapshotData.ticker.prevDay.c;
-          volume = snapshotData.ticker.day?.v || snapshotData.ticker.prevDay?.v || 0;
-          console.log(`[POLYGON][${rawSymbol}] Volume from snapshot.ticker: ${volume}`);
+          const dayVol = snapshotData.ticker.day?.v;
+          const prevDayVol = snapshotData.ticker.prevDay?.v;
+          volume = dayVol ?? prevDayVol ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: snapshot.ticker day=${dayVol}, prevDay=${prevDayVol} (RAW FROM API)`);
         } else if (snapshotData?.results?.[0]?.prev_day) {
           prevClose = snapshotData.results[0].prev_day.c;
-          volume = snapshotData.results[0].day?.v || snapshotData.results[0].prev_day?.v || 0;
-          console.log(`[POLYGON][${rawSymbol}] Volume from snapshot.results: ${volume}`);
+          const dayVol = snapshotData.results[0].day?.v;
+          const prevDayVol = snapshotData.results[0].prev_day?.v;
+          volume = dayVol ?? prevDayVol ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: snapshot.results day=${dayVol}, prevDay=${prevDayVol} (RAW FROM API)`);
         } else if (type === 'forex' && snapshotData?.ticker?.day?.o) {
           prevClose = snapshotData.ticker.day.o;
-          volume = snapshotData.ticker.day?.v || 0;
-          console.log(`[POLYGON][${rawSymbol}] Volume from forex snapshot.ticker.day: ${volume}`);
+          volume = snapshotData.ticker.day?.v ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: forex snapshot.ticker.day.v = ${snapshotData.ticker.day?.v} (RAW FROM API)`);
         } else if (snapshotData?.ticker?.day?.c) {
           prevClose = snapshotData.ticker.day.c;
-          volume = snapshotData.ticker.day?.v || 0;
-          console.log(`[POLYGON][${rawSymbol}] Volume from snapshot.ticker.day: ${volume}`);
+          volume = snapshotData.ticker.day?.v ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: snapshot.ticker.day.v = ${snapshotData.ticker.day?.v} (RAW FROM API)`);
         } else if (type === 'forex' && snapshotData?.results?.[0]?.day?.o) {
           prevClose = snapshotData.results[0].day.o;
-          volume = snapshotData.results[0].day?.v || 0;
-          console.log(`[POLYGON][${rawSymbol}] Volume from forex snapshot.results.day: ${volume}`);
+          volume = snapshotData.results[0].day?.v ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: forex snapshot.results.day.v = ${snapshotData.results[0].day?.v} (RAW FROM API)`);
         } else if (snapshotData?.results?.[0]?.day?.c) {
           prevClose = snapshotData.results[0].day.c;
-          volume = snapshotData.results[0].day?.v || 0;
-          console.log(`[POLYGON][${rawSymbol}] Volume from snapshot.results.day: ${volume}`);
+          volume = snapshotData.results[0].day?.v ?? 0;
+          console.log(`[POLYGON][${rawSymbol}] ✓ Volume source: snapshot.results.day.v = ${snapshotData.results[0].day?.v} (RAW FROM API)`);
         }
+        
+        console.log(`[POLYGON][${rawSymbol}] FINAL VOLUME VALUE: ${volume} (${volume === 0 ? 'Polygon returned 0 or no volume data' : 'Valid volume from Polygon'})`);
         
         if (currentPrice) {
           const change = prevClose ? (currentPrice - prevClose) : 0;
