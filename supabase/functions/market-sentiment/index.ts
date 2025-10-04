@@ -17,14 +17,16 @@ serve(async (req) => {
     const { marketData } = await req.json();
 
     if (!OPENAI_API_KEY) {
+      console.error('OPENAI_API_KEY not configured');
       throw new Error('OPENAI_API_KEY not configured');
     }
 
     if (!marketData || !Array.isArray(marketData) || marketData.length === 0) {
+      console.error('Invalid market data:', { hasData: !!marketData, isArray: Array.isArray(marketData), length: marketData?.length });
       throw new Error('Invalid market data provided');
     }
 
-    console.log(`Analyzing sentiment for ${marketData.length} symbols`);
+    console.log(`Analyzing sentiment for ${marketData.length} symbols from Polygon API`);
 
     // Prepare market data summary for AI analysis
     const marketSummary = marketData.map(item => ({
@@ -83,6 +85,7 @@ Rules:
 - Fear/Greed: Scale 0-100 based on momentum and avgChange (50 = neutral)
 - Analysis: Focus on data, not speculation`;
 
+    console.log('Calling OpenAI API with calculated metrics...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -109,13 +112,30 @@ Rules:
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
+      
+      // Return calculated fallback on API error
+      const momentumScore = ((bullishCount - bearishCount) / marketData.length) * 100;
+      const fearGreedIndex = Math.min(100, Math.max(0, 50 + (momentumScore * 0.4) + (avgChange * 5)));
+      
+      return new Response(
+        JSON.stringify({
+          sentiment: momentumScore > 20 && avgChange > 1 ? 'BULLISH' : 
+                     momentumScore < -20 && avgChange < -1 ? 'BEARISH' : 'NEUTRAL',
+          fearGreedIndex: Math.round(fearGreedIndex),
+          analysis: `Calculated from Polygon data: ${bullishCount} gainers, ${bearishCount} losers. Momentum: ${momentumScore.toFixed(1)}/100`,
+          timestamp: new Date().toISOString(),
+          source: 'calculated'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const aiData = await response.json();
     const aiResponse = aiData.choices[0].message.content;
 
-    console.log('AI Response:', aiResponse);
+    console.log('OpenAI Response received:', aiResponse.substring(0, 200));
 
     // Parse AI response (should be clean JSON with response_format)
     let sentimentData;
@@ -135,12 +155,16 @@ Rules:
       };
     }
 
+    console.log('Sentiment analysis complete:', sentimentData.sentiment, sentimentData.fearGreedIndex);
+    
     return new Response(
       JSON.stringify({
         sentiment: sentimentData.sentiment,
         fearGreedIndex: sentimentData.fearGreedIndex,
         analysis: sentimentData.analysis,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        source: 'openai',
+        dataPoints: marketData.length
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -149,15 +173,19 @@ Rules:
 
   } catch (error) {
     console.error('Error in market-sentiment function:', error);
+    
+    // Always return valid sentiment data even on error
     return new Response(
       JSON.stringify({ 
-        error: error.message,
         sentiment: 'NEUTRAL',
         fearGreedIndex: 50,
-        analysis: 'Unable to analyze market sentiment at this time.'
+        analysis: 'Market analysis temporarily unavailable. Using neutral baseline.',
+        timestamp: new Date().toISOString(),
+        source: 'fallback',
+        error: error.message
       }),
       {
-        status: 500,
+        status: 200, // Return 200 to prevent client-side errors
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

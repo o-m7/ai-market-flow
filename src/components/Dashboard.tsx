@@ -52,36 +52,56 @@ export const Dashboard = () => {
     return result;
   }, [data, filters.trend]);
 
-  // AI-powered market sentiment
+  // AI-powered market sentiment (persists last valid data)
   const [sentiment, setSentiment] = useState<{
     sentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
     fearGreedIndex: number;
     analysis: string;
+    source?: string;
+    dataPoints?: number;
   } | null>(null);
   const [sentimentLoading, setSentimentLoading] = useState(false);
 
   // Fetch market sentiment when data changes
   useEffect(() => {
     const fetchSentiment = async () => {
-      if (!filteredData.length || sentimentLoading) return;
+      if (!filteredData.length) return;
       
       setSentimentLoading(true);
       try {
+        console.log('Fetching sentiment for', filteredData.length, 'Polygon data points');
         const { data, error } = await supabase.functions.invoke('market-sentiment', {
-          body: { marketData: filteredData }
+          body: { 
+            marketData: filteredData.map(item => ({
+              symbol: item.symbol,
+              price: item.price,
+              changePercent: item.changePercent,
+              high24h: item.high24h,
+              low24h: item.low24h
+            }))
+          }
         });
 
-        if (error) throw error;
-        setSentiment(data);
+        if (error) {
+          console.error('Sentiment API error:', error);
+          // Keep last valid sentiment on error
+          return;
+        }
+        
+        if (data) {
+          console.log('Sentiment updated:', data.sentiment, data.fearGreedIndex, 'from', data.source || 'unknown');
+          setSentiment(data);
+        }
       } catch (err) {
         console.error('Error fetching sentiment:', err);
+        // Keep last valid sentiment on error
       } finally {
         setSentimentLoading(false);
       }
     };
 
     // Debounce sentiment updates
-    const timer = setTimeout(fetchSentiment, 2000);
+    const timer = setTimeout(fetchSentiment, 1500);
     return () => clearTimeout(timer);
   }, [filteredData]);
 
