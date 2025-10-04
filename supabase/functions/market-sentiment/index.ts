@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,8 +16,8 @@ serve(async (req) => {
   try {
     const { marketData } = await req.json();
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured');
     }
 
     if (!marketData || !Array.isArray(marketData) || marketData.length === 0) {
@@ -35,47 +35,66 @@ serve(async (req) => {
       low24h: item.low24h
     }));
 
+    // Calculate market metrics
     const bullishCount = marketData.filter(item => item.changePercent > 0).length;
     const bearishCount = marketData.filter(item => item.changePercent < 0).length;
     const avgChange = marketData.reduce((sum, item) => sum + item.changePercent, 0) / marketData.length;
+    
+    // Calculate volatility (average range as percentage of price)
+    const avgVolatility = marketData.reduce((sum, item) => {
+      const range = ((item.high24h - item.low24h) / item.price) * 100;
+      return sum + range;
+    }, 0) / marketData.length;
+    
+    // Calculate momentum score (-100 to 100)
+    const momentumScore = ((bullishCount - bearishCount) / marketData.length) * 100;
+    
+    // Sort by absolute change to find biggest movers
+    const sortedByChange = [...marketData].sort((a, b) => 
+      Math.abs(b.changePercent) - Math.abs(a.changePercent)
+    );
 
-    const prompt = `Analyze this market data and provide a market sentiment assessment:
+    const prompt = `You are a quantitative market analyst. Analyze this real-time market data:
 
-Market Overview:
+CALCULATED METRICS:
 - Total symbols: ${marketData.length}
-- Bullish symbols: ${bullishCount}
-- Bearish symbols: ${bearishCount}
+- Bullish: ${bullishCount} (${(bullishCount/marketData.length*100).toFixed(1)}%)
+- Bearish: ${bearishCount} (${(bearishCount/marketData.length*100).toFixed(1)}%)
 - Average change: ${avgChange.toFixed(2)}%
+- Momentum score: ${momentumScore.toFixed(1)}/100
+- Average volatility: ${avgVolatility.toFixed(2)}%
 
-Top 10 Movers:
-${marketSummary.slice(0, 10).map(item => 
-  `${item.symbol}: ${item.changePercent >= 0 ? '+' : ''}${item.changePercent.toFixed(2)}%`
+TOP MOVERS:
+${sortedByChange.slice(0, 8).map(item => 
+  `${item.symbol}: ${item.changePercent >= 0 ? '+' : ''}${item.changePercent.toFixed(2)}% (Range: $${item.low24h.toFixed(2)}-$${item.high24h.toFixed(2)})`
 ).join('\n')}
 
-Based on this data, provide:
-1. A single word sentiment: either "BULLISH", "BEARISH", or "NEUTRAL"
-2. A fear/greed index from 0-100 (0=extreme fear, 100=extreme greed)
-3. A brief 2-sentence market analysis
-
-Format your response as JSON:
+Provide a calculated sentiment assessment in JSON format:
 {
   "sentiment": "BULLISH|BEARISH|NEUTRAL",
   "fearGreedIndex": 0-100,
-  "analysis": "brief analysis"
-}`;
+  "analysis": "Brief 2-sentence technical analysis"
+}
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+Rules:
+- BULLISH if momentum > 20 and avgChange > 1%
+- BEARISH if momentum < -20 and avgChange < -1%
+- Otherwise NEUTRAL
+- Fear/Greed: Scale 0-100 based on momentum and avgChange (50 = neutral)
+- Analysis: Focus on data, not speculation`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content: 'You are a financial market analyst. Analyze market data and provide clear sentiment indicators. Always respond with valid JSON only.'
+            content: 'You are a quantitative financial analyst. Analyze market data using the provided metrics and respond ONLY with valid JSON. Be precise and data-driven.'
           },
           {
             role: 'user',
@@ -83,13 +102,14 @@ Format your response as JSON:
           }
         ],
         temperature: 0.3,
+        response_format: { type: "json_object" }
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI Gateway error:', response.status, errorText);
-      throw new Error(`AI Gateway error: ${response.status}`);
+      console.error('OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const aiData = await response.json();
@@ -97,23 +117,21 @@ Format your response as JSON:
 
     console.log('AI Response:', aiResponse);
 
-    // Parse AI response
+    // Parse AI response (should be clean JSON with response_format)
     let sentimentData;
     try {
-      // Try to extract JSON from response
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        sentimentData = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found in response');
-      }
+      sentimentData = JSON.parse(aiResponse);
     } catch (parseError) {
-      console.error('Failed to parse AI response:', parseError);
-      // Fallback to basic calculation
+      console.error('Failed to parse AI response:', parseError, aiResponse);
+      // Calculated fallback based on actual metrics
+      const momentumScore = ((bullishCount - bearishCount) / marketData.length) * 100;
+      const fearGreedIndex = Math.min(100, Math.max(0, 50 + (momentumScore * 0.4) + (avgChange * 5)));
+      
       sentimentData = {
-        sentiment: avgChange > 1 ? 'BULLISH' : avgChange < -1 ? 'BEARISH' : 'NEUTRAL',
-        fearGreedIndex: Math.min(100, Math.max(0, 50 + (avgChange * 10))),
-        analysis: `Market showing ${avgChange >= 0 ? 'positive' : 'negative'} momentum with ${bullishCount} gainers and ${bearishCount} decliners.`
+        sentiment: momentumScore > 20 && avgChange > 1 ? 'BULLISH' : 
+                   momentumScore < -20 && avgChange < -1 ? 'BEARISH' : 'NEUTRAL',
+        fearGreedIndex: Math.round(fearGreedIndex),
+        analysis: `Market momentum at ${momentumScore.toFixed(1)}/100 with ${bullishCount} gainers vs ${bearishCount} decliners. Average move: ${avgChange.toFixed(2)}%.`
       };
     }
 
