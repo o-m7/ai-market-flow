@@ -502,7 +502,7 @@ serve(async (req) => {
             price: Number(currentPrice.toFixed(4)),
             change: Number(change.toFixed(4)),
             changePercent: Number(changePercent.toFixed(2)),
-            volume: volume > 0 ? formatVolume(volume) : '—',
+            volume: volume.toString(), // RAW volume number from Polygon, no formatting
             lastUpdate: timestamp ? new Date(timestamp).toISOString() : new Date().toISOString(),
             aiSentiment: aiSentiment as 'bullish' | 'bearish' | 'neutral'
           };
@@ -510,7 +510,7 @@ serve(async (req) => {
           // Cache the successful result
           setCache(`market_${rawSymbol}`, marketDataItem);
           
-          console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) vol: ${formatVolume(volume)} @ ${marketDataItem.lastUpdate}`);
+          console.log(`[POLYGON] ✓ Live success: ${rawSymbol} = $${currentPrice.toFixed(4)} (${changePercent.toFixed(2)}%) vol: ${volume} @ ${marketDataItem.lastUpdate}`);
         } else {
           console.warn(`[POLYGON] ⚠️ No live data available for ${rawSymbol}`);
         }
