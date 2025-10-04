@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Navigation } from "@/components/Navigation";
 import TechnicalChart from "@/components/TechnicalChart";
 import { OrderBookPanel } from "@/components/OrderBookPanel";
@@ -301,12 +300,7 @@ export const AIAnalysis = () => {
       <div className="container mx-auto px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Panel - Analysis Controls */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="lg:col-span-1"
-          >
+          <div className="lg:col-span-1">
             <div className="sticky top-6 space-y-4">
               {/* Terminal Symbol Input */}
               <div className="bg-terminal border border-terminal-border">
@@ -444,15 +438,10 @@ export const AIAnalysis = () => {
                 </CardContent>
               </Card>
             </div>
-          </motion.div>
+          </div>
 
           {/* Right Panel - Chart and Results */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="lg:col-span-3 space-y-6"
-          >
+          <div className="lg:col-span-3 space-y-6">
             {/* Chart Section */}
             <Card>
               <CardHeader>
@@ -536,7 +525,7 @@ export const AIAnalysis = () => {
                 </CardContent>
               </Card>
             )}
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>
