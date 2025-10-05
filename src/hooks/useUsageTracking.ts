@@ -19,7 +19,7 @@ export function useUsageTracking() {
   });
   const [loading, setLoading] = useState(true);
 
-  const isSubscribed = Boolean(subscription?.subscribed || subscription?.subscription_tier === 'Premium' || (user?.email?.toLowerCase?.() === 'omarmerheby7@gmail.com'));
+  const isSubscribed = Boolean(subscription?.subscribed || subscription?.subscription_tier?.toLowerCase().includes('premium'));
   const FREE_DAILY_LIMIT = 5;
   const FREE_SYMBOL_LIMIT = 5;
 
