@@ -11,6 +11,9 @@ interface AnalysisResultsProps {
 }
 
 export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
+  // Log the data structure for debugging
+  console.log('AnalysisResults data:', data);
+  
   const getRecommendationColor = (rec: string) => {
     switch (rec) {
       case 'buy': return 'text-green-500 bg-green-500/10 border-green-500/20';
@@ -19,6 +22,9 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
     }
   };
 
+  // Extract analysis text - check multiple possible fields
+  const analysisText = data.analysis || data.action_text || data.summary || 'No analysis available';
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -57,7 +63,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
           <CardTitle className="text-sm font-mono-tabular text-terminal-accent">ANALYSIS SUMMARY</CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          <p className="leading-relaxed font-mono text-sm text-terminal-foreground">{data.analysis || data.action_text}</p>
+          <p className="leading-relaxed font-mono text-sm text-terminal-foreground whitespace-pre-wrap">{analysisText}</p>
         </CardContent>
       </Card>
 
@@ -207,7 +213,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
       )}
 
       {/* Evidence & Signals */}
-      {data.evidence && data.evidence.length > 0 && (
+      {data.evidence && Array.isArray(data.evidence) && data.evidence.length > 0 && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent">EVIDENCE & SIGNALS</CardTitle>
@@ -215,6 +221,25 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
           <CardContent className="pt-4">
             <div className="space-y-2">
               {data.evidence.map((item: string, idx: number) => (
+                <div key={idx} className="flex items-start gap-2 p-2 bg-terminal-darker/30 border-l-2 border-terminal-accent">
+                  <div className="text-xs font-mono-tabular text-terminal-accent mt-0.5">•</div>
+                  <div className="text-xs font-mono text-terminal-foreground flex-1">{item}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Chart Patterns - Alternative to evidence */}
+      {(!data.evidence || data.evidence.length === 0) && data.chartPatterns && Array.isArray(data.chartPatterns) && data.chartPatterns.length > 0 && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
+            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">CHART PATTERNS & SIGNALS</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-2">
+              {data.chartPatterns.map((item: string, idx: number) => (
                 <div key={idx} className="flex items-start gap-2 p-2 bg-terminal-darker/30 border-l-2 border-terminal-accent">
                   <div className="text-xs font-mono-tabular text-terminal-accent mt-0.5">•</div>
                   <div className="text-xs font-mono text-terminal-foreground flex-1">{item}</div>
@@ -258,12 +283,14 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </Card>
       )}
 
-      {/* Quantitative Metrics */}
-      <QuantMetricsGrid 
-        technical={data.technical}
-        quantitative_metrics={data.quantitative_metrics}
-        timeframe_profile={data.timeframe_profile}
-      />
+      {/* Quantitative Metrics - Always show even with minimal data */}
+      {(data.technical || data.quantitative_metrics || data.timeframe_profile) && (
+        <QuantMetricsGrid 
+          technical={data.technical}
+          quantitative_metrics={data.quantitative_metrics}
+          timeframe_profile={data.timeframe_profile}
+        />
+      )}
     </motion.div>
   );
 };

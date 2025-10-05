@@ -104,109 +104,123 @@ export const QuantMetricsGrid = ({ technical, quantitative_metrics, timeframe_pr
     </Card>
   );
 
-  if (!technical && !quantitative_metrics) {
+  if (!technical && !quantitative_metrics && !timeframe_profile) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
-        <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-        <p>No quantitative metrics available</p>
-      </div>
+      <Card className="bg-terminal border-terminal-border">
+        <CardContent className="py-8 text-center">
+          <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50 text-terminal-secondary" />
+          <p className="text-sm font-mono-tabular text-terminal-secondary">No quantitative metrics available</p>
+        </CardContent>
+      </Card>
     );
   }
+
+  // Show available sections even if some data is missing
+  const hasTrendData = technical?.ema20 || technical?.ema50 || technical?.bb?.middle || timeframe_profile?.trend;
+  const hasMomentumData = technical?.rsi14 !== undefined || technical?.macd;
+  const hasVolatilityData = technical?.atr14 || technical?.bb;
+  const hasRegimeData = quantitative_metrics && Object.keys(quantitative_metrics).length > 0;
 
   return (
     <div className="space-y-4">
       {/* Trend Section */}
-      <SectionCard title="Trend Analysis" icon={TrendingUp} sectionKey="trend">
-        {technical?.ema20 && (
-          <MetricCard 
-            title="EMA 20" 
-            value={technical.ema20.toFixed(4)}
-            color="text-blue-500"
-          />
-        )}
-        {technical?.ema50 && (
-          <MetricCard 
-            title="EMA 50" 
-            value={technical.ema50.toFixed(4)}
-            color="text-purple-500"
-          />
-        )}
-        {technical?.bb?.middle && (
-          <MetricCard 
-            title="BB Middle" 
-            value={technical.bb.middle.toFixed(4)}
-            subtitle="20-period SMA"
-          />
-        )}
-        {timeframe_profile?.trend && (
-          <MetricCard 
-            title="Trend Bias" 
-            value={timeframe_profile.trend}
-            color={timeframe_profile.trend === 'bullish' ? 'text-green-500' : 
-                   timeframe_profile.trend === 'bearish' ? 'text-red-500' : 'text-muted-foreground'}
-          />
-        )}
-      </SectionCard>
+      {hasTrendData && (
+        <SectionCard title="Trend Analysis" icon={TrendingUp} sectionKey="trend">
+          {technical?.ema20 && (
+            <MetricCard 
+              title="EMA 20" 
+              value={technical.ema20.toFixed(4)}
+              color="text-blue-500"
+            />
+          )}
+          {technical?.ema50 && (
+            <MetricCard 
+              title="EMA 50" 
+              value={technical.ema50.toFixed(4)}
+              color="text-purple-500"
+            />
+          )}
+          {technical?.bb?.middle && (
+            <MetricCard 
+              title="BB Middle" 
+              value={technical.bb.middle.toFixed(4)}
+              subtitle="20-period SMA"
+            />
+          )}
+          {timeframe_profile?.trend && (
+            <MetricCard 
+              title="Trend Bias" 
+              value={timeframe_profile.trend}
+              color={timeframe_profile.trend === 'bullish' ? 'text-green-500' : 
+                     timeframe_profile.trend === 'bearish' ? 'text-red-500' : 'text-muted-foreground'}
+            />
+          )}
+        </SectionCard>
+      )}
 
       {/* Momentum Section */}
-      <SectionCard title="Momentum" icon={Zap} sectionKey="momentum">
-        {technical?.rsi14 && (
-          <MetricCard 
-            title="RSI (14)" 
-            value={technical.rsi14.toFixed(1)}
-            subtitle={technical.rsi14 > 70 ? 'Overbought' : technical.rsi14 < 30 ? 'Oversold' : 'Neutral'}
-            color={technical.rsi14 > 70 ? 'text-red-500' : technical.rsi14 < 30 ? 'text-green-500' : 'text-muted-foreground'}
-          />
-        )}
-        {technical?.macd?.hist !== undefined && (
-          <MetricCard 
-            title="MACD Hist" 
-            value={technical.macd.hist > 0 ? `+${technical.macd.hist.toFixed(4)}` : technical.macd.hist.toFixed(4)}
-            subtitle={technical.macd.hist > 0 ? 'Bullish' : 'Bearish'}
-            color={technical.macd.hist > 0 ? 'text-green-500' : 'text-red-500'}
-          />
-        )}
-        {technical?.macd?.line && (
-          <MetricCard 
-            title="MACD Line" 
-            value={technical.macd.line.toFixed(4)}
-          />
-        )}
-        {technical?.macd?.signal && (
-          <MetricCard 
-            title="MACD Signal" 
-            value={technical.macd.signal.toFixed(4)}
-          />
-        )}
-      </SectionCard>
+      {hasMomentumData && (
+        <SectionCard title="Momentum" icon={Zap} sectionKey="momentum">
+          {technical?.rsi14 !== undefined && (
+            <MetricCard 
+              title="RSI (14)" 
+              value={technical.rsi14.toFixed(1)}
+              subtitle={technical.rsi14 > 70 ? 'Overbought' : technical.rsi14 < 30 ? 'Oversold' : 'Neutral'}
+              color={technical.rsi14 > 70 ? 'text-red-500' : technical.rsi14 < 30 ? 'text-green-500' : 'text-muted-foreground'}
+            />
+          )}
+          {technical?.macd?.hist !== undefined && (
+            <MetricCard 
+              title="MACD Hist" 
+              value={technical.macd.hist > 0 ? `+${technical.macd.hist.toFixed(4)}` : technical.macd.hist.toFixed(4)}
+              subtitle={technical.macd.hist > 0 ? 'Bullish' : 'Bearish'}
+              color={technical.macd.hist > 0 ? 'text-green-500' : 'text-red-500'}
+            />
+          )}
+          {technical?.macd?.line && (
+            <MetricCard 
+              title="MACD Line" 
+              value={technical.macd.line.toFixed(4)}
+            />
+          )}
+          {technical?.macd?.signal && (
+            <MetricCard 
+              title="MACD Signal" 
+              value={technical.macd.signal.toFixed(4)}
+            />
+          )}
+        </SectionCard>
+      )}
 
       {/* Volatility Section */}
-      <SectionCard title="Volatility" icon={BarChart3} sectionKey="volatility">
-        {technical?.atr14 && (
-          <MetricCard 
-            title="ATR (14)" 
-            value={technical.atr14.toFixed(4)}
-            subtitle="Average True Range"
-          />
-        )}
-        {technical?.bb?.upper && technical?.bb?.lower && (
-          <>
+      {hasVolatilityData && (
+        <SectionCard title="Volatility" icon={BarChart3} sectionKey="volatility">
+          {technical?.atr14 && (
             <MetricCard 
-              title="BB Upper" 
-              value={technical.bb.upper.toFixed(4)}
-              color="text-red-400"
+              title="ATR (14)" 
+              value={technical.atr14.toFixed(4)}
+              subtitle="Average True Range"
             />
-            <MetricCard 
-              title="BB Lower" 
-              value={technical.bb.lower.toFixed(4)}
-              color="text-green-400"
-            />
-          </>
-        )}
-      </SectionCard>
+          )}
+          {technical?.bb?.upper && technical?.bb?.lower && (
+            <>
+              <MetricCard 
+                title="BB Upper" 
+                value={technical.bb.upper.toFixed(4)}
+                color="text-red-400"
+              />
+              <MetricCard 
+                title="BB Lower" 
+                value={technical.bb.lower.toFixed(4)}
+                color="text-green-400"
+              />
+            </>
+          )}
+        </SectionCard>
+      )}
 
       {/* Regime Section */}
-      {quantitative_metrics && (
+      {hasRegimeData && (
         <SectionCard title="Market Regime" icon={Target} sectionKey="regime">
           {Object.entries(quantitative_metrics).slice(0, 4).map(([key, value]: [string, any]) => (
             <MetricCard 
@@ -216,6 +230,15 @@ export const QuantMetricsGrid = ({ technical, quantitative_metrics, timeframe_pr
             />
           ))}
         </SectionCard>
+      )}
+      
+      {!hasTrendData && !hasMomentumData && !hasVolatilityData && !hasRegimeData && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardContent className="py-8 text-center">
+            <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50 text-terminal-secondary" />
+            <p className="text-sm font-mono-tabular text-terminal-secondary">No quantitative metrics available in response</p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
