@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Target, AlertTriangle, Clock, TrendingUp, TrendingDown, Activity } from "lucide-react";
-import { QuantMetricsGrid } from "./QuantMetricsGrid";
 import { Separator } from "@/components/ui/separator";
 
 interface AnalysisResultsProps {
@@ -67,6 +66,92 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </CardContent>
       </Card>
 
+      {/* Quick Stats Grid - Technical Indicators */}
+      {data.technical && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
+            <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              TECHNICAL INDICATORS
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {data.technical.rsi14 !== undefined && (
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">RSI (14)</div>
+                  <div className="text-lg font-mono-tabular text-terminal-foreground">
+                    {data.technical.rsi14.toFixed(1)}
+                  </div>
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
+                    {data.technical.rsi14 > 70 ? 'Overbought' : data.technical.rsi14 < 30 ? 'Oversold' : 'Neutral'}
+                  </div>
+                </div>
+              )}
+              {data.technical.macd?.hist !== undefined && (
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">MACD HIST</div>
+                  <div className="text-lg font-mono-tabular text-terminal-foreground">
+                    {data.technical.macd.hist > 0 ? '+' : ''}{data.technical.macd.hist.toFixed(4)}
+                  </div>
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
+                    {data.technical.macd.hist > 0 ? 'Bullish' : 'Bearish'}
+                  </div>
+                </div>
+              )}
+              {data.technical.sma50 !== undefined && (
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SMA 50</div>
+                  <div className="text-lg font-mono-tabular text-terminal-foreground">
+                    {data.technical.sma50.toFixed(2)}
+                  </div>
+                </div>
+              )}
+              {data.technical.sma200 !== undefined && (
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SMA 200</div>
+                  <div className="text-lg font-mono-tabular text-terminal-foreground">
+                    {data.technical.sma200.toFixed(2)}
+                  </div>
+                </div>
+              )}
+              {data.technical.ema20 !== undefined && (
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">EMA 20</div>
+                  <div className="text-lg font-mono-tabular text-terminal-foreground">
+                    {data.technical.ema20.toFixed(2)}
+                  </div>
+                </div>
+              )}
+              {data.technical.ema50 !== undefined && (
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">EMA 50</div>
+                  <div className="text-lg font-mono-tabular text-terminal-foreground">
+                    {data.technical.ema50.toFixed(2)}
+                  </div>
+                </div>
+              )}
+              {data.technical.atr14 !== undefined && (
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ATR (14)</div>
+                  <div className="text-lg font-mono-tabular text-terminal-foreground">
+                    {data.technical.atr14.toFixed(4)}
+                  </div>
+                </div>
+              )}
+              {data.technical.bb?.middle !== undefined && (
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">BB MIDDLE</div>
+                  <div className="text-lg font-mono-tabular text-terminal-foreground">
+                    {data.technical.bb.middle.toFixed(2)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Trade Idea */}
       {data.trade_idea && (
         <Card className="bg-terminal border-terminal-border">
@@ -78,94 +163,30 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
           </CardHeader>
           <CardContent className="pt-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <div className="text-xs font-mono-tabular text-terminal-secondary">ENTRY</div>
+              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
                 <div className="text-lg font-mono-tabular text-terminal-green">
                   {data.trade_idea.entry?.toFixed(2) || 'N/A'}
                 </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-xs font-mono-tabular text-terminal-secondary">STOP LOSS</div>
+              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
                 <div className="text-lg font-mono-tabular text-terminal-red">
                   {data.trade_idea.stop?.toFixed(2) || 'N/A'}
                 </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-xs font-mono-tabular text-terminal-secondary">TARGET 1</div>
+              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TARGET 1</div>
                 <div className="text-lg font-mono-tabular text-terminal-accent">
                   {data.trade_idea.targets?.[0]?.toFixed(2) || 'N/A'}
                 </div>
               </div>
-              <div className="space-y-1">
-                <div className="text-xs font-mono-tabular text-terminal-secondary">RISK/REWARD</div>
+              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">RISK/REWARD</div>
                 <div className="text-lg font-mono-tabular text-terminal-accent">
                   {data.trade_idea.risk_reward?.toFixed(2) || 'N/A'}
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Technical Indicators */}
-      {data.technical && (
-        <Card className="bg-terminal border-terminal-border">
-          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
-            <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              TECHNICAL INDICATORS
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {data.technical.rsi14 !== undefined && (
-                <div className="space-y-1">
-                  <div className="text-xs font-mono-tabular text-terminal-secondary">RSI (14)</div>
-                  <div className="text-base font-mono-tabular text-terminal-foreground">
-                    {data.technical.rsi14.toFixed(2)}
-                  </div>
-                </div>
-              )}
-              {data.technical.macd && (
-                <>
-                  <div className="space-y-1">
-                    <div className="text-xs font-mono-tabular text-terminal-secondary">MACD</div>
-                    <div className="text-base font-mono-tabular text-terminal-foreground">
-                      {data.technical.macd.macd?.toFixed(4)}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs font-mono-tabular text-terminal-secondary">MACD SIGNAL</div>
-                    <div className="text-base font-mono-tabular text-terminal-foreground">
-                      {data.technical.macd.signal?.toFixed(4)}
-                    </div>
-                  </div>
-                </>
-              )}
-              {data.technical.sma50 !== undefined && (
-                <div className="space-y-1">
-                  <div className="text-xs font-mono-tabular text-terminal-secondary">SMA 50</div>
-                  <div className="text-base font-mono-tabular text-terminal-foreground">
-                    {data.technical.sma50.toFixed(2)}
-                  </div>
-                </div>
-              )}
-              {data.technical.sma200 !== undefined && (
-                <div className="space-y-1">
-                  <div className="text-xs font-mono-tabular text-terminal-secondary">SMA 200</div>
-                  <div className="text-base font-mono-tabular text-terminal-foreground">
-                    {data.technical.sma200.toFixed(2)}
-                  </div>
-                </div>
-              )}
-              {data.technical.ema20 !== undefined && (
-                <div className="space-y-1">
-                  <div className="text-xs font-mono-tabular text-terminal-secondary">EMA 20</div>
-                  <div className="text-base font-mono-tabular text-terminal-foreground">
-                    {data.technical.ema20.toFixed(2)}
-                  </div>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -281,15 +302,6 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Quantitative Metrics - Always show even with minimal data */}
-      {(data.technical || data.quantitative_metrics || data.timeframe_profile) && (
-        <QuantMetricsGrid 
-          technical={data.technical}
-          quantitative_metrics={data.quantitative_metrics}
-          timeframe_profile={data.timeframe_profile}
-        />
       )}
     </motion.div>
   );
