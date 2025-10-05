@@ -194,11 +194,11 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     </div>
                   </div>
                 )}
-                {data.technical.macd?.macd !== undefined && (
+                {data.technical.macd?.line !== undefined && (
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">MACD LINE</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.macd.macd.toFixed(4)}
+                      {data.technical.macd.line.toFixed(4)}
                     </div>
                   </div>
                 )}
@@ -326,7 +326,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                       <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">BB MIDDLE</div>
                       <div className="text-lg font-mono-tabular text-terminal-foreground">
-                        {data.technical.bb.middle.toFixed(2)}
+                        {data.technical.bb.mid.toFixed(2)}
                       </div>
                     </div>
                     <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
@@ -337,11 +337,11 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     </div>
                   </>
                 )}
-                {data.technical.obv !== undefined && (
+                {data.technical.volume_analysis?.obv !== undefined && (
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">OBV</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {(data.technical.obv / 1000000).toFixed(2)}M
+                      {(data.technical.volume_analysis.obv / 1000000).toFixed(2)}M
                     </div>
                   </div>
                 )}
