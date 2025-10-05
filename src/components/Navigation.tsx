@@ -1,10 +1,31 @@
-import { Bell, User, BarChart3, Settings, Brain } from "lucide-react";
+import { Bell, User, BarChart3, Settings, Brain, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SearchBar } from "@/components/SearchBar";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 export const Navigation = () => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out successfully",
+      });
+      navigate("/");
+    } catch (error: any) {
+      toast({
+        title: "Error signing out",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <nav className="bg-terminal border-b border-terminal-border shadow-terminal">
@@ -68,6 +89,41 @@ export const Navigation = () => {
             <Settings className="h-3 w-3" />
             <span>SETTINGS</span>
           </Link>
+
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="flex items-center space-x-2 px-3 py-1.5 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker font-mono-tabular border border-terminal-border text-sm"
+                >
+                  <User className="h-3 w-3" />
+                  <span>ACCOUNT</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-terminal border-terminal-border">
+                <DropdownMenuItem 
+                  className="text-terminal-secondary hover:text-terminal-accent focus:text-terminal-accent font-mono-tabular"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="h-3 w-3 mr-2" />
+                  SIGN OUT
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link to="/auth">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="flex items-center space-x-2 px-3 py-1.5 text-terminal-secondary hover:text-terminal-accent hover:bg-terminal-darker font-mono-tabular border border-terminal-border text-sm"
+              >
+                <LogIn className="h-3 w-3" />
+                <span>SIGN IN</span>
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </nav>
