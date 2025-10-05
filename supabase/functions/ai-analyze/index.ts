@@ -329,6 +329,8 @@ serve(async (req) => {
 MARKET DATA:
 Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
 
+IMPORTANT: The analysis summary MUST be specifically for the ${timeframe} timeframe. All levels, patterns, and recommendations should be contextualized to ${timeframe} chart analysis.
+
 TECHNICAL FEATURES:
 ${JSON.stringify(features, null, 2)}
 
