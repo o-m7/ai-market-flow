@@ -56,9 +56,12 @@ export function PremiumGateway({ children, feature, symbol }: PremiumGatewayProp
     );
   }
 
+  // Admin bypass for testing
+  const isAdmin = user?.email === 'omarmerheby195@gmail.com';
+  
   // Check if user has active subscription or trial
   const now = new Date();
-  const hasActiveSubscription = ((subscription?.subscribed ?? false) || subscription?.subscription_tier?.toLowerCase().includes('premium'));
+  const hasActiveSubscription = Boolean(isAdmin || (subscription?.subscribed ?? false) || subscription?.subscription_tier?.toLowerCase().includes('premium'));
   const trialEnd = subscription && subscription.subscription_end ? new Date(subscription.subscription_end) : null;
   const isInTrial = trialEnd && now < trialEnd && !hasActiveSubscription;
   const trialExpired = trialEnd && now > trialEnd && !hasActiveSubscription;

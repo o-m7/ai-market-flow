@@ -19,7 +19,9 @@ export function useUsageTracking() {
   });
   const [loading, setLoading] = useState(true);
 
-  const isSubscribed = Boolean(subscription?.subscribed || subscription?.subscription_tier?.toLowerCase().includes('premium'));
+  // Admin bypass for testing
+  const isAdmin = user?.email === 'omarmerheby195@gmail.com';
+  const isSubscribed = Boolean(isAdmin || subscription?.subscribed || subscription?.subscription_tier?.toLowerCase().includes('premium'));
   const FREE_DAILY_LIMIT = 5;
   const FREE_SYMBOL_LIMIT = 5;
 
@@ -76,7 +78,8 @@ export function useUsageTracking() {
   };
 
   const trackAnalysis = async (symbol: string) => {
-    if (!user || isSubscribed) return true;
+    const isAdmin = user?.email === 'omarmerheby195@gmail.com';
+    if (!user || isSubscribed || isAdmin) return true;
 
     try {
       const today = new Date().toISOString().split('T')[0];
