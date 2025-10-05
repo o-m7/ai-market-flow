@@ -138,6 +138,159 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </CardContent>
       </Card>
 
+      {/* Trading Signals - All Timeframes */}
+      {data.timeframe_profile && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
+            <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              TRADING SIGNALS - ALL TIMEFRAMES
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-4">
+              {/* Scalp Signals */}
+              {data.timeframe_profile.scalp && (
+                <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono-tabular text-terminal-accent uppercase">SCALP</span>
+                      <Badge variant="outline" className="text-xs font-mono-tabular">
+                        {data.timeframe_profile.scalp.strategy}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
+                      <span className={`text-xs font-mono-tabular font-bold ${
+                        data.timeframe_profile.scalp.probability >= 70 ? 'text-terminal-green' :
+                        data.timeframe_profile.scalp.probability >= 50 ? 'text-terminal-accent' :
+                        'text-terminal-red'
+                      }`}>
+                        {data.timeframe_profile.scalp.probability}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
+                      <div className="text-sm font-mono-tabular text-terminal-foreground font-bold">
+                        {data.timeframe_profile.scalp.entry?.toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
+                      <div className="text-sm font-mono-tabular text-terminal-red font-bold">
+                        {data.timeframe_profile.scalp.stop?.toFixed(2)}
+                      </div>
+                    </div>
+                    {data.timeframe_profile.scalp.targets?.map((target: number, idx: number) => (
+                      <div key={idx}>
+                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TP{idx + 1}</div>
+                        <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                          {target?.toFixed(2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Intraday Signals */}
+              {data.timeframe_profile.intraday && (
+                <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono-tabular text-terminal-accent uppercase">INTRADAY</span>
+                      <Badge variant="outline" className="text-xs font-mono-tabular">
+                        {data.timeframe_profile.intraday.strategy}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
+                      <span className={`text-xs font-mono-tabular font-bold ${
+                        data.timeframe_profile.intraday.probability >= 70 ? 'text-terminal-green' :
+                        data.timeframe_profile.intraday.probability >= 50 ? 'text-terminal-accent' :
+                        'text-terminal-red'
+                      }`}>
+                        {data.timeframe_profile.intraday.probability}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
+                      <div className="text-sm font-mono-tabular text-terminal-foreground font-bold">
+                        {data.timeframe_profile.intraday.entry?.toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
+                      <div className="text-sm font-mono-tabular text-terminal-red font-bold">
+                        {data.timeframe_profile.intraday.stop?.toFixed(2)}
+                      </div>
+                    </div>
+                    {data.timeframe_profile.intraday.targets?.map((target: number, idx: number) => (
+                      <div key={idx}>
+                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TP{idx + 1}</div>
+                        <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                          {target?.toFixed(2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Swing Signals */}
+              {data.timeframe_profile.swing && (
+                <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono-tabular text-terminal-accent uppercase">SWING</span>
+                      <Badge variant="outline" className="text-xs font-mono-tabular">
+                        {data.timeframe_profile.swing.strategy}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
+                      <span className={`text-xs font-mono-tabular font-bold ${
+                        data.timeframe_profile.swing.probability >= 70 ? 'text-terminal-green' :
+                        data.timeframe_profile.swing.probability >= 50 ? 'text-terminal-accent' :
+                        'text-terminal-red'
+                      }`}>
+                        {data.timeframe_profile.swing.probability}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
+                      <div className="text-sm font-mono-tabular text-terminal-foreground font-bold">
+                        {data.timeframe_profile.swing.entry?.toFixed(2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
+                      <div className="text-sm font-mono-tabular text-terminal-red font-bold">
+                        {data.timeframe_profile.swing.stop?.toFixed(2)}
+                      </div>
+                    </div>
+                    {data.timeframe_profile.swing.targets?.map((target: number, idx: number) => (
+                      <div key={idx}>
+                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TP{idx + 1}</div>
+                        <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                          {target?.toFixed(2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Comprehensive Technical Indicators Grid */}
       {data.technical && (
         <Card className="bg-terminal border-terminal-border">
