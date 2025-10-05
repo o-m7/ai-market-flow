@@ -196,7 +196,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                           </div>
                         </div>
                         <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
-                          Timeframe: 1-5 min • Tight stops • Quick profit taking
+                          Timeframe: 1-5 min • Tight stops • Quick profit taking • Est. Duration: 1-15 minutes
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div>
@@ -214,17 +214,22 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                               {calculatePercent(data.timeframe_profile.scalp.entry, data.timeframe_profile.scalp.stop)}%
                             </div>
                           </div>
-                          {data.timeframe_profile.scalp.targets?.map((target: number, idx: number) => (
-                            <div key={idx}>
-                              <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TP{idx + 1}</div>
-                              <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                                {target?.toFixed(2)}
+                          {data.timeframe_profile.scalp.targets?.map((target: number, idx: number) => {
+                            const timeEstimates = ['2-5 min', '5-10 min', '10-15 min'];
+                            return (
+                              <div key={idx}>
+                                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">
+                                  TP{idx + 1} • {timeEstimates[idx]}
+                                </div>
+                                <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                                  {target?.toFixed(2)}
+                                </div>
+                                <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
+                                  {calculatePercent(data.timeframe_profile.scalp.entry, target)}% • R:{calculateRR(data.timeframe_profile.scalp.entry, data.timeframe_profile.scalp.stop, target)}
+                                </div>
                               </div>
-                              <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                                {calculatePercent(data.timeframe_profile.scalp.entry, target)}% • R:{calculateRR(data.timeframe_profile.scalp.entry, data.timeframe_profile.scalp.stop, target)}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -255,7 +260,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                           </div>
                         </div>
                         <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
-                          Timeframe: 15min-4hr • Same-day exit • Moderate risk/reward
+                          Timeframe: 15min-4hr • Same-day exit • Moderate risk/reward • Est. Duration: 1-8 hours
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div>
@@ -273,17 +278,22 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                               {calculatePercent(data.timeframe_profile.intraday.entry, data.timeframe_profile.intraday.stop)}%
                             </div>
                           </div>
-                          {data.timeframe_profile.intraday.targets?.map((target: number, idx: number) => (
-                            <div key={idx}>
-                              <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TP{idx + 1}</div>
-                              <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                                {target?.toFixed(2)}
+                          {data.timeframe_profile.intraday.targets?.map((target: number, idx: number) => {
+                            const timeEstimates = ['1-3 hrs', '3-5 hrs', '5-8 hrs'];
+                            return (
+                              <div key={idx}>
+                                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">
+                                  TP{idx + 1} • {timeEstimates[idx]}
+                                </div>
+                                <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                                  {target?.toFixed(2)}
+                                </div>
+                                <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
+                                  {calculatePercent(data.timeframe_profile.intraday.entry, target)}% • R:{calculateRR(data.timeframe_profile.intraday.entry, data.timeframe_profile.intraday.stop, target)}
+                                </div>
                               </div>
-                              <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                                {calculatePercent(data.timeframe_profile.intraday.entry, target)}% • R:{calculateRR(data.timeframe_profile.intraday.entry, data.timeframe_profile.intraday.stop, target)}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -314,7 +324,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                           </div>
                         </div>
                         <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
-                          Timeframe: 4hr-Daily • Multi-day hold • Larger targets & stops
+                          Timeframe: 4hr-Daily • Multi-day hold • Larger targets & stops • Est. Duration: 1-7 days
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div>
@@ -332,17 +342,22 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                               {calculatePercent(data.timeframe_profile.swing.entry, data.timeframe_profile.swing.stop)}%
                             </div>
                           </div>
-                          {data.timeframe_profile.swing.targets?.map((target: number, idx: number) => (
-                            <div key={idx}>
-                              <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TP{idx + 1}</div>
-                              <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                                {target?.toFixed(2)}
+                          {data.timeframe_profile.swing.targets?.map((target: number, idx: number) => {
+                            const timeEstimates = ['1-2 days', '2-4 days', '4-7 days'];
+                            return (
+                              <div key={idx}>
+                                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">
+                                  TP{idx + 1} • {timeEstimates[idx]}
+                                </div>
+                                <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                                  {target?.toFixed(2)}
+                                </div>
+                                <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
+                                  {calculatePercent(data.timeframe_profile.swing.entry, target)}% • R:{calculateRR(data.timeframe_profile.swing.entry, data.timeframe_profile.swing.stop, target)}
+                                </div>
                               </div>
-                              <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                                {calculatePercent(data.timeframe_profile.swing.entry, target)}% • R:{calculateRR(data.timeframe_profile.swing.entry, data.timeframe_profile.swing.stop, target)}
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}
