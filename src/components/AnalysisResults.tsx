@@ -21,6 +21,14 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
     }
   };
 
+  // Safe formatting function
+  const safeFormatNumber = (value: any, decimals: number = 2): string => {
+    if (value === null || value === undefined || typeof value !== 'number' || !isFinite(value)) {
+      return '—';
+    }
+    return value.toFixed(decimals);
+  };
+
   // Extract analysis text - check multiple possible fields
   const analysisText = data.analysis || data.action_text || data.summary || 'No analysis available';
   
@@ -177,7 +185,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                 return (
                   <>
                     {/* Scalp Signals - Quick exits, tight stops, 1-5 min holding */}
-                    {data.timeframe_profile.scalp && (
+                    {data.timeframe_profile?.scalp && data.timeframe_profile.scalp.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -186,20 +194,24 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                               {direction}
                             </Badge>
                             <span className="text-xs font-mono-tabular text-terminal-accent uppercase">SCALP</span>
-                            <Badge variant="outline" className="text-xs font-mono-tabular">
-                              {data.timeframe_profile.scalp.strategy}
-                            </Badge>
+                            {data.timeframe_profile.scalp.strategy && (
+                              <Badge variant="outline" className="text-xs font-mono-tabular">
+                                {data.timeframe_profile.scalp.strategy}
+                              </Badge>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
-                            <span className={`text-xs font-mono-tabular font-bold ${
-                              data.timeframe_profile.scalp.probability >= 70 ? 'text-terminal-green' :
-                              data.timeframe_profile.scalp.probability >= 50 ? 'text-terminal-accent' :
-                              'text-terminal-red'
-                            }`}>
-                              {data.timeframe_profile.scalp.probability}%
-                            </span>
-                          </div>
+                          {data.timeframe_profile.scalp.probability && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
+                              <span className={`text-xs font-mono-tabular font-bold ${
+                                data.timeframe_profile.scalp.probability >= 70 ? 'text-terminal-green' :
+                                data.timeframe_profile.scalp.probability >= 50 ? 'text-terminal-accent' :
+                                'text-terminal-red'
+                              }`}>
+                                {data.timeframe_profile.scalp.probability}%
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
                           Timeframe: 1-5 min • Tight stops • Quick profit taking • Est. Duration: 1-15 minutes
@@ -208,13 +220,13 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
                             <div className="text-sm font-mono-tabular text-terminal-foreground font-bold">
-                              {data.timeframe_profile.scalp.entry?.toFixed(2)}
+                              {safeFormatNumber(data.timeframe_profile.scalp.entry)}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
                             <div className="text-sm font-mono-tabular text-terminal-red font-bold">
-                              {data.timeframe_profile.scalp.stop?.toFixed(2)}
+                              {safeFormatNumber(data.timeframe_profile.scalp.stop)}
                             </div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
                               {calculatePercent(data.timeframe_profile.scalp.entry, data.timeframe_profile.scalp.stop)}%
@@ -228,7 +240,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                                   TP{idx + 1} • {timeEstimates[idx]}
                                 </div>
                                 <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                                  {target?.toFixed(2)}
+                                  {safeFormatNumber(target)}
                                 </div>
                                 <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
                                   {calculatePercent(data.timeframe_profile.scalp.entry, target)}% • R:{calculateRR(data.timeframe_profile.scalp.entry, data.timeframe_profile.scalp.stop, target)}
@@ -241,7 +253,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     )}
 
                     {/* Intraday Signals - Same-day exits, moderate stops, 15min-4hr holding */}
-                    {data.timeframe_profile.intraday && (
+                    {data.timeframe_profile?.intraday && data.timeframe_profile.intraday.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -250,20 +262,24 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                               {direction}
                             </Badge>
                             <span className="text-xs font-mono-tabular text-terminal-accent uppercase">INTRADAY</span>
-                            <Badge variant="outline" className="text-xs font-mono-tabular">
-                              {data.timeframe_profile.intraday.strategy}
-                            </Badge>
+                            {data.timeframe_profile.intraday.strategy && (
+                              <Badge variant="outline" className="text-xs font-mono-tabular">
+                                {data.timeframe_profile.intraday.strategy}
+                              </Badge>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
-                            <span className={`text-xs font-mono-tabular font-bold ${
-                              data.timeframe_profile.intraday.probability >= 70 ? 'text-terminal-green' :
-                              data.timeframe_profile.intraday.probability >= 50 ? 'text-terminal-accent' :
-                              'text-terminal-red'
-                            }`}>
-                              {data.timeframe_profile.intraday.probability}%
-                            </span>
-                          </div>
+                          {data.timeframe_profile.intraday.probability && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
+                              <span className={`text-xs font-mono-tabular font-bold ${
+                                data.timeframe_profile.intraday.probability >= 70 ? 'text-terminal-green' :
+                                data.timeframe_profile.intraday.probability >= 50 ? 'text-terminal-accent' :
+                                'text-terminal-red'
+                              }`}>
+                                {data.timeframe_profile.intraday.probability}%
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
                           Timeframe: 15min-4hr • Same-day exit • Moderate risk/reward • Est. Duration: 1-8 hours
@@ -272,13 +288,13 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
                             <div className="text-sm font-mono-tabular text-terminal-foreground font-bold">
-                              {data.timeframe_profile.intraday.entry?.toFixed(2)}
+                              {safeFormatNumber(data.timeframe_profile.intraday.entry)}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
                             <div className="text-sm font-mono-tabular text-terminal-red font-bold">
-                              {data.timeframe_profile.intraday.stop?.toFixed(2)}
+                              {safeFormatNumber(data.timeframe_profile.intraday.stop)}
                             </div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
                               {calculatePercent(data.timeframe_profile.intraday.entry, data.timeframe_profile.intraday.stop)}%
@@ -292,7 +308,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                                   TP{idx + 1} • {timeEstimates[idx]}
                                 </div>
                                 <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                                  {target?.toFixed(2)}
+                                  {safeFormatNumber(target)}
                                 </div>
                                 <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
                                   {calculatePercent(data.timeframe_profile.intraday.entry, target)}% • R:{calculateRR(data.timeframe_profile.intraday.entry, data.timeframe_profile.intraday.stop, target)}
@@ -305,7 +321,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     )}
 
                     {/* Swing Signals - Multi-day holds, wider stops, larger targets */}
-                    {data.timeframe_profile.swing && (
+                    {data.timeframe_profile?.swing && data.timeframe_profile.swing.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -314,20 +330,24 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                               {direction}
                             </Badge>
                             <span className="text-xs font-mono-tabular text-terminal-accent uppercase">SWING</span>
-                            <Badge variant="outline" className="text-xs font-mono-tabular">
-                              {data.timeframe_profile.swing.strategy}
-                            </Badge>
+                            {data.timeframe_profile.swing.strategy && (
+                              <Badge variant="outline" className="text-xs font-mono-tabular">
+                                {data.timeframe_profile.swing.strategy}
+                              </Badge>
+                            )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
-                            <span className={`text-xs font-mono-tabular font-bold ${
-                              data.timeframe_profile.swing.probability >= 70 ? 'text-terminal-green' :
-                              data.timeframe_profile.swing.probability >= 50 ? 'text-terminal-accent' :
-                              'text-terminal-red'
-                            }`}>
-                              {data.timeframe_profile.swing.probability}%
-                            </span>
-                          </div>
+                          {data.timeframe_profile.swing.probability && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
+                              <span className={`text-xs font-mono-tabular font-bold ${
+                                data.timeframe_profile.swing.probability >= 70 ? 'text-terminal-green' :
+                                data.timeframe_profile.swing.probability >= 50 ? 'text-terminal-accent' :
+                                'text-terminal-red'
+                              }`}>
+                                {data.timeframe_profile.swing.probability}%
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
                           Timeframe: 4hr-Daily • Multi-day hold • Larger targets & stops • Est. Duration: 1-7 days
@@ -336,13 +356,13 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
                             <div className="text-sm font-mono-tabular text-terminal-foreground font-bold">
-                              {data.timeframe_profile.swing.entry?.toFixed(2)}
+                              {safeFormatNumber(data.timeframe_profile.swing.entry)}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
                             <div className="text-sm font-mono-tabular text-terminal-red font-bold">
-                              {data.timeframe_profile.swing.stop?.toFixed(2)}
+                              {safeFormatNumber(data.timeframe_profile.swing.stop)}
                             </div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
                               {calculatePercent(data.timeframe_profile.swing.entry, data.timeframe_profile.swing.stop)}%
@@ -356,7 +376,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                                   TP{idx + 1} • {timeEstimates[idx]}
                                 </div>
                                 <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                                  {target?.toFixed(2)}
+                                  {safeFormatNumber(target)}
                                 </div>
                                 <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
                                   {calculatePercent(data.timeframe_profile.swing.entry, target)}% • R:{calculateRR(data.timeframe_profile.swing.entry, data.timeframe_profile.swing.stop, target)}
