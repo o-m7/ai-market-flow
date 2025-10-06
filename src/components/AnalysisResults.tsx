@@ -817,9 +817,26 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                 </Badge>
               </div>
               {data.riskAssessment.factors && data.riskAssessment.factors.length > 0 && (
-                <div className="space-y-1">
-                  {data.riskAssessment.factors.map((factor: string, idx: number) => (
-                    <div key={idx} className="text-xs font-mono text-terminal-secondary">• {factor}</div>
+                <div className="space-y-2">
+                  {data.riskAssessment.factors.map((factor: any, idx: number) => (
+                    <div key={idx}>
+                      {typeof factor === 'string' ? (
+                        <div className="text-xs font-mono text-terminal-secondary">• {factor}</div>
+                      ) : (
+                        <div className="space-y-1">
+                          {factor.level && (
+                            <div className="text-xs font-mono-tabular text-terminal-accent uppercase">{factor.level}</div>
+                          )}
+                          {factor.bullets && factor.bullets.length > 0 && (
+                            <div className="space-y-1 ml-2">
+                              {factor.bullets.map((bullet: string, bIdx: number) => (
+                                <div key={bIdx} className="text-xs font-mono text-terminal-secondary">• {bullet}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
