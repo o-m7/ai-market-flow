@@ -31,9 +31,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
 
   const refreshSubscription = async () => {
-    if (!session) {
-      console.log('RefreshSubscription: No session, setting subscription to null');
-      setSubscription(null);
+    // Get current session directly from Supabase to avoid stale state
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    
+    if (!currentSession) {
+      console.log('RefreshSubscription: No session, skipping refresh');
       return;
     }
 
@@ -41,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription', {
         headers: {
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${currentSession.access_token}`,
         },
       });
 
@@ -72,7 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setTimeout(() => {
             refreshSubscription();
           }, 0);
-        } else {
+        } else if (event === 'SIGNED_OUT') {
+          // Only clear subscription on actual sign out, not during token refresh
           setSubscription(null);
         }
         
