@@ -417,7 +417,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">RSI (14)</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.rsi14.toFixed(1)}
+                      {safeFormatNumber(data.technical.rsi14, 1)}
                     </div>
                     <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
                       {data.technical.rsi14 > 70 ? 'Overbought' : data.technical.rsi14 < 30 ? 'Oversold' : 'Neutral'}
@@ -428,7 +428,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOCH %K</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.stoch_k.toFixed(1)}
+                      {safeFormatNumber(data.technical.stoch_k, 1)}
                     </div>
                   </div>
                 )}
@@ -436,7 +436,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOCH %D</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.stoch_d.toFixed(1)}
+                      {safeFormatNumber(data.technical.stoch_d, 1)}
                     </div>
                   </div>
                 )}
@@ -444,7 +444,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">MACD HIST</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.macd.hist > 0 ? '+' : ''}{data.technical.macd.hist.toFixed(4)}
+                      {data.technical.macd.hist > 0 ? '+' : ''}{safeFormatNumber(data.technical.macd.hist, 4)}
                     </div>
                     <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
                       {data.technical.macd.hist > 0 ? 'Bullish' : 'Bearish'}
@@ -455,7 +455,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">MACD LINE</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.macd.line.toFixed(4)}
+                      {safeFormatNumber(data.technical.macd.line, 4)}
                     </div>
                   </div>
                 )}
@@ -463,7 +463,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">MACD SIGNAL</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.macd.signal.toFixed(4)}
+                      {safeFormatNumber(data.technical.macd.signal, 4)}
                     </div>
                   </div>
                 )}
@@ -471,7 +471,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">CCI (20)</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.cci.toFixed(1)}
+                      {safeFormatNumber(data.technical.cci, 1)}
                     </div>
                   </div>
                 )}
@@ -479,7 +479,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ADX (14)</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.adx.toFixed(1)}
+                      {safeFormatNumber(data.technical.adx, 1)}
                     </div>
                     <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
                       {data.technical.adx > 25 ? 'Strong Trend' : 'Weak Trend'}
@@ -501,7 +501,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SMA 20</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.sma20.toFixed(2)}
+                      {safeFormatNumber(data.technical.sma20, 2)}
                     </div>
                   </div>
                 )}
@@ -509,7 +509,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SMA 50</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.sma50.toFixed(2)}
+                      {safeFormatNumber(data.technical.sma50, 2)}
                     </div>
                   </div>
                 )}
@@ -517,7 +517,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SMA 200</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.sma200.toFixed(2)}
+                      {safeFormatNumber(data.technical.sma200, 2)}
                     </div>
                   </div>
                 )}
@@ -525,7 +525,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">EMA 9</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.ema9.toFixed(2)}
+                      {safeFormatNumber(data.technical.ema9, 2)}
                     </div>
                   </div>
                 )}
@@ -533,7 +533,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">EMA 20</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.ema20.toFixed(2)}
+                      {safeFormatNumber(data.technical.ema20, 2)}
                     </div>
                   </div>
                 )}
@@ -541,7 +541,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">EMA 50</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.ema50.toFixed(2)}
+                      {safeFormatNumber(data.technical.ema50, 2)}
                     </div>
                   </div>
                 )}
@@ -549,7 +549,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">VWMA</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.vwma.toFixed(2)}
+                      {safeFormatNumber(data.technical.vwma, 2)}
                     </div>
                   </div>
                 )}
@@ -568,7 +568,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ATR (14)</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {data.technical.atr14.toFixed(4)}
+                      {safeFormatNumber(data.technical.atr14, 4)}
                     </div>
                   </div>
                 )}
@@ -577,19 +577,19 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                       <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">BB UPPER</div>
                       <div className="text-lg font-mono-tabular text-terminal-foreground">
-                        {data.technical.bb.upper.toFixed(2)}
+                        {safeFormatNumber(data.technical.bb.upper, 2)}
                       </div>
                     </div>
                     <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                       <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">BB MIDDLE</div>
                       <div className="text-lg font-mono-tabular text-terminal-foreground">
-                        {data.technical.bb.mid.toFixed(2)}
+                        {safeFormatNumber(data.technical.bb.mid, 2)}
                       </div>
                     </div>
                     <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                       <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">BB LOWER</div>
                       <div className="text-lg font-mono-tabular text-terminal-foreground">
-                        {data.technical.bb.lower.toFixed(2)}
+                        {safeFormatNumber(data.technical.bb.lower, 2)}
                       </div>
                     </div>
                   </>
@@ -598,7 +598,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">OBV</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {(data.technical.volume_analysis.obv / 1000000).toFixed(2)}M
+                      {safeFormatNumber(data.technical.volume_analysis.obv / 1000000, 2)}M
                     </div>
                   </div>
                 )}
@@ -606,7 +606,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                     <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">VOL SMA 20</div>
                     <div className="text-lg font-mono-tabular text-terminal-foreground">
-                      {(data.technical.volume_sma20 / 1000000).toFixed(2)}M
+                      {safeFormatNumber(data.technical.volume_sma20 / 1000000, 2)}M
                     </div>
                   </div>
                 )}
@@ -630,25 +630,25 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
               <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                 <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
                 <div className="text-lg font-mono-tabular text-terminal-green">
-                  {data.trade_idea.entry?.toFixed(2) || 'N/A'}
+                  {data.trade_idea.entry ? safeFormatNumber(data.trade_idea.entry, 2) : 'N/A'}
                 </div>
               </div>
               <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                 <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
                 <div className="text-lg font-mono-tabular text-terminal-red">
-                  {data.trade_idea.stop?.toFixed(2) || 'N/A'}
+                  {data.trade_idea.stop ? safeFormatNumber(data.trade_idea.stop, 2) : 'N/A'}
                 </div>
               </div>
               <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                 <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TARGET 1</div>
                 <div className="text-lg font-mono-tabular text-terminal-accent">
-                  {data.trade_idea.targets?.[0]?.toFixed(2) || 'N/A'}
+                  {data.trade_idea.targets?.[0] ? safeFormatNumber(data.trade_idea.targets[0], 2) : 'N/A'}
                 </div>
               </div>
               <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                 <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">RISK/REWARD</div>
                 <div className="text-lg font-mono-tabular text-terminal-accent">
-                  {data.trade_idea.risk_reward?.toFixed(2) || 'N/A'}
+                  {data.trade_idea.risk_reward ? safeFormatNumber(data.trade_idea.risk_reward, 2) : 'N/A'}
                 </div>
               </div>
             </div>
@@ -673,7 +673,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   {data.keyLevels.support?.map((level: number, idx: number) => (
                     <div key={idx} className="flex justify-between items-center bg-terminal-darker/50 p-2 border border-terminal-border/30">
                       <span className="text-xs font-mono-tabular text-terminal-secondary">S{idx + 1}</span>
-                      <span className="text-sm font-mono-tabular text-terminal-green">{level.toFixed(2)}</span>
+                      <span className="text-sm font-mono-tabular text-terminal-green">{safeFormatNumber(level, 2)}</span>
                     </div>
                   ))}
                 </div>
@@ -687,7 +687,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                   {data.keyLevels.resistance?.map((level: number, idx: number) => (
                     <div key={idx} className="flex justify-between items-center bg-terminal-darker/50 p-2 border border-terminal-border/30">
                       <span className="text-xs font-mono-tabular text-terminal-secondary">R{idx + 1}</span>
-                      <span className="text-sm font-mono-tabular text-terminal-red">{level.toFixed(2)}</span>
+                      <span className="text-sm font-mono-tabular text-terminal-red">{safeFormatNumber(level, 2)}</span>
                     </div>
                   ))}
                 </div>
@@ -773,7 +773,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     {key.replace(/_/g, ' ').toUpperCase()}
                   </div>
                   <div className="text-lg font-mono-tabular text-terminal-foreground">
-                    {typeof value === 'number' ? value.toFixed(4) : String(value)}
+                    {typeof value === 'number' ? safeFormatNumber(value, 4) : String(value)}
                   </div>
                 </div>
               ))}
@@ -797,7 +797,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     {Object.entries(data.fibonacci.retracement).map(([level, price]: [string, any]) => (
                       <div key={level} className="flex justify-between items-center bg-terminal-darker/50 p-2 border border-terminal-border/30">
                         <span className="text-xs font-mono-tabular text-terminal-secondary">{level}</span>
-                        <span className="text-sm font-mono-tabular text-terminal-accent">{Number(price).toFixed(2)}</span>
+                        <span className="text-sm font-mono-tabular text-terminal-accent">{safeFormatNumber(Number(price), 2)}</span>
                       </div>
                     ))}
                   </div>
@@ -810,7 +810,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     {Object.entries(data.fibonacci.extension).map(([level, price]: [string, any]) => (
                       <div key={level} className="flex justify-between items-center bg-terminal-darker/50 p-2 border border-terminal-border/30">
                         <span className="text-xs font-mono-tabular text-terminal-secondary">{level}</span>
-                        <span className="text-sm font-mono-tabular text-terminal-accent">{Number(price).toFixed(2)}</span>
+                        <span className="text-sm font-mono-tabular text-terminal-accent">{safeFormatNumber(Number(price), 2)}</span>
                       </div>
                     ))}
                   </div>
