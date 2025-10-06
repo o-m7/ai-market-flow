@@ -1,7 +1,9 @@
-// Institutional Technical Analysis Engine v2.0
+// Institutional Technical Analysis Engine v2.1 - Fixed Signal Inversion Bug
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
+
+const FUNCTION_VERSION = "2.1.0"; // Force redeployment
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -279,11 +281,12 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { symbol, timeframe, market, features, news, debug } = body || {};
 
-    console.log(`[ai-analyze v2.0] Processing analysis request: ${symbol} (${timeframe}, ${market})`);
+    console.log(`[ai-analyze v${FUNCTION_VERSION}] Processing analysis request: ${symbol} (${timeframe}, ${market})`);
 
     // Debug endpoint
     if (debug === true) {
       return new Response(JSON.stringify({
+        version: FUNCTION_VERSION,
         hasOpenAI: !!Deno.env.get('OPENAI_API_KEY'),
         symbol: symbol || null,
         timeframe: timeframe || null,
@@ -457,6 +460,7 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, a
       symbol,
       timeframe,
       market,
+      function_version: FUNCTION_VERSION,
       json_version: "1.0.0",
       analyzed_at: new Date().toISOString(),
       input_features: features,
