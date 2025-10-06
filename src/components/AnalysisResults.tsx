@@ -158,6 +158,9 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
 
                 // Calculate risk/reward for display
                 const calculateRR = (entry: number, stop: number, target: number) => {
+                  if (!entry || !stop || !target || typeof entry !== 'number' || typeof stop !== 'number' || typeof target !== 'number') {
+                    return '0.00';
+                  }
                   const risk = Math.abs(entry - stop);
                   const reward = Math.abs(target - entry);
                   return risk > 0 ? (reward / risk).toFixed(2) : '0.00';
@@ -165,6 +168,9 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
 
                 // Calculate percentage move
                 const calculatePercent = (entry: number, target: number) => {
+                  if (!entry || !target || typeof entry !== 'number' || typeof target !== 'number' || entry === 0) {
+                    return '0.00';
+                  }
                   return (((target - entry) / entry) * 100).toFixed(2);
                 };
 
