@@ -279,7 +279,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { symbol, timeframe, market, features, news, debug } = body || {};
 
-    console.log(`[ai-analyze] NEW DETERMINISTIC ANALYSIS: ${symbol} (${timeframe}, ${market})`);
+    console.log(`[ai-analyze v2.0] Processing analysis request: ${symbol} (${timeframe}, ${market})`);
 
     // Debug endpoint
     if (debug === true) {
