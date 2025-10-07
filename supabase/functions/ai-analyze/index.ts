@@ -335,45 +335,25 @@ serve(async (req) => {
 
     const client = new OpenAI({ apiKey: openaiApiKey });
 
-    // Create comprehensive institutional analysis prompt
-    const currentPriceContext = currentPrice ? `\nCURRENT LIVE PRICE: ${currentPrice} (MOST RECENT - use this as reference for analysis)` : '';
-    const comprehensivePrompt = `You are an elite institutional trading desk providing multi-strategy quantitative analysis.
+    // Optimized concise prompt - reduced token usage while maintaining accuracy
+    const currentPriceContext = currentPrice ? `\nLIVE PRICE: ${currentPrice}` : '';
+    const comprehensivePrompt = `Institutional technical analysis for ${symbol} ${timeframe} (${market})${currentPriceContext}
 
-MARKET DATA:
-Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}${currentPriceContext}
-
-IMPORTANT: The analysis summary MUST be specifically for the ${timeframe} timeframe. All levels, patterns, and recommendations should be contextualized to ${timeframe} chart analysis.
-${currentPrice ? `CRITICAL: Use the CURRENT LIVE PRICE (${currentPrice}) as the reference point for all analysis, support/resistance levels, and trade recommendations.` : ''}
-
-TECHNICAL FEATURES:
+TECHNICAL DATA:
 ${JSON.stringify(features, null, 2)}
 
-NEWS/EVENT CONTEXT:
-${JSON.stringify(news || { event_risk: false, headline_hits_30m: 0 }, null, 2)}
+NEWS: ${JSON.stringify(news || { event_risk: false, headline_hits_30m: 0 })}
 
-ANALYSIS REQUIREMENTS - Provide COMPREHENSIVE institutional-grade analysis:
+REQUIREMENTS:
+1. Market structure (EMA trend, phase, volatility, session)
+2. Technical signals (RSI, MACD, BB, VWAP, volume)
+3. Fibonacci levels (retracements & extensions with confluence)
+4. Four strategies: trend, mean reversion, momentum, range
+5. Multi-timeframe setups (scalp/intraday/swing)
+6. Risk-reward with ATR stops and probability targets
+7. Quantitative metrics and institutional perspective
 
-1. MARKET STRUCTURE: Identify trend direction (EMA 20/50/200 alignment), market phase (trending/range/consolidation/breakout), volatility regime (low/normal/high based on ATR), and session liquidity context.
-
-2. TECHNICAL ANALYSIS: Analyze RSI divergence patterns, MACD crossovers and histogram strength, Bollinger Band position and squeeze/expansion signals, VWAP deviation for mean reversion probability, and volume profile for institutional order flow.
-
-3. FIBONACCI RETRACEMENT: Calculate precise Fibonacci levels from significant swing high/low. Identify key retracement zones (23.6%, 38.2%, 50%, 61.8%, 78.6%) and extension targets (127.2%, 161.8%, 261.8%) for breakout scenarios. Note confluence with other technical levels.
-
-4. MULTIPLE TRADING STRATEGIES: 
-   A) TREND FOLLOWING: EMA alignment with momentum confirmation, breakout setups above resistance with volume, pullback entries to moving averages in trends.
-   B) MEAN REVERSION: Oversold/overbought RSI conditions, Bollinger Band touch reversals, VWAP mean reversion trades.
-   C) MOMENTUM: MACD bullish/bearish crossovers, RSI breakouts above 70 or below 30, volume confirmation on directional moves.
-   D) RANGE TRADING: Support/resistance level trades, range-bound oscillator signals, mean reversion within established ranges.
-
-5. MULTI-TIMEFRAME SETUPS: Provide scalp (1-15min) quick momentum plays and level bounces, intraday (30min-4h) session-based trades and pattern completions, and swing (daily+) multi-day position trades with trend following.
-
-6. RISK-REWARD ANALYSIS: Calculate precise stop-loss levels using ATR multiples, multiple profit targets with percentage allocations, position sizing based on volatility, and probability estimates for worst-case and best-case scenarios.
-
-7. QUANTITATIVE METRICS: Include probability estimates for directional moves, expected value calculations for trade setups, historical win rates for similar market conditions, and risk-adjusted return expectations.
-
-8. INSTITUTIONAL PERSPECTIVE: Analyze smart money flow indicators, level significance and institutional interest, market maker positioning insights, and liquidity/slippage considerations.
-
-CRITICAL: Provide detailed, actionable analysis with specific entry points, stop losses, and multiple profit targets for each viable strategy. Include confidence intervals and probability assessments for each recommendation. Return analysis in the exact JSON structure defined by the function schema.`;
+Provide actionable entries, stops, targets with confidence intervals. Return JSON per schema.`;
 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
@@ -391,7 +371,7 @@ CRITICAL: Provide detailed, actionable analysis with specific entry points, stop
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_tokens: 4096,
+      max_tokens: 1500, // Reduced from 4096 for faster generation
       temperature: 0.7,
     });
 

@@ -19,16 +19,30 @@ export async function getAggregates(
   if (limit) u.searchParams.set("limit", String(limit));
   u.searchParams.set("apiKey", apiKey);
   
-  const res = await fetch(u);
-  if (!res.ok) throw new Error(`Polygon error ${res.status}`);
+  // Add 3-second timeout for fast failure
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
   
-  const j = await res.json();
-  return j?.results?.map((x: any) => ({ 
-    t: x.t, 
-    o: x.o, 
-    h: x.h, 
-    l: x.l, 
-    c: x.c, 
-    v: x.v 
-  })) ?? [];
+  try {
+    const res = await fetch(u, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) throw new Error(`Polygon error ${res.status}`);
+    
+    const j = await res.json();
+    return j?.results?.map((x: any) => ({ 
+      t: x.t, 
+      o: x.o, 
+      h: x.h, 
+      l: x.l, 
+      c: x.c, 
+      v: x.v 
+    })) ?? [];
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Polygon API timeout (3s)');
+    }
+    throw error;
+  }
 }
