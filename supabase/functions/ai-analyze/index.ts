@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.6.0"; // Fetch fresh candles from Polygon
+const FUNCTION_VERSION = "2.7.0"; // Fixed candle fetching with proper time calculation
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -88,18 +88,30 @@ async function fetchFreshCandles(
   };
   
   const [multiplier, unit] = timespanMap[timespan] || [1, 'hour'];
+  
+  // Calculate from/to timestamps with extra buffer to ensure we get enough data
   const to = Date.now();
-  const from = to - (limit * multiplier * (unit === 'minute' ? 60000 : unit === 'hour' ? 3600000 : 86400000));
+  const msPerUnit = unit === 'minute' ? 60000 : unit === 'hour' ? 3600000 : 86400000;
+  const from = to - (limit * 1.5 * multiplier * msPerUnit); // 1.5x buffer
   
-  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${multiplier}/${unit}/${from}/${to}?adjusted=true&sort=asc&limit=${limit}&apiKey=${apiKey}`;
+  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${multiplier}/${unit}/${from}/${to}?adjusted=true&sort=asc&limit=50000&apiKey=${apiKey}`;
   
-  console.log(`[ai-analyze] Fetching ${limit} fresh candles from Polygon`);
+  console.log(`[ai-analyze] Fetching candles from Polygon: ${polygonSymbol}, timeframe: ${multiplier}${unit}, limit: ${limit}`);
   
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Polygon candles fetch failed: ${res.status}`);
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`[ai-analyze] Polygon error: ${res.status} - ${errorText}`);
+    throw new Error(`Polygon candles fetch failed: ${res.status}`);
+  }
   
   const data = await res.json();
-  const candles = (data.results || []).map((bar: any) => ({
+  if (!data.results || data.results.length === 0) {
+    console.error(`[ai-analyze] No results from Polygon for ${polygonSymbol}`);
+    throw new Error(`No candle data available for ${polygonSymbol}`);
+  }
+  
+  const candles = data.results.map((bar: any) => ({
     t: bar.t, o: bar.o, h: bar.h, l: bar.l, c: bar.c, v: bar.v
   }));
   
