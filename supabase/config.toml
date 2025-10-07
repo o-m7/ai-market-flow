@@ -57,6 +57,9 @@ verify_jwt = false
 [functions.polygon-chart-data]
 verify_jwt = false
 
+[functions.polygon-indicators]
+verify_jwt = false
+
 [functions.polygon-debug]
 verify_jwt = false
 
