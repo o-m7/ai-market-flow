@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.2.0"; // Now fetches technicals from Polygon
+const FUNCTION_VERSION = "2.3.0"; // Added detailed Polygon API logging
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -523,9 +523,18 @@ async function fetchTechnicalIndicators(symbol: string, timeframe: string, marke
       fetch(`https://api.polygon.io/v1/indicators/macd/${providerSymbol}?timespan=${timespan}&adjusted=true&short_window=12&long_window=26&signal_window=9&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`)
     ]);
 
+    // Check for HTTP errors
+    if (!rsiRes.ok) console.warn(`[ai-analyze] RSI fetch failed: ${rsiRes.status}`);
+    if (!ema20Res.ok) console.warn(`[ai-analyze] EMA20 fetch failed: ${ema20Res.status}`);
+    if (!macdRes.ok) console.warn(`[ai-analyze] MACD fetch failed: ${macdRes.status}`);
+
     const [rsiData, ema20Data, ema50Data, ema200Data, macdData] = await Promise.all([
       rsiRes.json(), ema20Res.json(), ema50Res.json(), ema200Res.json(), macdRes.json()
     ]);
+
+    console.log(`[ai-analyze] Polygon RSI response:`, JSON.stringify(rsiData));
+    console.log(`[ai-analyze] Polygon EMA20 response:`, JSON.stringify(ema20Data));
+    console.log(`[ai-analyze] Polygon MACD response:`, JSON.stringify(macdData));
 
     const closes = candles.map((c: any) => c.c);
     const highs = candles.map((c: any) => c.h);
