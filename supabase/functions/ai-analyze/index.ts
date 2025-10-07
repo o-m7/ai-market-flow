@@ -330,7 +330,7 @@ serve(async (req) => {
 
     // Fetch technical indicators from Polygon API
     console.log(`[ai-analyze] Fetching technical indicators from Polygon for ${symbol}`);
-    const features = await fetchTechnicalIndicators(symbol, timeframe, market, candles);
+    const features = await fetchTechnicalIndicators(symbol, timeframe, market, candles, currentPrice);
     console.log(`[ai-analyze] Technical indicators fetched:`, JSON.stringify(features.technical, null, 2));
 
     const client = new OpenAI({ apiKey: openaiApiKey });
@@ -510,7 +510,7 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, a
 });
 
 // Fetch technical indicators from Polygon API
-async function fetchTechnicalIndicators(symbol: string, timeframe: string, market: string, candles: any[]) {
+async function fetchTechnicalIndicators(symbol: string, timeframe: string, market: string, candles: any[], currentPrice?: number) {
   const polygonApiKey = Deno.env.get('POLYGON_API_KEY');
   
   if (!polygonApiKey) {
@@ -557,7 +557,7 @@ async function fetchTechnicalIndicators(symbol: string, timeframe: string, marke
     const closes = candles.map((c: any) => c.c);
     const highs = candles.map((c: any) => c.h);
     const lows = candles.map((c: any) => c.l);
-    const currentPrice = closes[closes.length - 1] || 0;
+    const priceRef = currentPrice || closes[closes.length - 1] || 0;
 
     return {
       technical: {
@@ -573,10 +573,10 @@ async function fetchTechnicalIndicators(symbol: string, timeframe: string, marke
         atr14: calculateATR(highs, lows, closes, 14),
         bb: calculateBollingerBands(closes, 20, 2),
         vwap: calculateVWAP(candles),
-        support: findSupportLevels(lows),
-        resistance: findResistanceLevels(highs),
-        lastClose: currentPrice,
-        current: currentPrice
+        support: findSupportLevels(lows, priceRef),
+        resistance: findResistanceLevels(highs, priceRef),
+        lastClose: priceRef,
+        current: priceRef
       },
       market: { session: getMarketSession(), spread: 0.001, stale: false }
     };
@@ -586,18 +586,18 @@ async function fetchTechnicalIndicators(symbol: string, timeframe: string, marke
   }
 }
 
-function calculateTechnicalIndicators(candles: any[]) {
+function calculateTechnicalIndicators(candles: any[], currentPrice?: number) {
   const closes = candles.map((c: any) => c.c);
   const highs = candles.map((c: any) => c.h);
   const lows = candles.map((c: any) => c.l);
-  const currentPrice = closes[closes.length - 1] || 0;
+  const priceRef = currentPrice || closes[closes.length - 1] || 0;
   return {
     technical: {
       ema20: calculateEMA(closes, 20), ema50: calculateEMA(closes, 50), ema200: calculateEMA(closes, 200),
       rsi14: calculateRSI(closes, 14), macd: calculateMACD(closes), atr14: calculateATR(highs, lows, closes, 14),
       bb: calculateBollingerBands(closes, 20, 2), vwap: calculateVWAP(candles),
-      support: findSupportLevels(lows), resistance: findResistanceLevels(highs),
-      lastClose: currentPrice, current: currentPrice
+      support: findSupportLevels(lows, priceRef), resistance: findResistanceLevels(highs, priceRef),
+      lastClose: priceRef, current: priceRef
     },
     market: { session: getMarketSession(), spread: 0.001, stale: false }
   };
@@ -659,16 +659,66 @@ function calculateVWAP(candles: any[]): number {
   return totalVolume > 0 ? totalVolumePrice / totalVolume : 0;
 }
 
-function findSupportLevels(lows: number[]): number[] {
+function findSupportLevels(lows: number[], currentPrice?: number): number[] {
   if (lows.length < 10) return [];
-  const sorted = [...lows.slice(-50)].sort((a, b) => a - b);
-  return [sorted[0], sorted[1]].filter(Boolean);
+  
+  // Focus on recent 30 bars for more current levels
+  const recentLows = lows.slice(-30);
+  const refPrice = currentPrice || lows[lows.length - 1];
+  
+  // Find pivot lows (local minimums where price bounced)
+  const pivots: number[] = [];
+  for (let i = 2; i < recentLows.length - 2; i++) {
+    if (recentLows[i] < recentLows[i-1] && 
+        recentLows[i] < recentLows[i-2] && 
+        recentLows[i] < recentLows[i+1] && 
+        recentLows[i] < recentLows[i+2]) {
+      // Only include if it's below current price
+      if (recentLows[i] < refPrice * 0.999) {
+        pivots.push(recentLows[i]);
+      }
+    }
+  }
+  
+  // If no pivots, use recent lows below current price
+  if (pivots.length === 0) {
+    const belowPrice = recentLows.filter(l => l < refPrice * 0.999).sort((a, b) => b - a);
+    return belowPrice.slice(0, 2);
+  }
+  
+  // Return most recent/strongest pivots
+  return pivots.slice(-3).sort((a, b) => b - a).slice(0, 2);
 }
 
-function findResistanceLevels(highs: number[]): number[] {
+function findResistanceLevels(highs: number[], currentPrice?: number): number[] {
   if (highs.length < 10) return [];
-  const sorted = [...highs.slice(-50)].sort((a, b) => b - a);
-  return [sorted[0], sorted[1]].filter(Boolean);
+  
+  // Focus on recent 30 bars for more current levels
+  const recentHighs = highs.slice(-30);
+  const refPrice = currentPrice || highs[highs.length - 1];
+  
+  // Find pivot highs (local maximums where price rejected)
+  const pivots: number[] = [];
+  for (let i = 2; i < recentHighs.length - 2; i++) {
+    if (recentHighs[i] > recentHighs[i-1] && 
+        recentHighs[i] > recentHighs[i-2] && 
+        recentHighs[i] > recentHighs[i+1] && 
+        recentHighs[i] > recentHighs[i+2]) {
+      // Only include if it's above current price
+      if (recentHighs[i] > refPrice * 1.001) {
+        pivots.push(recentHighs[i]);
+      }
+    }
+  }
+  
+  // If no pivots, use recent highs above current price
+  if (pivots.length === 0) {
+    const abovePrice = recentHighs.filter(h => h > refPrice * 1.001).sort((a, b) => a - b);
+    return abovePrice.slice(0, 2);
+  }
+  
+  // Return most recent/strongest pivots
+  return pivots.slice(-3).sort((a, b) => a - b).slice(0, 2);
 }
 
 function getMarketSession(): string {
