@@ -351,25 +351,29 @@ ${JSON.stringify(features, null, 2)}
 NEWS/EVENT CONTEXT:
 ${JSON.stringify(news || { event_risk: false, headline_hits_30m: 0 }, null, 2)}
 
-ANALYSIS REQUIREMENTS - Provide COMPREHENSIVE institutional-grade analysis covering:
+ANALYSIS REQUIREMENTS - Provide COMPREHENSIVE institutional-grade analysis:
 
-1. MARKET STRUCTURE: Identify trend (EMA alignment), phase, volatility, and session context.
+1. MARKET STRUCTURE: Identify trend direction (EMA 20/50/200 alignment), market phase (trending/range/consolidation/breakout), volatility regime (low/normal/high based on ATR), and session liquidity context.
 
-2. TECHNICAL ANALYSIS: RSI divergence, MACD signals, Bollinger Bands, VWAP deviation, volume flow.
+2. TECHNICAL ANALYSIS: Analyze RSI divergence patterns, MACD crossovers and histogram strength, Bollinger Band position and squeeze/expansion signals, VWAP deviation for mean reversion probability, and volume profile for institutional order flow.
 
-3. FIBONACCI: Calculate retracements (23.6%, 38.2%, 50%, 61.8%, 78.6%) and extensions (127.2%, 161.8%) from significant swing points.
+3. FIBONACCI RETRACEMENT: Calculate precise Fibonacci levels from significant swing high/low. Identify key retracement zones (23.6%, 38.2%, 50%, 61.8%, 78.6%) and extension targets (127.2%, 161.8%, 261.8%) for breakout scenarios. Note confluence with other technical levels.
 
-4. STRATEGIES: Assess trend following, mean reversion, momentum, and range trading opportunities.
+4. MULTIPLE TRADING STRATEGIES: 
+   A) TREND FOLLOWING: EMA alignment with momentum confirmation, breakout setups above resistance with volume, pullback entries to moving averages in trends.
+   B) MEAN REVERSION: Oversold/overbought RSI conditions, Bollinger Band touch reversals, VWAP mean reversion trades.
+   C) MOMENTUM: MACD bullish/bearish crossovers, RSI breakouts above 70 or below 30, volume confirmation on directional moves.
+   D) RANGE TRADING: Support/resistance level trades, range-bound oscillator signals, mean reversion within established ranges.
 
-5. MULTI-TIMEFRAME: Provide scalp (1-15min), intraday (30min-4h), and swing (daily+) trade setups.
+5. MULTI-TIMEFRAME SETUPS: Provide scalp (1-15min) quick momentum plays and level bounces, intraday (30min-4h) session-based trades and pattern completions, and swing (daily+) multi-day position trades with trend following.
 
-6. RISK-REWARD: Calculate precise stop-loss using ATR, multiple targets, position sizing.
+6. RISK-REWARD ANALYSIS: Calculate precise stop-loss levels using ATR multiples, multiple profit targets with percentage allocations, position sizing based on volatility, and probability estimates for worst-case and best-case scenarios.
 
-7. QUANTITATIVE: Probability estimates, expected value, historical win rates for similar conditions.
+7. QUANTITATIVE METRICS: Include probability estimates for directional moves, expected value calculations for trade setups, historical win rates for similar market conditions, and risk-adjusted return expectations.
 
-8. INSTITUTIONAL: Smart money flow, level significance, market maker positioning, liquidity considerations.
+8. INSTITUTIONAL PERSPECTIVE: Analyze smart money flow indicators, level significance and institutional interest, market maker positioning insights, and liquidity/slippage considerations.
 
-PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entries, stops, and targets for each viable strategy. Include confidence intervals and probabilities.`;
+CRITICAL: Provide detailed, actionable analysis with specific entry points, stop losses, and multiple profit targets for each viable strategy. Include confidence intervals and probability assessments for each recommendation. Return analysis in the exact JSON structure defined by the function schema.`;
 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
@@ -399,13 +403,30 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entries, stops, and targets 
       hasToolCalls: !!response.choices?.[0]?.message?.tool_calls,
       toolCallsLength: response.choices?.[0]?.message?.tool_calls?.length,
       finishReason: response.choices?.[0]?.finish_reason,
-      messageContent: response.choices?.[0]?.message?.content?.slice(0, 200)
+      messageContent: response.choices?.[0]?.message?.content?.slice(0, 200),
+      toolCallName: toolCall?.function?.name,
+      toolCallArgsPreview: toolCall?.function?.arguments?.slice(0, 200)
     }));
     
-    if (!toolCall || toolCall.function.name !== "InstitutionalTaResult") {
-      console.error('[ai-analyze] No valid function call returned');
+    if (!toolCall) {
+      console.error('[ai-analyze] No tool call in response. Full response:', JSON.stringify(response, null, 2));
       return new Response(JSON.stringify({ 
-        error: "AI did not return valid function call" 
+        error: "AI did not return function call. This may be due to model constraints or prompt issues.",
+        debug: {
+          finishReason: response.choices?.[0]?.finish_reason,
+          hasContent: !!response.choices?.[0]?.message?.content,
+          contentPreview: response.choices?.[0]?.message?.content?.slice(0, 500)
+        }
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    if (toolCall.function.name !== "InstitutionalTaResult") {
+      console.error('[ai-analyze] Wrong function name returned:', toolCall.function.name);
+      return new Response(JSON.stringify({ 
+        error: `AI returned wrong function: ${toolCall.function.name} instead of InstitutionalTaResult` 
       }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
