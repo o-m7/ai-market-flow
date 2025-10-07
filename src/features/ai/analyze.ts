@@ -30,12 +30,55 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     throw new Error('No backend configured. Set VITE_PUBLIC_API_URL or VITE_SUPABASE_URL.');
   }
 
+  // PHASE 1 FIX: Fetch latest 2 candles for real-time accuracy
+  let currentPrice: number | null = null;
+  let freshCandles = payload.candles;
+  
+  try {
+    const liveDataResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: payload.symbol,
+        timeframe: payload.timeframe,
+        asset: payload.market.toLowerCase(),
+        limit: 2,
+        lite: true
+      })
+    });
+    
+    if (liveDataResponse.ok) {
+      const liveData = await liveDataResponse.json();
+      if (liveData.candles && liveData.candles.length > 0) {
+        // Replace last candles with fresh ones
+        freshCandles = [...payload.candles.slice(0, -2), ...liveData.candles.map((c: any) => ({
+          t: c.t,
+          o: c.o,
+          h: c.h,
+          l: c.l,
+          c: c.c,
+          v: c.v
+        }))];
+        // Get current live price from snapshot
+        currentPrice = liveData.snapshotLastTrade || liveData.candles[liveData.candles.length - 1].c;
+        console.log('[analyze] Fresh data fetched:', { 
+          latestClose: liveData.candles[liveData.candles.length - 1].c,
+          currentPrice,
+          age: liveData.lastTimeUTC 
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[analyze] Failed to fetch fresh candles, using provided data:', err);
+  }
+
   // Send candles to ai-analyze - it will fetch technicals from Polygon
   const analysisPayload = {
     symbol: payload.symbol,
     timeframe: payload.timeframe,
     market: payload.market,
-    candles: payload.candles,
+    candles: freshCandles,
+    currentPrice, // Pass live price for context
     news: {
       event_risk: false,
       headline_hits_30m: 0

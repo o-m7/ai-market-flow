@@ -279,9 +279,12 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { symbol, timeframe, market, candles, news, debug } = body || {};
+    const { symbol, timeframe, market, candles, currentPrice, news, debug } = body || {};
 
     console.log(`[ai-analyze v${FUNCTION_VERSION}] Processing analysis request: ${symbol} (${timeframe}, ${market})`);
+    if (currentPrice) {
+      console.log(`[ai-analyze] Live price provided: ${currentPrice}`);
+    }
 
     // Debug endpoint
     if (debug === true) {
@@ -293,6 +296,7 @@ serve(async (req) => {
         timeframe: timeframe || null,
         market: market || null,
         hasCandles: !!candles,
+        currentPrice: currentPrice || null,
         hasNews: !!news,
         analyzed_at: new Date().toISOString(),
       }), {
@@ -332,12 +336,14 @@ serve(async (req) => {
     const client = new OpenAI({ apiKey: openaiApiKey });
 
     // Create comprehensive institutional analysis prompt
+    const currentPriceContext = currentPrice ? `\nCURRENT LIVE PRICE: ${currentPrice} (MOST RECENT - use this as reference for analysis)` : '';
     const comprehensivePrompt = `You are an elite institutional trading desk providing multi-strategy quantitative analysis.
 
 MARKET DATA:
-Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
+Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}${currentPriceContext}
 
 IMPORTANT: The analysis summary MUST be specifically for the ${timeframe} timeframe. All levels, patterns, and recommendations should be contextualized to ${timeframe} chart analysis.
+${currentPrice ? `CRITICAL: Use the CURRENT LIVE PRICE (${currentPrice}) as the reference point for all analysis, support/resistance levels, and trade recommendations.` : ''}
 
 TECHNICAL FEATURES:
 ${JSON.stringify(features, null, 2)}
@@ -475,6 +481,7 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, a
       symbol,
       timeframe,
       market,
+      currentPrice: currentPrice || null,
       function_version: FUNCTION_VERSION,
       json_version: "1.0.0",
       analyzed_at: new Date().toISOString(),
