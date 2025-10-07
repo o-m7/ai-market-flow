@@ -125,52 +125,17 @@ serve(async (req) => {
 
     console.log(`Analyzing ${articles.length} articles with ${analysisType} analysis`);
 
-    let insights: string | null = null;
-
-    // Prefer newer Responses API with accessible models, then fall back
-    try {
-      const r1 = await client.responses.create({
-        model: "gpt-4.1-mini-2025-04-14",
-        input: `${systemPrompt}\n\n${userPrompt}`,
-        max_completion_tokens: 1200
-      });
-      insights =
-        (r1 as any).output_text ??
-        (r1 as any).output?.[0]?.content?.[0]?.text ??
-        (r1 as any).content?.[0]?.text ??
-        null;
-    } catch (err: any) {
-      console.log("[news-insights] gpt-4.1-mini attempt failed", err?.message || err);
-    }
-
-    if (!insights) {
-      try {
-        const r2 = await client.responses.create({
-          model: "gpt-4.1-2025-04-14",
-          input: `${systemPrompt}\n\n${userPrompt}`,
-          max_completion_tokens: 1200
-        });
-        insights =
-          (r2 as any).output_text ??
-          (r2 as any).output?.[0]?.content?.[0]?.text ??
-          (r2 as any).content?.[0]?.text ??
-          null;
-      } catch (err: any) {
-        console.log("[news-insights] gpt-4.1 attempt failed", err?.message || err);
-      }
-    }
-
-    if (!insights) {
-      const response = await client.chat.completions.create({
-        model: "gpt-5-2025-08-07",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        max_completion_tokens: 1200
-      });
-      insights = response.choices[0]?.message?.content ?? null;
-    }
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      max_tokens: 1200,
+      temperature: 0.7
+    });
+    
+    const insights = response.choices[0]?.message?.content;
 
     if (!insights) {
       throw new Error('No insights generated from OpenAI');
