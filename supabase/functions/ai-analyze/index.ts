@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.6.0"; // Phase 2: Speed optimizations - gpt-4o-mini, reduced tokens, timeouts
+const FUNCTION_VERSION = "2.6.1"; // Using gpt-5 with correct parameters
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -374,7 +374,7 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entries, stops, and targets 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
     const response = await client.chat.completions.create({
-      model: "gpt-4o-mini", // Phase 2: Faster, cheaper model
+      model: "gpt-5-2025-08-07", // GPT-5 flagship model
       messages: [
         { 
           role: "system", 
@@ -387,8 +387,8 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entries, stops, and targets 
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_tokens: 1500, // Phase 2: Reduced from 2000
-      temperature: 0.1
+      max_completion_tokens: 1500, // GPT-5 uses max_completion_tokens, not max_tokens
+      // Note: temperature not supported by GPT-5
     });
 
     const toolCall = response.choices?.[0]?.message?.tool_calls?.[0];
