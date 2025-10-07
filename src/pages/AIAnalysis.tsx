@@ -214,22 +214,42 @@ export const AIAnalysis = () => {
         '60': '1h', '240': '4h', 'D': '1d'
       };
 
-      // Convert chart data to proper format
-      const seriesData = chartData.map(bar => ({
-        t: bar.time * 1000, // Convert to milliseconds
-        o: bar.open,
-        h: bar.high,
-        l: bar.low,
-        c: bar.close,
-        v: bar.volume || 0
-      }));
+      // Fetch FRESH candles directly - don't rely on cached chart data
+      console.log('[AI Analysis] Fetching fresh candles for analysis');
+      const freshDataResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: symbol.toUpperCase(),
+          timeframe: timeframeMap[timeframe],
+          asset: getAssetType(symbol).toLowerCase(),
+          limit: 500,
+          lite: false
+        })
+      });
 
-      // Call Edge Function ai-analyze with OHLCV-only payload
+      if (!freshDataResponse.ok) {
+        throw new Error('Failed to fetch fresh market data');
+      }
+
+      const freshData = await freshDataResponse.json();
+      if (!freshData.candles || freshData.candles.length === 0) {
+        throw new Error('No candle data available for analysis');
+      }
+
+      console.log('[AI Analysis] Fresh data loaded:', {
+        symbol: symbol.toUpperCase(),
+        candles: freshData.candles.length,
+        latest: freshData.candles[freshData.candles.length - 1],
+        currentPrice: freshData.snapshotLastTrade
+      });
+
+      // Call Edge Function ai-analyze with FRESH OHLCV data
       const payload: AnalysisRequest = {
         symbol: symbol.toUpperCase(),
         timeframe: timeframeMap[timeframe],
         market: getAssetType(symbol),
-        candles: seriesData,
+        candles: freshData.candles,
       };
 
       const result = await analyzeWithAI(payload);
@@ -274,7 +294,7 @@ export const AIAnalysis = () => {
       setAnalysis(analysisForDisplay);
       toast({
         title: 'Analysis Complete ✅',
-        description: `AI analyzed ${symbol.toUpperCase()} with ${seriesData.length} data points`,
+        description: `AI analyzed ${symbol.toUpperCase()} with ${freshData.candles.length} data points`,
       });
 
     } catch (error: any) {
