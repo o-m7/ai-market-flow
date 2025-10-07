@@ -391,7 +391,7 @@ CRITICAL: Provide detailed, actionable analysis with specific entry points, stop
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_completion_tokens: 1500, // GPT-5 uses max_completion_tokens, not max_tokens
+      max_completion_tokens: 4096, // Increased for comprehensive analysis (GPT-5 uses max_completion_tokens)
       // Note: temperature not supported by GPT-5
     });
 
