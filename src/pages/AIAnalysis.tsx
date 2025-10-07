@@ -118,6 +118,12 @@ export const AIAnalysis = () => {
   
   const [symbol, setSymbol] = useState(initialSymbol);
   const [timeframe, setTimeframe] = useState<'1'|'5'|'15'|'30'|'60'|'240'|'D'>("60");
+  
+  // Clear analysis when symbol or timeframe changes
+  useEffect(() => {
+    setAnalysis(null);
+    setAiError(null);
+  }, [symbol, timeframe]);
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
   const [chartData, setChartData] = useState<LWBar[]>([]);
@@ -286,9 +292,7 @@ export const AIAnalysis = () => {
 
   const handleChartDataChange = (data: LWBar[]) => {
     setChartData(data);
-    // Clear previous analysis when chart data changes
-    setAnalysis(null);
-    setAiError(null);
+    // Don't clear analysis on chart updates - only on symbol/timeframe changes
   };
 
   return (
