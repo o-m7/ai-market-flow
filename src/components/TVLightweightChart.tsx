@@ -130,9 +130,14 @@ export default function TVLightweightChart({
       }
     })();
 
-    // Live updates
+    // Live updates - tick every second to update current bar
     let tickTimer: NodeJS.Timeout | null = null;
+    
+    // Full refresh every 30 seconds to capture completed candles
+    let refreshTimer: NodeJS.Timeout | null = null;
+    
     if (live) {
+      // Update current bar every second with live price
       tickTimer = setInterval(async () => {
         try {
           const q = await fetchQuote(symbol);
@@ -164,10 +169,30 @@ export default function TVLightweightChart({
           console.error('Live update error:', error);
         }
       }, 1000);
+
+      // Refresh full dataset every 30 seconds to get completed candles
+      refreshTimer = setInterval(async () => {
+        try {
+          console.log(`[Live Refresh] Fetching fresh candles for ${symbol}`);
+          const freshData = await fetchCandles(symbol, tf);
+          lastBar.current = freshData.at(-1);
+          dataRef.current = freshData;
+          onDataChange?.(freshData);
+          
+          if (series === 'candles') {
+            seriesRef.current.setData(freshData);
+          } else {
+            seriesRef.current.setData(freshData.map(b => ({ time: b.time as Time, value: b.close })));
+          }
+        } catch (error) {
+          console.error('Live refresh error:', error);
+        }
+      }, 30000); // 30 seconds
     }
 
     return () => {
       if (tickTimer) clearInterval(tickTimer);
+      if (refreshTimer) clearInterval(refreshTimer);
       resizeObserver.disconnect();
       if (chartRef.current) {
         chart.remove();

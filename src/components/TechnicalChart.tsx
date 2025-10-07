@@ -144,11 +144,24 @@ const getAssetType = (symbol: string): 'STOCK' | 'CRYPTO' | 'FOREX' => {
       }
     };
 
-
+    // Initial fetch
     fetchChartData();
+    
+    // Refresh full chart data every 30 seconds when live=true to capture completed candles
+    let refreshInterval: NodeJS.Timeout | undefined;
+    if (live) {
+      refreshInterval = setInterval(() => {
+        console.log(`[Live Refresh] Fetching fresh candles for ${symbol}`);
+        fetchChartData();
+      }, 30000); // 30 seconds
+    }
+
+    return () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+    };
     // Note: Intentionally exclude onDataChange to avoid re-fetch loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbol, timeframe]);
+  }, [symbol, timeframe, live]);
 
 
   // Live meta (barLast & snapshot) refresher every 3 seconds

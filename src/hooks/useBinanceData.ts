@@ -65,7 +65,16 @@ export const useBinanceData = (symbol: string, interval: string) => {
       }
     };
 
+    // Initial fetch
     fetchData();
+
+    // Auto-refresh every 30 seconds to capture completed candles
+    const refreshInterval = setInterval(() => {
+      console.log(`[Auto-refresh] Fetching fresh Binance data for ${symbol}`);
+      fetchData();
+    }, 30000);
+
+    return () => clearInterval(refreshInterval);
   }, [symbol, interval]);
 
   return { data, loading, error, source };
