@@ -72,6 +72,40 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     console.warn('[analyze] Failed to fetch fresh candles, using provided data:', err);
   }
 
+  // Fetch real news sentiment analysis
+  let newsData = {
+    event_risk: false,
+    headline_hits_30m: 0,
+    sentiment: 'neutral' as 'bullish' | 'bearish' | 'neutral',
+    confidence: 0
+  };
+
+  try {
+    const newsResponse = await fetch(`${ENV.SUPABASE_URL}/functions/v1/news-signal-analysis`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: payload.symbol,
+        timeframe: payload.timeframe
+      })
+    });
+
+    if (newsResponse.ok) {
+      const newsResult = await newsResponse.json();
+      if (newsResult.analysis) {
+        newsData = {
+          event_risk: newsResult.analysis.news_impact === 'high',
+          headline_hits_30m: newsResult.news?.length || 0,
+          sentiment: newsResult.analysis.sentiment,
+          confidence: newsResult.analysis.confidence
+        };
+        console.log('[analyze] News sentiment fetched:', newsData);
+      }
+    }
+  } catch (err) {
+    console.warn('[analyze] Failed to fetch news sentiment, using neutral:', err);
+  }
+
   // Send candles to ai-analyze - it will fetch technicals from Polygon
   const analysisPayload = {
     symbol: payload.symbol,
@@ -79,10 +113,7 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     market: payload.market,
     candles: freshCandles,
     currentPrice, // Pass live price for context
-    news: {
-      event_risk: false,
-      headline_hits_30m: 0
-    }
+    news: newsData
   };
 
   const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(analysisPayload) });
