@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.7.0"; // Fixed candle fetching with proper time calculation
+const FUNCTION_VERSION = "2.8.0"; // Using GPT-5 model
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -406,7 +406,8 @@ async function callOpenAIAnalysis(marketContext: string, technical: any) {
   console.log('[ai-analyze] Calling OpenAI with function calling...');
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4-turbo-preview",
+    model: "gpt-5-2025-08-07",
+    max_completion_tokens: 2000,
     messages: [
       {
         role: "system",
