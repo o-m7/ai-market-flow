@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.1.0"; // Force redeployment
+const FUNCTION_VERSION = "2.2.0"; // Now fetches technicals from Polygon
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -279,7 +279,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { symbol, timeframe, market, features, news, debug } = body || {};
+    const { symbol, timeframe, market, candles, news, debug } = body || {};
 
     console.log(`[ai-analyze v${FUNCTION_VERSION}] Processing analysis request: ${symbol} (${timeframe}, ${market})`);
 
@@ -288,10 +288,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         version: FUNCTION_VERSION,
         hasOpenAI: !!Deno.env.get('OPENAI_API_KEY'),
+        hasPolygon: !!Deno.env.get('POLYGON_API_KEY'),
         symbol: symbol || null,
         timeframe: timeframe || null,
         market: market || null,
-        hasFeatures: !!features,
+        hasCandles: !!candles,
         hasNews: !!news,
         analyzed_at: new Date().toISOString(),
       }), {
@@ -314,16 +315,19 @@ serve(async (req) => {
       });
     }
 
-    if (!symbol || !features || !features.technical) {
+    if (!symbol || !candles || candles.length === 0) {
       return new Response(JSON.stringify({ 
-        error: "symbol, features, and features.technical are required" 
+        error: "symbol and candles are required" 
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    console.log(`[ai-analyze] Processing with deterministic rules for ${symbol}`);
+    // Fetch technical indicators from Polygon API
+    console.log(`[ai-analyze] Fetching technical indicators from Polygon for ${symbol}`);
+    const features = await fetchTechnicalIndicators(symbol, timeframe, market, candles);
+    console.log(`[ai-analyze] Technical indicators fetched:`, JSON.stringify(features.technical, null, 2));
 
     const client = new OpenAI({ apiKey: openaiApiKey });
 
@@ -486,3 +490,163 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, a
     });
   }
 });
+
+// Fetch technical indicators from Polygon API
+async function fetchTechnicalIndicators(symbol: string, timeframe: string, market: string, candles: any[]) {
+  const polygonApiKey = Deno.env.get('POLYGON_API_KEY');
+  
+  if (!polygonApiKey) {
+    console.warn('[ai-analyze] POLYGON_API_KEY not set, using calculated indicators');
+    return calculateTechnicalIndicators(candles);
+  }
+
+  try {
+    const providerSymbol = 
+      market === "CRYPTO" ? (symbol.startsWith('X:') ? symbol : `X:${symbol}`)
+      : market === "FOREX" ? (symbol.startsWith('C:') ? symbol : `C:${symbol}`)
+      : symbol.toUpperCase();
+
+    const tfMap: Record<string, string> = {
+      '1m': 'minute', '5m': 'minute', '15m': 'minute', '30m': 'minute',
+      '1h': 'hour', '60m': 'hour', '4h': 'hour', '240m': 'hour',
+      '1d': 'day', 'D': 'day'
+    };
+    const timespan = tfMap[timeframe] || 'hour';
+
+    console.log(`[ai-analyze] Fetching Polygon indicators for ${providerSymbol}, timespan=${timespan}`);
+
+    const [rsiRes, ema20Res, ema50Res, ema200Res, macdRes] = await Promise.all([
+      fetch(`https://api.polygon.io/v1/indicators/rsi/${providerSymbol}?timespan=${timespan}&adjusted=true&window=14&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`),
+      fetch(`https://api.polygon.io/v1/indicators/ema/${providerSymbol}?timespan=${timespan}&adjusted=true&window=20&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`),
+      fetch(`https://api.polygon.io/v1/indicators/ema/${providerSymbol}?timespan=${timespan}&adjusted=true&window=50&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`),
+      fetch(`https://api.polygon.io/v1/indicators/ema/${providerSymbol}?timespan=${timespan}&adjusted=true&window=200&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`),
+      fetch(`https://api.polygon.io/v1/indicators/macd/${providerSymbol}?timespan=${timespan}&adjusted=true&short_window=12&long_window=26&signal_window=9&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`)
+    ]);
+
+    const [rsiData, ema20Data, ema50Data, ema200Data, macdData] = await Promise.all([
+      rsiRes.json(), ema20Res.json(), ema50Res.json(), ema200Res.json(), macdRes.json()
+    ]);
+
+    const closes = candles.map((c: any) => c.c);
+    const highs = candles.map((c: any) => c.h);
+    const lows = candles.map((c: any) => c.l);
+    const currentPrice = closes[closes.length - 1] || 0;
+
+    return {
+      technical: {
+        ema20: ema20Data?.results?.values?.[0]?.value || 0,
+        ema50: ema50Data?.results?.values?.[0]?.value || 0,
+        ema200: ema200Data?.results?.values?.[0]?.value || 0,
+        rsi14: rsiData?.results?.values?.[0]?.value || 50,
+        macd: {
+          line: macdData?.results?.values?.[0]?.value || 0,
+          signal: macdData?.results?.values?.[0]?.signal || 0,
+          hist: (macdData?.results?.values?.[0]?.value || 0) - (macdData?.results?.values?.[0]?.signal || 0)
+        },
+        atr14: calculateATR(highs, lows, closes, 14),
+        bb: calculateBollingerBands(closes, 20, 2),
+        vwap: calculateVWAP(candles),
+        support: findSupportLevels(lows),
+        resistance: findResistanceLevels(highs),
+        lastClose: currentPrice,
+        current: currentPrice
+      },
+      market: { session: getMarketSession(), spread: 0.001, stale: false }
+    };
+  } catch (error) {
+    console.error('[ai-analyze] Error fetching Polygon indicators:', error);
+    return calculateTechnicalIndicators(candles);
+  }
+}
+
+function calculateTechnicalIndicators(candles: any[]) {
+  const closes = candles.map((c: any) => c.c);
+  const highs = candles.map((c: any) => c.h);
+  const lows = candles.map((c: any) => c.l);
+  const currentPrice = closes[closes.length - 1] || 0;
+  return {
+    technical: {
+      ema20: calculateEMA(closes, 20), ema50: calculateEMA(closes, 50), ema200: calculateEMA(closes, 200),
+      rsi14: calculateRSI(closes, 14), macd: calculateMACD(closes), atr14: calculateATR(highs, lows, closes, 14),
+      bb: calculateBollingerBands(closes, 20, 2), vwap: calculateVWAP(candles),
+      support: findSupportLevels(lows), resistance: findResistanceLevels(highs),
+      lastClose: currentPrice, current: currentPrice
+    },
+    market: { session: getMarketSession(), spread: 0.001, stale: false }
+  };
+}
+
+function calculateEMA(values: number[], period: number): number {
+  if (!values.length) return 0;
+  const multiplier = 2 / (period + 1);
+  let ema = values[0];
+  for (let i = 1; i < values.length; i++) ema = (values[i] * multiplier) + (ema * (1 - multiplier));
+  return ema;
+}
+
+function calculateRSI(values: number[], period: number = 14): number {
+  if (values.length < period + 1) return 50;
+  let gains = 0, losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const change = values[i] - values[i - 1];
+    if (change > 0) gains += change; else losses -= change;
+  }
+  const rs = (gains / period) / (losses / period);
+  return 100 - (100 / (1 + rs));
+}
+
+function calculateMACD(values: number[]): { line: number; signal: number; hist: number } {
+  const line = calculateEMA(values, 12) - calculateEMA(values, 26);
+  const signal = line * 0.1;
+  return { line, signal, hist: line - signal };
+}
+
+function calculateATR(highs: number[], lows: number[], closes: number[], period: number = 14): number {
+  if (highs.length < 2) return 0;
+  const trs: number[] = [];
+  for (let i = 1; i < highs.length; i++) {
+    trs.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
+  }
+  return trs.slice(-period).reduce((a, b) => a + b, 0) / Math.min(period, trs.length);
+}
+
+function calculateBollingerBands(values: number[], period: number = 20, multiplier: number = 2) {
+  if (values.length < period) {
+    const last = values[values.length - 1] || 0;
+    return { upper: last, mid: last, lower: last };
+  }
+  const recentValues = values.slice(-period);
+  const mid = recentValues.reduce((a, b) => a + b, 0) / period;
+  const stdDev = Math.sqrt(recentValues.reduce((a, b) => a + Math.pow(b - mid, 2), 0) / period);
+  return { upper: mid + (stdDev * multiplier), mid, lower: mid - (stdDev * multiplier) };
+}
+
+function calculateVWAP(candles: any[]): number {
+  if (!candles.length) return 0;
+  let totalVolumePrice = 0, totalVolume = 0;
+  for (const c of candles.slice(-30)) {
+    const typical = (c.h + c.l + c.c) / 3;
+    totalVolumePrice += typical * (c.v || 1);
+    totalVolume += (c.v || 1);
+  }
+  return totalVolume > 0 ? totalVolumePrice / totalVolume : 0;
+}
+
+function findSupportLevels(lows: number[]): number[] {
+  if (lows.length < 10) return [];
+  const sorted = [...lows.slice(-50)].sort((a, b) => a - b);
+  return [sorted[0], sorted[1]].filter(Boolean);
+}
+
+function findResistanceLevels(highs: number[]): number[] {
+  if (highs.length < 10) return [];
+  const sorted = [...highs.slice(-50)].sort((a, b) => b - a);
+  return [sorted[0], sorted[1]].filter(Boolean);
+}
+
+function getMarketSession(): string {
+  const hour = new Date().getUTCHours();
+  if (hour >= 0 && hour < 8) return 'ASIA';
+  if (hour >= 8 && hour < 16) return 'EUROPE'; 
+  return 'US';
+}
