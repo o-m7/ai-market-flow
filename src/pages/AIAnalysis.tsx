@@ -126,6 +126,10 @@ export const AIAnalysis = () => {
   const [includeQuantData, setIncludeQuantData] = useState(true);
   const chartRef = useRef<any>(null);
   const { toast } = useToast();
+  
+  // Phase 2: Debouncing to prevent rapid analysis calls
+  const lastAnalysisTime = useRef<number>(0);
+  const ANALYSIS_DEBOUNCE_MS = 2000; // 2 seconds
 
   // UI state management
   const [showKeySettings, setShowKeySettings] = useState(false);
@@ -140,6 +144,20 @@ export const AIAnalysis = () => {
       });
       return;
     }
+
+    // Phase 2: Debounce check - prevent rapid analysis calls
+    const now = Date.now();
+    const timeSinceLastAnalysis = now - lastAnalysisTime.current;
+    if (timeSinceLastAnalysis < ANALYSIS_DEBOUNCE_MS) {
+      const remainingTime = Math.ceil((ANALYSIS_DEBOUNCE_MS - timeSinceLastAnalysis) / 1000);
+      toast({
+        title: 'Please Wait',
+        description: `Analysis in progress. Please wait ${remainingTime}s before requesting another analysis.`,
+        variant: 'default',
+      });
+      return;
+    }
+    lastAnalysisTime.current = now;
 
     // Check usage limits for non-subscribed users
     if (!isSubscribed && !usage.canAnalyzeSymbol(symbol)) {

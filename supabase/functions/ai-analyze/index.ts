@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.5.0"; // Switched to gpt-4o for reliable function calling
+const FUNCTION_VERSION = "2.6.0"; // Phase 2: Speed optimizations - gpt-4o-mini, reduced tokens, timeouts
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -353,80 +353,32 @@ ${JSON.stringify(news || { event_risk: false, headline_hits_30m: 0 }, null, 2)}
 
 ANALYSIS REQUIREMENTS - Provide COMPREHENSIVE institutional-grade analysis covering:
 
-1. MARKET STRUCTURE ANALYSIS:
-   - Identify trend direction using EMAs (20/50/200 alignment)
-   - Market phase: Trending, Range-bound, Consolidation, Breakout
-   - Volatility regime: Low/Normal/High based on ATR percentiles
-   - Session analysis and liquidity considerations
+1. MARKET STRUCTURE: Identify trend (EMA alignment), phase, volatility, and session context.
 
-2. QUANTITATIVE TECHNICAL ANALYSIS:
-   - RSI divergence patterns and momentum shifts
-   - MACD crossovers, histogram strength, and signal quality
-   - Bollinger Band position and squeeze/expansion signals
-   - VWAP deviation and mean reversion probabilities
-   - Volume profile and institutional order flow analysis
+2. TECHNICAL ANALYSIS: RSI divergence, MACD signals, Bollinger Bands, VWAP deviation, volume flow.
 
-3. FIBONACCI RETRACEMENT ANALYSIS:
-   - Calculate precise Fibonacci levels from significant swing high/low
-   - Identify key retracement zones (23.6%, 38.2%, 50%, 61.8%, 78.6%)
-   - Extension targets (127.2%, 161.8%) for breakout scenarios
-   - Confluence with other technical levels
+3. FIBONACCI: Calculate retracements (23.6%, 38.2%, 50%, 61.8%, 78.6%) and extensions (127.2%, 161.8%) from significant swing points.
 
-4. MULTIPLE STRATEGY ASSESSMENT:
-   
-   A) TREND FOLLOWING STRATEGY:
-      - EMA alignment and momentum confirmation
-      - Breakout setups above resistance with volume
-      - Pullback entries to moving averages in trends
-      
-   B) MEAN REVERSION STRATEGY:
-      - Oversold/overbought conditions (RSI extremes)
-      - Bollinger Band touch reversals
-      - VWAP mean reversion trades
-      
-   C) MOMENTUM STRATEGY:
-      - MACD bullish/bearish crossovers
-      - RSI breakouts above 70 or below 30
-      - Volume confirmation on directional moves
-      
-   D) RANGE TRADING STRATEGY:
-      - Support/resistance level trades
-      - Range-bound oscillator signals
-      - Mean reversion within established ranges
+4. STRATEGIES: Assess trend following, mean reversion, momentum, and range trading opportunities.
 
-5. MULTI-TIMEFRAME ANALYSIS:
-   - Scalp (1-15min): Quick momentum plays, level bounces
-   - Intraday (30min-4h): Session-based trades, pattern completions  
-   - Swing (daily+): Multi-day position trades, trend following
+5. MULTI-TIMEFRAME: Provide scalp (1-15min), intraday (30min-4h), and swing (daily+) trade setups.
 
-6. RISK-REWARD SCENARIOS:
-   - Calculate precise stop-loss levels using ATR multiples
-   - Multiple profit targets with percentage allocations
-   - Position sizing recommendations based on volatility
-   - Worst-case and best-case scenario probabilities
+6. RISK-REWARD: Calculate precise stop-loss using ATR, multiple targets, position sizing.
 
-7. QUANTITATIVE EDGE ANALYSIS:
-   - Probability estimates for directional moves
-   - Expected value calculations for trade setups
-   - Historical win rates for similar market conditions
-   - Risk-adjusted return expectations
+7. QUANTITATIVE: Probability estimates, expected value, historical win rates for similar conditions.
 
-8. INSTITUTIONAL PERSPECTIVE:
-   - Smart money flow indicators
-   - Level significance and institutional interest
-   - Market maker positioning insights
-   - Liquidity and slippage considerations
+8. INSTITUTIONAL: Smart money flow, level significance, market maker positioning, liquidity considerations.
 
-PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, and multiple profit targets for each viable strategy. Include confidence intervals and probability assessments for each recommendation.`;
+PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entries, stops, and targets for each viable strategy. Include confidence intervals and probabilities.`;
 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
     const response = await client.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini", // Phase 2: Faster, cheaper model
       messages: [
         { 
           role: "system", 
-          content: "You are an institutional-grade technical analysis engine. Use ONLY provided data. Apply deterministic rules in exact order. Return ONLY JSON with no extra text. Be consistent - same inputs must produce same outputs." 
+          content: "You are an institutional-grade technical analysis engine. Use ONLY provided data. Apply deterministic rules. Return ONLY JSON." 
         },
         { 
           role: "user", 
@@ -435,7 +387,7 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, a
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_tokens: 2000,
+      max_tokens: 1500, // Phase 2: Reduced from 2000
       temperature: 0.1
     });
 
@@ -509,14 +461,41 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, a
   }
 });
 
-// Fetch technical indicators from Polygon API
+// Simple in-memory cache for indicator values (30 second TTL)
+const indicatorCache = new Map<string, { data: any; expires: number }>();
+
+function getCacheKey(symbol: string, timeframe: string): string {
+  return `${symbol}-${timeframe}`;
+}
+
+function getCachedIndicators(symbol: string, timeframe: string): any | null {
+  const key = getCacheKey(symbol, timeframe);
+  const cached = indicatorCache.get(key);
+  if (cached && Date.now() < cached.expires) {
+    console.log(`[ai-analyze] Using cached indicators for ${key}`);
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedIndicators(symbol: string, timeframe: string, data: any): void {
+  const key = getCacheKey(symbol, timeframe);
+  indicatorCache.set(key, { data, expires: Date.now() + 30000 }); // 30 second TTL
+  console.log(`[ai-analyze] Cached indicators for ${key}`);
+}
+
+// Fetch technical indicators from Polygon API with timeout
 async function fetchTechnicalIndicators(symbol: string, timeframe: string, market: string, candles: any[], currentPrice?: number) {
   const polygonApiKey = Deno.env.get('POLYGON_API_KEY');
   
   if (!polygonApiKey) {
     console.warn('[ai-analyze] POLYGON_API_KEY not set, using calculated indicators');
-    return calculateTechnicalIndicators(candles);
+    return calculateTechnicalIndicators(candles, currentPrice);
   }
+
+  // Check cache first
+  const cached = getCachedIndicators(symbol, timeframe);
+  if (cached) return cached;
 
   try {
     const providerSymbol = 
@@ -533,57 +512,75 @@ async function fetchTechnicalIndicators(symbol: string, timeframe: string, marke
 
     console.log(`[ai-analyze] Fetching Polygon indicators for ${providerSymbol}, timespan=${timespan}`);
 
-    const [rsiRes, ema20Res, ema50Res, ema200Res, macdRes] = await Promise.all([
-      fetch(`https://api.polygon.io/v1/indicators/rsi/${providerSymbol}?timespan=${timespan}&adjusted=true&window=14&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`),
-      fetch(`https://api.polygon.io/v1/indicators/ema/${providerSymbol}?timespan=${timespan}&adjusted=true&window=20&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`),
-      fetch(`https://api.polygon.io/v1/indicators/ema/${providerSymbol}?timespan=${timespan}&adjusted=true&window=50&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`),
-      fetch(`https://api.polygon.io/v1/indicators/ema/${providerSymbol}?timespan=${timespan}&adjusted=true&window=200&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`),
-      fetch(`https://api.polygon.io/v1/indicators/macd/${providerSymbol}?timespan=${timespan}&adjusted=true&short_window=12&long_window=26&signal_window=9&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`)
-    ]);
+    // Phase 2: Add 3-second timeout for Polygon calls
+    const timeout = 3000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    // Check for HTTP errors
-    if (!rsiRes.ok) console.warn(`[ai-analyze] RSI fetch failed: ${rsiRes.status}`);
-    if (!ema20Res.ok) console.warn(`[ai-analyze] EMA20 fetch failed: ${ema20Res.status}`);
-    if (!macdRes.ok) console.warn(`[ai-analyze] MACD fetch failed: ${macdRes.status}`);
+    try {
+      const [rsiRes, ema20Res, ema50Res, ema200Res, macdRes] = await Promise.all([
+        fetch(`https://api.polygon.io/v1/indicators/rsi/${providerSymbol}?timespan=${timespan}&adjusted=true&window=14&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`, { signal: controller.signal }),
+        fetch(`https://api.polygon.io/v1/indicators/ema/${providerSymbol}?timespan=${timespan}&adjusted=true&window=20&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`, { signal: controller.signal }),
+        fetch(`https://api.polygon.io/v1/indicators/ema/${providerSymbol}?timespan=${timespan}&adjusted=true&window=50&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`, { signal: controller.signal }),
+        fetch(`https://api.polygon.io/v1/indicators/ema/${providerSymbol}?timespan=${timespan}&adjusted=true&window=200&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`, { signal: controller.signal }),
+        fetch(`https://api.polygon.io/v1/indicators/macd/${providerSymbol}?timespan=${timespan}&adjusted=true&short_window=12&long_window=26&signal_window=9&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`, { signal: controller.signal })
+      ]);
+      
+      clearTimeout(timeoutId);
 
-    const [rsiData, ema20Data, ema50Data, ema200Data, macdData] = await Promise.all([
-      rsiRes.json(), ema20Res.json(), ema50Res.json(), ema200Res.json(), macdRes.json()
-    ]);
+      // Check for HTTP errors
+      if (!rsiRes.ok) console.warn(`[ai-analyze] RSI fetch failed: ${rsiRes.status}`);
+      if (!ema20Res.ok) console.warn(`[ai-analyze] EMA20 fetch failed: ${ema20Res.status}`);
+      if (!macdRes.ok) console.warn(`[ai-analyze] MACD fetch failed: ${macdRes.status}`);
 
-    console.log(`[ai-analyze] Polygon RSI response:`, JSON.stringify(rsiData));
-    console.log(`[ai-analyze] Polygon EMA20 response:`, JSON.stringify(ema20Data));
-    console.log(`[ai-analyze] Polygon MACD response:`, JSON.stringify(macdData));
+      const [rsiData, ema20Data, ema50Data, ema200Data, macdData] = await Promise.all([
+        rsiRes.json(), ema20Res.json(), ema50Res.json(), ema200Res.json(), macdRes.json()
+      ]);
 
-    const closes = candles.map((c: any) => c.c);
-    const highs = candles.map((c: any) => c.h);
-    const lows = candles.map((c: any) => c.l);
-    const priceRef = currentPrice || closes[closes.length - 1] || 0;
+      const closes = candles.map((c: any) => c.c);
+      const highs = candles.map((c: any) => c.h);
+      const lows = candles.map((c: any) => c.l);
+      const priceRef = currentPrice || closes[closes.length - 1] || 0;
 
-    return {
-      technical: {
-        ema20: ema20Data?.results?.values?.[0]?.value || 0,
-        ema50: ema50Data?.results?.values?.[0]?.value || 0,
-        ema200: ema200Data?.results?.values?.[0]?.value || 0,
-        rsi14: rsiData?.results?.values?.[0]?.value || 50,
-        macd: {
-          line: macdData?.results?.values?.[0]?.value || 0,
-          signal: macdData?.results?.values?.[0]?.signal || 0,
-          hist: (macdData?.results?.values?.[0]?.value || 0) - (macdData?.results?.values?.[0]?.signal || 0)
+      const result = {
+        technical: {
+          ema20: ema20Data?.results?.values?.[0]?.value || 0,
+          ema50: ema50Data?.results?.values?.[0]?.value || 0,
+          ema200: ema200Data?.results?.values?.[0]?.value || 0,
+          rsi14: rsiData?.results?.values?.[0]?.value || 50,
+          macd: {
+            line: macdData?.results?.values?.[0]?.value || 0,
+            signal: macdData?.results?.values?.[0]?.signal || 0,
+            hist: (macdData?.results?.values?.[0]?.value || 0) - (macdData?.results?.values?.[0]?.signal || 0)
+          },
+          atr14: calculateATR(highs, lows, closes, 14),
+          bb: calculateBollingerBands(closes, 20, 2),
+          vwap: calculateVWAP(candles),
+          support: findSupportLevels(lows, priceRef),
+          resistance: findResistanceLevels(highs, priceRef),
+          lastClose: priceRef,
+          current: priceRef
         },
-        atr14: calculateATR(highs, lows, closes, 14),
-        bb: calculateBollingerBands(closes, 20, 2),
-        vwap: calculateVWAP(candles),
-        support: findSupportLevels(lows, priceRef),
-        resistance: findResistanceLevels(highs, priceRef),
-        lastClose: priceRef,
-        current: priceRef
-      },
-      market: { session: getMarketSession(), spread: 0.001, stale: false }
-    };
+        market: { session: getMarketSession(), spread: 0.001, stale: false }
+      };
+
+      // Cache the result
+      setCachedIndicators(symbol, timeframe, result);
+      return result;
+      
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        console.warn('[ai-analyze] Polygon request timed out after 3s, using calculated indicators');
+      } else {
+        throw err;
+      }
+    }
   } catch (error) {
     console.error('[ai-analyze] Error fetching Polygon indicators:', error);
-    return calculateTechnicalIndicators(candles);
   }
+  
+  return calculateTechnicalIndicators(candles, currentPrice);
 }
 
 function calculateTechnicalIndicators(candles: any[], currentPrice?: number) {
