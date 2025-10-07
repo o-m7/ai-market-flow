@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.6.1"; // Using gpt-5 with correct parameters
+const FUNCTION_VERSION = "2.6.2"; // Using gpt-4o model
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -378,7 +378,7 @@ CRITICAL: Provide detailed, actionable analysis with specific entry points, stop
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
     const response = await client.chat.completions.create({
-      model: "gpt-5-2025-08-07", // GPT-5 flagship model
+      model: "gpt-4o",
       messages: [
         { 
           role: "system", 
@@ -391,8 +391,8 @@ CRITICAL: Provide detailed, actionable analysis with specific entry points, stop
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_completion_tokens: 4096, // Increased for comprehensive analysis (GPT-5 uses max_completion_tokens)
-      // Note: temperature not supported by GPT-5
+      max_tokens: 4096,
+      temperature: 0.7,
     });
 
     const toolCall = response.choices?.[0]?.message?.tool_calls?.[0];
