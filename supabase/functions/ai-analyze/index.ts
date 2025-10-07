@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.3.0"; // Added detailed Polygon API logging
+const FUNCTION_VERSION = "2.5.0"; // Switched to gpt-4o for reliable function calling
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -416,7 +416,7 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, a
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
     const response = await client.chat.completions.create({
-      model: "gpt-5-2025-08-07",
+      model: "gpt-4o",
       messages: [
         { 
           role: "system", 
@@ -429,10 +429,21 @@ PROVIDE DETAILED, ACTIONABLE ANALYSIS with specific entry points, stop losses, a
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_completion_tokens: 2000
+      max_tokens: 2000,
+      temperature: 0.1
     });
 
     const toolCall = response.choices?.[0]?.message?.tool_calls?.[0];
+    
+    console.log('[ai-analyze] OpenAI response:', JSON.stringify({
+      hasChoices: !!response.choices?.[0],
+      hasMessage: !!response.choices?.[0]?.message,
+      hasToolCalls: !!response.choices?.[0]?.message?.tool_calls,
+      toolCallsLength: response.choices?.[0]?.message?.tool_calls?.length,
+      finishReason: response.choices?.[0]?.finish_reason,
+      messageContent: response.choices?.[0]?.message?.content?.slice(0, 200)
+    }));
+    
     if (!toolCall || toolCall.function.name !== "InstitutionalTaResult") {
       console.error('[ai-analyze] No valid function call returned');
       return new Response(JSON.stringify({ 
