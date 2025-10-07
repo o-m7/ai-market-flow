@@ -18,7 +18,6 @@ import { useUsageTracking } from "@/hooks/useUsageTracking";
 import { useAuth } from "@/contexts/AuthContext";
 import { type LWBar } from "@/features/ai/collectBars";
 import { analyzeWithAI, type AnalysisRequest } from "@/features/ai/analyze";
-import { useAnalysisDebounce } from "@/hooks/useAnalysisDebounce";
 
 interface AnalysisResult {
   symbol: string;
