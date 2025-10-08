@@ -160,10 +160,10 @@ const InstitutionalTaResultSchema = {
       trade_idea: {
         type: "object",
         properties: {
-          direction: { type: "string", enum: ["long", "short", "none"] },
-          entry: { type: "number" },
-          stop: { type: "number" },
-          targets: { type: "array", items: { type: "number" } },
+          direction: { type: "string", enum: ["long", "short"], description: "REQUIRED: Must choose long or short based on technical bias. Never return none." },
+          entry: { type: "number", description: "Entry price based on CURRENT price, not historical levels" },
+          stop: { type: "number", description: "Stop loss calculated from CURRENT price" },
+          targets: { type: "array", items: { type: "number" }, description: "Target prices calculated from CURRENT price" },
           target_probabilities: { type: "array", items: { type: "number" }, description: "Probability of reaching each target" },
           rationale: { type: "string" },
           time_horizon: { type: "string", enum: ["scalp", "intraday", "swing", "position"] },
@@ -336,14 +336,19 @@ serve(async (req) => {
     const client = new OpenAI({ apiKey: openaiApiKey });
 
     // Create comprehensive institutional analysis prompt
-    const currentPriceContext = currentPrice ? `\nCURRENT LIVE PRICE: ${currentPrice} (MOST RECENT - use this as reference for analysis)` : '';
+    const livePrice = currentPrice || features.technical.current;
     const comprehensivePrompt = `You are an elite institutional trading desk providing multi-strategy quantitative analysis.
 
 MARKET DATA:
-Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}${currentPriceContext}
+Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
+CURRENT LIVE PRICE: ${livePrice}
 
-IMPORTANT: The analysis summary MUST be specifically for the ${timeframe} timeframe. All levels, patterns, and recommendations should be contextualized to ${timeframe} chart analysis.
-${currentPrice ? `CRITICAL: Use the CURRENT LIVE PRICE (${currentPrice}) as the reference point for all analysis, support/resistance levels, and trade recommendations.` : ''}
+🚨 CRITICAL RULES - MUST FOLLOW:
+1. ALL entry prices MUST be within 2% of CURRENT LIVE PRICE: ${livePrice}
+2. You MUST choose either "long" or "short" direction - NEVER "none"
+3. If technical indicators are mixed, pick the direction with STRONGER evidence
+4. Calculate ALL prices (entry/stop/targets) relative to ${livePrice}, not historical levels
+5. All timeframe_profile entries (scalp/intraday/swing) MUST use prices near ${livePrice}
 
 TECHNICAL FEATURES:
 ${JSON.stringify(features, null, 2)}
@@ -365,15 +370,26 @@ ANALYSIS REQUIREMENTS - Provide COMPREHENSIVE institutional-grade analysis:
    C) MOMENTUM: MACD bullish/bearish crossovers, RSI breakouts above 70 or below 30, volume confirmation on directional moves.
    D) RANGE TRADING: Support/resistance level trades, range-bound oscillator signals, mean reversion within established ranges.
 
-5. MULTI-TIMEFRAME SETUPS: Provide scalp (1-15min) quick momentum plays and level bounces, intraday (30min-4h) session-based trades and pattern completions, and swing (daily+) multi-day position trades with trend following.
+5. MULTI-TIMEFRAME SETUPS: 
+   🚨 CRITICAL: ALL entries must be calculated from current price ${livePrice}
+   - SCALP: Entry within 0.3% of ${livePrice}, tight ATR-based stops
+   - INTRADAY: Entry within 1% of ${livePrice}, wider targets
+   - SWING: Entry within 2% of ${livePrice}, widest targets
+   DO NOT use old historical levels like 119500 when current price is ${livePrice}!
 
-6. RISK-REWARD ANALYSIS: Calculate precise stop-loss levels using ATR multiples, multiple profit targets with percentage allocations, position sizing based on volatility, and probability estimates for worst-case and best-case scenarios.
+6. DIRECTIONAL BIAS: You MUST pick long or short. If indicators conflict:
+   - Check EMA alignment: Price above EMAs = LONG bias, below = SHORT bias  
+   - Check RSI: <40 = consider LONG, >60 = consider SHORT
+   - Check MACD: Positive histogram = LONG bias, negative = SHORT bias
+   - Pick the direction with MOST supporting evidence
 
-7. QUANTITATIVE METRICS: Include probability estimates for directional moves, expected value calculations for trade setups, historical win rates for similar market conditions, and risk-adjusted return expectations.
+7. RISK-REWARD ANALYSIS: Calculate precise stop-loss levels using ATR multiples, multiple profit targets with percentage allocations, position sizing based on volatility, and probability estimates for worst-case and best-case scenarios.
 
-8. INSTITUTIONAL PERSPECTIVE: Analyze smart money flow indicators, level significance and institutional interest, market maker positioning insights, and liquidity/slippage considerations.
+8. QUANTITATIVE METRICS: Include probability estimates for directional moves, expected value calculations for trade setups, historical win rates for similar market conditions, and risk-adjusted return expectations.
 
-CRITICAL: Provide detailed, actionable analysis with specific entry points, stop losses, and multiple profit targets for each viable strategy. Include confidence intervals and probability assessments for each recommendation. Return analysis in the exact JSON structure defined by the function schema.`;
+9. INSTITUTIONAL PERSPECTIVE: Analyze smart money flow indicators, level significance and institutional interest, market maker positioning insights, and liquidity/slippage considerations.
+
+CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never "none"). All entry prices across all timeframes MUST be within 2% of current live price ${livePrice}. Return analysis in the exact JSON structure defined by the function schema.`;
 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     

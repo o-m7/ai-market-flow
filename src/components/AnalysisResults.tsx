@@ -159,12 +159,12 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
             <div className="space-y-4">
               {/* Helper function to determine if signal is long or short */}
               {(() => {
-                // Use trade_idea.direction for accurate signal direction
-                const tradeDirection = data.trade_idea?.direction || 'none';
+                // Use trade_idea.direction for accurate signal direction (always long or short now)
+                const tradeDirection = data.trade_idea?.direction || 'long';
                 const isLong = tradeDirection === 'long';
-                const direction = isLong ? 'LONG' : tradeDirection === 'short' ? 'SHORT' : 'NEUTRAL';
-                const directionColor = isLong ? 'text-terminal-green' : tradeDirection === 'short' ? 'text-terminal-red' : 'text-muted-foreground';
-                const directionIcon = isLong ? <TrendingUp className="h-3 w-3" /> : tradeDirection === 'short' ? <TrendingDown className="h-3 w-3" /> : <Activity className="h-3 w-3" />;
+                const direction = isLong ? 'LONG' : 'SHORT';
+                const directionColor = isLong ? 'text-terminal-green' : 'text-terminal-red';
+                const directionIcon = isLong ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />;
 
                 // Calculate risk/reward for display
                 const calculateRR = (entry: number, stop: number, target: number) => {
@@ -618,8 +618,8 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </Card>
       )}
 
-      {/* Trade Idea - Only show if valid data exists */}
-      {data.trade_idea && data.trade_idea.direction !== 'none' && data.trade_idea.entry > 0 && (
+      {/* Trade Idea - Always shows since direction is always long or short */}
+      {data.trade_idea && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
