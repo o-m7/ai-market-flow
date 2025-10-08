@@ -159,10 +159,12 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
             <div className="space-y-4">
               {/* Helper function to determine if signal is long or short */}
               {(() => {
-                const isLong = data.recommendation === 'buy';
-                const direction = isLong ? 'LONG' : 'SHORT';
-                const directionColor = isLong ? 'text-terminal-green' : 'text-terminal-red';
-                const directionIcon = isLong ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />;
+                // Use trade_idea.direction for accurate signal direction
+                const tradeDirection = data.trade_idea?.direction || 'none';
+                const isLong = tradeDirection === 'long';
+                const direction = isLong ? 'LONG' : tradeDirection === 'short' ? 'SHORT' : 'NEUTRAL';
+                const directionColor = isLong ? 'text-terminal-green' : tradeDirection === 'short' ? 'text-terminal-red' : 'text-muted-foreground';
+                const directionIcon = isLong ? <TrendingUp className="h-3 w-3" /> : tradeDirection === 'short' ? <TrendingDown className="h-3 w-3" /> : <Activity className="h-3 w-3" />;
 
                 // Calculate risk/reward for display
                 const calculateRR = (entry: number, stop: number, target: number) => {
@@ -616,42 +618,59 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </Card>
       )}
 
-      {/* Trade Idea */}
-      {data.trade_idea && (
+      {/* Trade Idea - Only show if valid data exists */}
+      {data.trade_idea && data.trade_idea.direction !== 'none' && data.trade_idea.entry > 0 && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
               <Target className="h-4 w-4" />
-              TRADE IDEA
+              TRADE IDEA • {data.trade_idea.direction?.toUpperCase()}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
+            <div className="flex items-center gap-3 mb-4">
+              <Badge className={`${
+                data.trade_idea.direction === 'long' ? 'text-terminal-green bg-terminal-green/10 border-terminal-green/20' :
+                'text-terminal-red bg-terminal-red/10 border-terminal-red/20'
+              } font-mono-tabular`}>
+                {data.trade_idea.direction === 'long' ? '↑ LONG' : '↓ SHORT'}
+              </Badge>
+              {data.trade_idea.setup_type && (
+                <Badge variant="outline" className="font-mono-tabular text-xs">
+                  {data.trade_idea.setup_type.replace(/_/g, ' ').toUpperCase()}
+                </Badge>
+              )}
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                 <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
-                <div className="text-lg font-mono-tabular text-terminal-green">
-                  {data.trade_idea.entry ? safeFormatNumber(data.trade_idea.entry, 2) : 'N/A'}
+                <div className="text-lg font-mono-tabular text-terminal-accent font-bold">
+                  {safeFormatNumber(data.trade_idea.entry, 5)}
                 </div>
               </div>
               <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
                 <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
-                <div className="text-lg font-mono-tabular text-terminal-red">
-                  {data.trade_idea.stop ? safeFormatNumber(data.trade_idea.stop, 2) : 'N/A'}
+                <div className="text-lg font-mono-tabular text-terminal-red font-bold">
+                  {safeFormatNumber(data.trade_idea.stop, 5)}
                 </div>
               </div>
-              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
-                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TARGET 1</div>
-                <div className="text-lg font-mono-tabular text-terminal-accent">
-                  {data.trade_idea.targets?.[0] ? safeFormatNumber(data.trade_idea.targets[0], 2) : 'N/A'}
+              {data.trade_idea.targets?.slice(0, 2).map((target: number, idx: number) => (
+                <div key={idx} className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TARGET {idx + 1}</div>
+                  <div className="text-lg font-mono-tabular text-terminal-green font-bold">
+                    {safeFormatNumber(target, 5)}
+                  </div>
                 </div>
-              </div>
-              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
-                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">RISK/REWARD</div>
-                <div className="text-lg font-mono-tabular text-terminal-accent">
-                  {data.trade_idea.risk_reward ? safeFormatNumber(data.trade_idea.risk_reward, 2) : 'N/A'}
-                </div>
-              </div>
+              ))}
             </div>
+            {data.trade_idea.rationale && (
+              <div className="mt-4 bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">RATIONALE</div>
+                <div className="text-xs font-mono text-terminal-foreground leading-relaxed">
+                  {data.trade_idea.rationale}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
