@@ -161,9 +161,9 @@ const InstitutionalTaResultSchema = {
         type: "object",
         properties: {
           direction: { type: "string", enum: ["long", "short"], description: "REQUIRED: Must choose long or short based on technical bias. Never return none." },
-          entry: { type: "number", description: "Entry price based on CURRENT price, not historical levels" },
-          stop: { type: "number", description: "Stop loss calculated from CURRENT price" },
-          targets: { type: "array", items: { type: "number" }, description: "Target prices calculated from CURRENT price" },
+          entry: { type: "number", description: "Optimal entry at key technical level - can be at support/resistance/EMA levels, not forced at current price" },
+          stop: { type: "number", description: "Stop loss at structure invalidation point (recent swing + ATR buffer)" },
+          targets: { type: "array", items: { type: "number" }, description: "Multiple targets at key resistance/support levels with minimum 2:1 R:R" },
           target_probabilities: { type: "array", items: { type: "number" }, description: "Probability of reaching each target" },
           rationale: { type: "string" },
           time_horizon: { type: "string", enum: ["scalp", "intraday", "swing", "position"] },
@@ -343,12 +343,30 @@ MARKET DATA:
 Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
 CURRENT LIVE PRICE: ${livePrice}
 
-🚨 CRITICAL RULES - MUST FOLLOW:
-1. ALL entry prices MUST be within 2% of CURRENT LIVE PRICE: ${livePrice}
-2. You MUST choose either "long" or "short" direction - NEVER "none"
-3. If technical indicators are mixed, pick the direction with STRONGER evidence
-4. Calculate ALL prices (entry/stop/targets) relative to ${livePrice}, not historical levels
-5. All timeframe_profile entries (scalp/intraday/swing) MUST use prices near ${livePrice}
+🚨 CRITICAL RULES FOR PROFESSIONAL ENTRIES:
+1. You MUST choose either "long" or "short" direction - NEVER "none"
+2. Determine directional bias from:
+   - EMA alignment: Price above 20/50/200 EMAs = LONG bias, below = SHORT bias
+   - MACD: Positive histogram = LONG bias, negative = SHORT bias  
+   - RSI: <40 + bullish divergence = LONG, >60 + bearish divergence = SHORT
+   - Pick the direction with MOST confluence of supporting indicators
+
+3. ENTRY PRICES - Think like an institutional trader:
+   - LONG entries: Wait for pullbacks to support levels, EMA bounces, or breakout retests
+   - SHORT entries: Wait for rallies to resistance levels, EMA rejections, or breakdown retests
+   - DO NOT force market orders at current price ${livePrice}
+   - Entries can be at key technical levels even if 3-5% away from current price
+   - Use: Support/Resistance, Fibonacci retracements, VWAP, Round numbers, EMA levels
+
+4. STOP LOSS placement:
+   - LONG: Place stops below recent swing lows or support levels (invalidation point)
+   - SHORT: Place stops above recent swing highs or resistance levels
+   - Use ATR for buffer: Stop should be recent structure + (1-1.5 × ATR)
+
+5. TARGET placement:
+   - LONG: Resistance levels, Fibonacci extensions, previous highs
+   - SHORT: Support levels, Fibonacci extensions, previous lows
+   - Minimum 2:1 risk-reward ratio required
 
 TECHNICAL FEATURES:
 ${JSON.stringify(features, null, 2)}
@@ -370,26 +388,39 @@ ANALYSIS REQUIREMENTS - Provide COMPREHENSIVE institutional-grade analysis:
    C) MOMENTUM: MACD bullish/bearish crossovers, RSI breakouts above 70 or below 30, volume confirmation on directional moves.
    D) RANGE TRADING: Support/resistance level trades, range-bound oscillator signals, mean reversion within established ranges.
 
-5. MULTI-TIMEFRAME SETUPS: 
-   🚨 CRITICAL: ALL entries must be calculated from current price ${livePrice}
-   - SCALP: Entry within 0.3% of ${livePrice}, tight ATR-based stops
-   - INTRADAY: Entry within 1% of ${livePrice}, wider targets
-   - SWING: Entry within 2% of ${livePrice}, widest targets
-   DO NOT use old historical levels like 119500 when current price is ${livePrice}!
+5. MULTI-TIMEFRAME SETUPS - Professional entry zones:
+   
+   SCALP (1-15min timeframe):
+   - Entry: Nearest support/resistance bounce or micro-breakout level
+   - Look for: 5-15min chart patterns, VWAP touches, EMA bounces
+   - Entry can be limit orders at key micro levels within 1-2% of current price
+   
+   INTRADAY (30min-4h timeframe):  
+   - Entry: Session highs/lows, hourly chart patterns, major EMA levels
+   - Look for: 1h/4h support/resistance, Fibonacci retracements, VWAP deviation
+   - Entry can be 2-4% away waiting for pullback/rally to key level
+   
+   SWING (Daily+ timeframe):
+   - Entry: Daily support/resistance, weekly pivots, major Fibonacci levels
+   - Look for: Daily chart patterns, multi-day consolidation breakouts
+   - Entry can be 3-5% away waiting for ideal technical setup
+   
+   Example for LONG bias: If ${livePrice} is current and nearest support is at ${Math.round(livePrice * 0.97)}, 
+   use ${Math.round(livePrice * 0.97)} as swing entry (not forcing entry at ${livePrice})
 
-6. DIRECTIONAL BIAS: You MUST pick long or short. If indicators conflict:
-   - Check EMA alignment: Price above EMAs = LONG bias, below = SHORT bias  
-   - Check RSI: <40 = consider LONG, >60 = consider SHORT
-   - Check MACD: Positive histogram = LONG bias, negative = SHORT bias
-   - Pick the direction with MOST supporting evidence
+6. RISK-REWARD ANALYSIS: 
+   - Stop loss at recent structure invalidation point (swing low/high + ATR buffer)
+   - Minimum 2:1 reward:risk ratio required for all setups
+   - Multiple targets: 1st target at 1R, 2nd at 2R, 3rd at 3R+
+   - Position sizing based on stop distance and volatility
 
-7. RISK-REWARD ANALYSIS: Calculate precise stop-loss levels using ATR multiples, multiple profit targets with percentage allocations, position sizing based on volatility, and probability estimates for worst-case and best-case scenarios.
+7. QUANTITATIVE METRICS: Include probability estimates for directional moves, expected value calculations for trade setups, historical win rates for similar market conditions, and risk-adjusted return expectations.
 
-8. QUANTITATIVE METRICS: Include probability estimates for directional moves, expected value calculations for trade setups, historical win rates for similar market conditions, and risk-adjusted return expectations.
+8. INSTITUTIONAL PERSPECTIVE: Analyze smart money flow indicators, level significance and institutional interest, market maker positioning insights, and liquidity/slippage considerations.
 
-9. INSTITUTIONAL PERSPECTIVE: Analyze smart money flow indicators, level significance and institutional interest, market maker positioning insights, and liquidity/slippage considerations.
+REMEMBER: Think like a professional trader - patience for optimal entries at key levels beats forcing entries at current price. Your entries should be where institutional traders would actually place their limit orders based on technical structure, not random prices near current market price.
 
-CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never "none"). All entry prices across all timeframes MUST be within 2% of current live price ${livePrice}. Return analysis in the exact JSON structure defined by the function schema.`;
+CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never "none"). Return analysis in the exact JSON structure defined by the function schema.`;
 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
