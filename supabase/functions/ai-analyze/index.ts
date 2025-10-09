@@ -492,7 +492,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
     // Add timeout wrapper for OpenAI call
-    const openaiTimeout = 60000; // 60 second timeout for OpenAI
+    const openaiTimeout = 120000; // 120 second timeout for GPT-5
     const openaiPromise = client.chat.completions.create({
       model: "gpt-5",
       messages: [
@@ -511,7 +511,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('OpenAI API timeout after 60 seconds')), openaiTimeout);
+      setTimeout(() => reject(new Error('OpenAI API timeout after 120 seconds')), openaiTimeout);
     });
 
     const response = await Promise.race([openaiPromise, timeoutPromise]);
