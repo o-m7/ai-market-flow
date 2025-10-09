@@ -43,6 +43,29 @@ interface QuantResponse {
     calmar_ratio: number | null;
     information_ratio: number | null;
   };
+  timeframe_profile?: {
+    scalp: {
+      entry: number;
+      stop: number;
+      targets: number[];
+      strategy: string;
+      probability: number;
+    };
+    intraday: {
+      entry: number;
+      stop: number;
+      targets: number[];
+      strategy: string;
+      probability: number;
+    };
+    swing: {
+      entry: number;
+      stop: number;
+      targets: number[];
+      strategy: string;
+      probability: number;
+    };
+  };
 }
 
 const TF_OPTIONS = [
@@ -304,6 +327,94 @@ export default function QuantCard({ symbol: initialSymbol = "BTCUSD" }: { symbol
             </>
           )}
         </div>
+
+        {/* Trading Signals */}
+        {data?.timeframe_profile && (
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-muted-foreground">Trading Signals</div>
+            
+            {/* Scalp Signal */}
+            {data.timeframe_profile.scalp && (
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border p-4 bg-gradient-to-br from-blue-500/5 to-transparent">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold">⚡ SCALP</div>
+                    <Badge variant="outline" className="text-xs">{data.timeframe_profile.scalp.probability}% confidence</Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">Entry</div>
+                    <div className="font-medium">{formatPrice(data.timeframe_profile.scalp.entry)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Stop</div>
+                    <div className="font-medium text-red-500">{formatPrice(data.timeframe_profile.scalp.stop)}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-muted-foreground">Targets</div>
+                    <div className="font-medium">{data.timeframe_profile.scalp.targets.map(t => formatPrice(t)).join(' → ')}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground mt-2">{data.timeframe_profile.scalp.strategy}</div>
+              </motion.div>
+            )}
+
+            {/* Intraday Signal */}
+            {data.timeframe_profile.intraday && (
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border p-4 bg-gradient-to-br from-purple-500/5 to-transparent">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold">📊 INTRADAY</div>
+                    <Badge variant="outline" className="text-xs">{data.timeframe_profile.intraday.probability}% confidence</Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">Entry</div>
+                    <div className="font-medium">{formatPrice(data.timeframe_profile.intraday.entry)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Stop</div>
+                    <div className="font-medium text-red-500">{formatPrice(data.timeframe_profile.intraday.stop)}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-muted-foreground">Targets</div>
+                    <div className="font-medium">{data.timeframe_profile.intraday.targets.map(t => formatPrice(t)).join(' → ')}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground mt-2">{data.timeframe_profile.intraday.strategy}</div>
+              </motion.div>
+            )}
+
+            {/* Swing Signal */}
+            {data.timeframe_profile.swing && (
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-xl border p-4 bg-gradient-to-br from-green-500/5 to-transparent">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold">📈 SWING</div>
+                    <Badge variant="outline" className="text-xs">{data.timeframe_profile.swing.probability}% confidence</Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">Entry</div>
+                    <div className="font-medium">{formatPrice(data.timeframe_profile.swing.entry)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Stop</div>
+                    <div className="font-medium text-red-500">{formatPrice(data.timeframe_profile.swing.stop)}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-muted-foreground">Targets</div>
+                    <div className="font-medium">{data.timeframe_profile.swing.targets.map(t => formatPrice(t)).join(' → ')}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground mt-2">{data.timeframe_profile.swing.strategy}</div>
+              </motion.div>
+            )}
+          </div>
+        )}
 
         {/* Summary */}
         {withSummary && data?.summary && (

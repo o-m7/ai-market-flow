@@ -32,6 +32,30 @@ interface QuantResponse {
   vwap?: number | null;
   tail?: { t: number; c: number }[];
   summary?: string;
+  // Trading signals for different timeframes
+  timeframe_profile?: {
+    scalp: {
+      entry: number;
+      stop: number;
+      targets: number[];
+      strategy: string;
+      probability: number;
+    };
+    intraday: {
+      entry: number;
+      stop: number;
+      targets: number[];
+      strategy: string;
+      probability: number;
+    };
+    swing: {
+      entry: number;
+      stop: number;
+      targets: number[];
+      strategy: string;
+      probability: number;
+    };
+  };
   // Advanced quantitative metrics
   quant_metrics: {
     sharpe_ratio: number | null;
@@ -433,6 +457,71 @@ function calculateInformationRatio(prices: number[], benchmarkPrices: number[], 
   return annualizedExcessReturn / annualizedTrackingError;
 }
 
+// Generate trading signals based on technical indicators
+function generateTradingSignals(
+  price: number,
+  atr: number,
+  rsi: number,
+  macd: { line: number; signal: number; hist: number },
+  bb: { mid: number; upper: number; lower: number },
+  ema20: number,
+  ema50: number,
+  donchian: { high: number; low: number }
+) {
+  // Determine trend direction
+  const isBullish = price > ema20 && ema20 > ema50 && macd.hist > 0 && rsi > 50;
+  const isBearish = price < ema20 && ema20 < ema50 && macd.hist < 0 && rsi < 50;
+  
+  // Calculate confidence based on indicator alignment
+  let baseConfidence = 50;
+  if (isBullish) baseConfidence += 10;
+  if (isBearish) baseConfidence += 10;
+  if (Math.abs(rsi - 50) > 20) baseConfidence += 10;
+  if (Math.abs(macd.hist) > Math.abs(macd.line) * 0.1) baseConfidence += 10;
+  
+  // Scalp signal (quick trades, tight stops)
+  const scalpStop = isBullish ? price - (atr * 0.5) : price + (atr * 0.5);
+  const scalpTargets = isBullish 
+    ? [price + (atr * 0.5), price + (atr * 1.0), price + (atr * 1.5)]
+    : [price - (atr * 0.5), price - (atr * 1.0), price - (atr * 1.5)];
+  
+  // Intraday signal (session trades, moderate risk)
+  const intradayStop = isBullish ? bb.lower : bb.upper;
+  const intradayTargets = isBullish
+    ? [ema20, bb.upper, donchian.high]
+    : [ema20, bb.lower, donchian.low];
+  
+  // Swing signal (multi-day, wider stops)
+  const swingStop = isBullish ? price - (atr * 2) : price + (atr * 2);
+  const swingTargets = isBullish
+    ? [ema50, donchian.high, donchian.high * 1.02]
+    : [ema50, donchian.low, donchian.low * 0.98];
+  
+  return {
+    scalp: {
+      entry: price,
+      stop: scalpStop,
+      targets: scalpTargets,
+      strategy: `${isBullish ? 'Long' : 'Short'} scalp with ${atr.toFixed(2)} ATR risk. Target quick momentum moves.`,
+      probability: Math.min(baseConfidence + 5, 85)
+    },
+    intraday: {
+      entry: price,
+      stop: intradayStop,
+      targets: intradayTargets,
+      strategy: `${isBullish ? 'Long' : 'Short'} intraday using BB and EMA levels. Hold for session move.`,
+      probability: baseConfidence
+    },
+    swing: {
+      entry: price,
+      stop: swingStop,
+      targets: swingTargets,
+      strategy: `${isBullish ? 'Long' : 'Short'} swing targeting major S/R levels. Multi-day position.`,
+      probability: Math.max(baseConfidence - 10, 45)
+    }
+  };
+}
+
 async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: string): Promise<CandleData[]> {
   const timeframes: Record<string, string> = {
     '1m': '1/minute',
@@ -635,6 +724,18 @@ serve(async (req) => {
       }
     }
 
+    // Generate trading signals based on technical indicators
+    const timeframe_profile = generateTradingSignals(
+      currentPrice,
+      atr14,
+      rsi14,
+      macd,
+      bb20,
+      ema20,
+      ema50,
+      donchian20
+    );
+
     const response: QuantResponse = {
       symbol,
       tf,
@@ -656,6 +757,7 @@ serve(async (req) => {
       vwap,
       tail,
       summary,
+      timeframe_profile,
       quant_metrics: {
         sharpe_ratio,
         sortino_ratio,
