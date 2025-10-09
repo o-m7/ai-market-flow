@@ -7,6 +7,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useHistoricalAccuracy } from "@/hooks/useHistoricalAccuracy";
 import { Loader2, TrendingUp, Target, XCircle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { format } from "date-fns";
 
 export const TradeAccuracy = () => {
   const { toast } = useToast();
@@ -15,6 +18,25 @@ export const TradeAccuracy = () => {
   const [days] = useState(30);
   
   const { data: accuracy, isLoading, refetch } = useHistoricalAccuracy(symbol, days);
+
+  // Fetch individual trades that hit targets
+  const { data: targetHits, refetch: refetchTargetHits } = useQuery({
+    queryKey: ['target-hits', symbol, days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('trade_analyses')
+        .select('*')
+        .eq('symbol', symbol)
+        .eq('outcome', 'TARGET_HIT')
+        .gte('created_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
+        .order('outcome_time', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!symbol,
+  });
 
   const handleCheckOutcomes = async () => {
     setChecking(true);
@@ -35,6 +57,7 @@ export const TradeAccuracy = () => {
 
       // Refresh accuracy data
       refetch();
+      refetchTargetHits();
     } catch (error: any) {
       console.error('Error checking outcomes:', error);
       toast({
@@ -162,6 +185,62 @@ export const TradeAccuracy = () => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">No accuracy data available for {symbol}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Target Hits Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Target Hits</CardTitle>
+              <CardDescription>Individual trades that reached their targets</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {targetHits && targetHits.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date Hit</TableHead>
+                      <TableHead>Direction</TableHead>
+                      <TableHead>Entry</TableHead>
+                      <TableHead>Target #</TableHead>
+                      <TableHead>Exit Price</TableHead>
+                      <TableHead>PnL</TableHead>
+                      <TableHead>Time to Target</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {targetHits.map((trade: any) => (
+                      <TableRow key={trade.id}>
+                        <TableCell>
+                          {trade.outcome_time ? format(new Date(trade.outcome_time), 'MMM d, HH:mm') : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={trade.direction === 'long' ? 'default' : 'destructive'}>
+                            {trade.direction?.toUpperCase() || 'N/A'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>${trade.entry_price?.toFixed(2) || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">Target {trade.target_hit || 1}</Badge>
+                        </TableCell>
+                        <TableCell>${trade.outcome_price?.toFixed(2) || '-'}</TableCell>
+                        <TableCell>
+                          <span className="text-green-600 font-semibold">
+                            +{trade.pnl_percentage?.toFixed(2)}%
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {trade.hours_to_outcome ? `${trade.hours_to_outcome.toFixed(1)}h` : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No target hits yet for {symbol}</p>
                 </div>
               )}
             </CardContent>
