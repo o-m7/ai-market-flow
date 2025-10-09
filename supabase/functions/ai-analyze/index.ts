@@ -639,22 +639,37 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
     console.log(`  - Latest candle: ${new Date(latestCandleTime).toISOString()}`);
     console.log(`  - Data age: ${dataAgeSeconds}s (${dataAgeMinutes} minutes)`);
     
-    // CRYPTO SPECIFIC: 2-minute freshness threshold (lose 15 points per minute)
-    // At 2 minutes = 70% (warning threshold)
-    // At 3 minutes = 55% (stale)
-    // At 5 minutes = 25% (very stale)
-    const freshness_score = Math.max(0, 100 - (dataAgeSeconds / 60) * 15);
-    console.log(`  - Freshness score: ${freshness_score.toFixed(2)}/100 (crypto threshold: 2min)`);
+    // TIMEFRAME-AWARE FRESHNESS CHECK
+    // Adjust threshold based on timeframe (allow slightly more than the candle interval)
+    const timeframeThresholds: Record<string, number> = {
+      '1m': 120,    // 2 minutes
+      '5m': 600,    // 10 minutes
+      '15m': 1200,  // 20 minutes
+      '30m': 2100,  // 35 minutes
+      '1h': 3900,   // 65 minutes
+      '4h': 15000,  // 250 minutes
+      '1d': 90000   // 1500 minutes
+    };
     
-    // Critical: Block analysis if data is extremely stale (>5 minutes old)
-    if (dataAgeSeconds > 300) {
-      console.error(`[VALIDATION] ❌ CRITICAL: Data is ${dataAgeMinutes} minutes old (>5min threshold). Analysis blocked.`);
+    const maxAgeSeconds = timeframeThresholds[timeframe] || 300; // default 5min for unknown
+    const freshnessThreshold = maxAgeSeconds / 60;
+    
+    // Calculate freshness score relative to timeframe (lose 15 points per minute beyond half the threshold)
+    const halfThreshold = maxAgeSeconds / 2;
+    const freshness_score = Math.max(0, 100 - Math.max(0, (dataAgeSeconds - halfThreshold) / 60) * 15);
+    console.log(`  - Freshness score: ${freshness_score.toFixed(2)}/100 (${timeframe} threshold: ${freshnessThreshold.toFixed(1)}min)`);
+    
+    // Critical: Block analysis only if data is VERY stale (exceeds timeframe threshold)
+    if (dataAgeSeconds > maxAgeSeconds) {
+      console.error(`[VALIDATION] ❌ CRITICAL: Data is ${dataAgeMinutes} minutes old (>${freshnessThreshold.toFixed(1)}min threshold for ${timeframe}). Analysis blocked.`);
       return new Response(JSON.stringify({ 
         error: "Data too stale for accurate analysis",
         data_age_seconds: dataAgeSeconds,
         data_age_minutes: parseFloat(dataAgeMinutes),
         freshness_score: Math.round(freshness_score),
-        message: `Market data is ${dataAgeMinutes} minutes old. For crypto analysis, data must be less than 5 minutes old. Please refresh and try again.`,
+        timeframe,
+        max_age_minutes: freshnessThreshold,
+        message: `Market data is ${dataAgeMinutes} minutes old. For ${timeframe} analysis, data must be less than ${freshnessThreshold.toFixed(1)} minutes old. Please refresh and try again.`,
         timestamp: new Date().toISOString()
       }), {
         status: 422,
@@ -663,9 +678,9 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
     }
     
     if (freshness_score < 70) {
-      console.warn(`[VALIDATION] ⚠️  DATA STALENESS WARNING: Score ${freshness_score.toFixed(2)} < 70 (data is ${dataAgeMinutes} minutes old - exceeds 2min crypto threshold)`);
+      console.warn(`[VALIDATION] ⚠️  DATA STALENESS WARNING: Score ${freshness_score.toFixed(2)} < 70 (data is ${dataAgeMinutes} minutes old for ${timeframe} timeframe)`);
     } else {
-      console.log(`[VALIDATION] ✅ Data is fresh (within 2-minute crypto threshold)`);
+      console.log(`[VALIDATION] ✅ Data is fresh for ${timeframe} timeframe`);
     }
     
     // Reuse livePrice from earlier in the function
