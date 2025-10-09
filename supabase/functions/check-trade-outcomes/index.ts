@@ -84,11 +84,14 @@ serve(async (req) => {
 
         // Fetch price data from creation time to now
         let symbol = analysis.symbol;
-        if (analysis.market === 'crypto') {
+        const marketType = (analysis.market || '').toUpperCase();
+        
+        if (marketType === 'CRYPTO') {
           symbol = `X:${analysis.symbol.replace('/', '')}`;
-        } else if (analysis.market === 'forex') {
+        } else if (marketType === 'FOREX') {
           symbol = `C:${analysis.symbol}`;
         }
+        // For stocks, use symbol as-is
         const timeframe = analysis.timeframe || '60m';
         
         // Map timeframe to Polygon format
