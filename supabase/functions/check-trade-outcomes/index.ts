@@ -2,6 +2,8 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
+// Version 1.1 - Fixed symbol formatting for Polygon API (X: for crypto, C: for forex)
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -118,8 +120,10 @@ serve(async (req) => {
         const response = await fetch(url);
         const data = await response.json();
 
+        console.log(`[check-trade-outcomes] Polygon API response for ${symbol}: status=${response.status}, resultsCount=${data?.results?.length || 0}, status=${data?.status}`);
+        
         if (!response.ok || !data.results || data.results.length === 0) {
-          console.warn(`[check-trade-outcomes] No price data for ${analysis.symbol}`);
+          console.warn(`[check-trade-outcomes] No price data for ${analysis.symbol} - Polygon response:`, JSON.stringify(data).slice(0, 200));
           continue;
         }
 
