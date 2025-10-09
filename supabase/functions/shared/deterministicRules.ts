@@ -14,7 +14,7 @@ export const THRESHOLDS = {
   LEVEL_PROXIMITY_ATR_MULTIPLIER: 0.15,
   
   // Stop/target multipliers
-  STOP_ATR_MULTIPLIER: 0.25,
+  STOP_ATR_MULTIPLIER: 1.5,  // Increased from 0.25 to give trades room to breathe
   TARGET1_ATR_MULTIPLIER: 1,
   TARGET2_ATR_MULTIPLIER: 2,
   

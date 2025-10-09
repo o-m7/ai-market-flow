@@ -104,7 +104,7 @@ const InstitutionalTaResultSchema = {
       trade_idea: {
         type: "object",
         properties: {
-          direction: { type: "string", enum: ["long", "short"], description: "Trade direction - AI decides based on ALL factors including news" },
+          direction: { type: "string", enum: ["long", "short", "hold"], description: "Trade direction - return 'hold' when conditions are unclear or conflicting. AI decides based on ALL factors including news" },
           entry: { type: "number", description: "Entry price at current market level or key technical level" },
           stop: { type: "number", description: "Stop loss level" },
           targets: { type: "array", items: { type: "number" }, description: "Profit targets" },
@@ -807,6 +807,75 @@ CRITICAL RULES:
       (level_precision * 0.2) + 
       (entry_validity * 0.2)
     );
+    
+    // ==================== SIGNAL QUALITY FILTERS ====================
+    
+    // Check if direction is "hold" - if so, return early without saving to database
+    if (parsed.trade_idea.direction === 'hold') {
+      console.log(`[VALIDATION] ⚠️  AI returned "hold" - no trade signal generated`);
+      return new Response(JSON.stringify({
+        signal: "hold",
+        message: "Conditions unclear - waiting for better setup",
+        rationale: parsed.trade_idea.rationale,
+        confidence_agreement: signal_confidence_agreement,
+        overall_accuracy: overall_accuracy
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Reject signals with low confidence agreement
+    if (signal_confidence_agreement < 75) {
+      console.warn(`[VALIDATION] ⚠️  Signal rejected: confidence agreement ${signal_confidence_agreement}% below threshold`);
+      return new Response(JSON.stringify({
+        error: "Signal quality too low",
+        details: {
+          confidence_agreement: signal_confidence_agreement,
+          threshold: 75,
+          message: "Indicators do not strongly support the proposed trade direction. Wait for clearer setup.",
+          rationale: parsed.trade_idea.rationale
+        }
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Validate risk-reward ratio
+    const tradeIdea = parsed.trade_idea;
+    const entryPrice = tradeIdea.entry;
+    const stopPrice = tradeIdea.stop;
+    const target1Price = tradeIdea.targets?.[0];
+    
+    if (entryPrice && stopPrice && target1Price) {
+      const isLong = tradeIdea.direction === 'long';
+      const risk = Math.abs(entryPrice - stopPrice);
+      const reward = isLong ? (target1Price - entryPrice) : (entryPrice - target1Price);
+      const rrRatio = reward / risk;
+      
+      if (rrRatio < 2.0) {
+        console.warn(`[VALIDATION] ⚠️  Signal rejected: R:R ratio ${rrRatio.toFixed(2)} below minimum 2.0`);
+        return new Response(JSON.stringify({
+          error: "Risk-reward ratio too low",
+          details: {
+            rr_ratio: rrRatio.toFixed(2),
+            threshold: 2.0,
+            message: "Trade setup does not offer sufficient reward for the risk. Wait for better entry.",
+            entry: entryPrice,
+            stop: stopPrice,
+            target: target1Price
+          }
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      console.log(`[VALIDATION] ✅ R:R ratio passed: ${rrRatio.toFixed(2)} (minimum 2.0)`);
+    }
+    
+    console.log(`[VALIDATION] ✅ All signal quality filters passed`);
     
     console.log(`[VALIDATION] 🎯 OVERALL ACCURACY: ${overall_accuracy}/100`);
     
