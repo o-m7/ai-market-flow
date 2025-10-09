@@ -67,7 +67,7 @@ Provide analysis in JSON format:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5',
+        model: 'gpt-5-2025-08-07', // Use latest model for better sentiment analysis
         messages: [
           {
             role: 'system',

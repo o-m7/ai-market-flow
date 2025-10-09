@@ -66,9 +66,50 @@ const InstitutionalTaResultSchema = {
       levels: {
         type: "object",
         properties: {
-          support: { type: "array", items: { type: "number" }, description: "Key support levels" },
-          resistance: { type: "array", items: { type: "number" }, description: "Key resistance levels" },
-          vwap: { type: ["number", "null"], description: "VWAP level" }
+          support: { type: "array", items: { type: "number" }, description: "Key support levels from price action" },
+          resistance: { type: "array", items: { type: "number" }, description: "Key resistance levels from price action" },
+          vwap: { type: ["number", "null"], description: "VWAP level" },
+          pivot_points: { type: "array", items: { type: "number" }, description: "Daily pivot points" },
+          liquidity_zones: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                price: { type: "number" },
+                type: { type: "string", enum: ["buy", "sell"] },
+                strength: { type: "string", enum: ["weak", "moderate", "strong"] },
+                description: { type: "string" }
+              }
+            },
+            description: "Institutional liquidity zones where orders cluster"
+          },
+          breakout_zones: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                price: { type: "number" },
+                type: { type: "string", enum: ["bullish", "bearish"] },
+                strength: { type: "string", enum: ["weak", "moderate", "strong"] },
+                description: { type: "string" }
+              }
+            },
+            description: "Key psychological breakout levels"
+          },
+          order_blocks: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                high: { type: "number" },
+                low: { type: "number" },
+                type: { type: "string", enum: ["bullish", "bearish"] },
+                strength: { type: "string" },
+                description: { type: "string" }
+              }
+            },
+            description: "Institutional order block zones"
+          }
         },
         required: ["support", "resistance"]
       },
@@ -77,9 +118,84 @@ const InstitutionalTaResultSchema = {
         properties: {
           pivot_high: { type: "number" },
           pivot_low: { type: "number" },
-          key_levels: { type: "array", items: { type: "number" }, description: "Key Fibonacci retracement levels" }
+          retracements: {
+            type: "object",
+            properties: {
+              "23.6": { type: "number" },
+              "38.2": { type: "number" },
+              "50.0": { type: "number" },
+              "61.8": { type: "number" },
+              "78.6": { type: "number" }
+            },
+            required: ["23.6", "38.2", "50.0", "61.8", "78.6"]
+          },
+          extensions: {
+            type: "object",
+            properties: {
+              "127.2": { type: "number" },
+              "161.8": { type: "number" },
+              "261.8": { type: "number" }
+            },
+            required: ["127.2", "161.8", "261.8"]
+          },
+          direction: { type: "string", enum: ["up", "down"] },
+          confluence_zones: { type: "array", items: { type: "string" }, description: "Key Fibonacci confluence areas" }
         },
-        required: ["pivot_high", "pivot_low", "key_levels"]
+        required: ["pivot_high", "pivot_low", "retracements", "extensions", "direction", "confluence_zones"]
+      },
+      trading_strategies: {
+        type: "object",
+        properties: {
+          trend_following: {
+            type: "object",
+            properties: {
+              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              probability: { type: "number", minimum: 0, maximum: 100 },
+              rationale: { type: "string" }
+            },
+            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
+          },
+          mean_reversion: {
+            type: "object",
+            properties: {
+              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              probability: { type: "number", minimum: 0, maximum: 100 },
+              rationale: { type: "string" }
+            },
+            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
+          },
+          momentum: {
+            type: "object",
+            properties: {
+              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              probability: { type: "number", minimum: 0, maximum: 100 },
+              rationale: { type: "string" }
+            },
+            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
+          },
+          range_trading: {
+            type: "object",
+            properties: {
+              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              probability: { type: "number", minimum: 0, maximum: 100 },
+              rationale: { type: "string" }
+            },
+            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
+          }
+        },
+        required: ["trend_following", "mean_reversion", "momentum", "range_trading"]
       },
       trade_idea: {
         type: "object",
@@ -104,26 +220,106 @@ const InstitutionalTaResultSchema = {
           ema50: { type: "number" },
           ema200: { type: "number" },
           rsi14: { type: "number" },
-          macd_line: { type: "number" },
-          macd_signal: { type: "number" },
-          macd_hist: { type: "number" },
+          rsi_divergence: { type: "string", description: "RSI divergence analysis" },
+          macd: {
+            type: "object",
+            properties: {
+              line: { type: "number" },
+              signal: { type: "number" },
+              hist: { type: "number" },
+              analysis: { type: "string", description: "MACD signal quality and context" }
+            },
+            required: ["line", "signal", "hist", "analysis"]
+          },
           atr14: { type: "number" },
-          bb_upper: { type: "number" },
-          bb_mid: { type: "number" },
-          bb_lower: { type: "number" }
+          bb: {
+            type: "object",
+            properties: {
+              mid: { type: "number" },
+              upper: { type: "number" },
+              lower: { type: "number" },
+              width: { type: "number" },
+              position: { type: "string", description: "Price position relative to bands" }
+            },
+            required: ["mid", "upper", "lower", "width", "position"]
+          },
+          volume_analysis: { type: "string", description: "Volume and order flow analysis" }
         },
-        required: ["ema20", "ema50", "ema200", "rsi14", "macd_line", "macd_signal", "macd_hist", "atr14", "bb_upper", "bb_mid", "bb_lower"]
+        required: ["ema20", "ema50", "ema200", "rsi14", "rsi_divergence", "macd", "atr14", "bb", "volume_analysis"]
+      },
+      quantitative_metrics: {
+        type: "object",
+        properties: {
+          volatility_percentile: { type: "number" },
+          trend_strength: { type: "number", minimum: 0, maximum: 100 },
+          momentum_score: { type: "number", minimum: -100, maximum: 100 },
+          mean_reversion_probability: { type: "number", minimum: 0, maximum: 100 },
+          breakout_probability: { type: "number", minimum: 0, maximum: 100 }
+        },
+        required: ["volatility_percentile", "trend_strength", "momentum_score", "mean_reversion_probability", "breakout_probability"]
       },
       confidence_model: { type: "number", minimum: 0, maximum: 100 },
       confidence_calibrated: { type: "number", minimum: 0, maximum: 100 },
-      evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence" },
-      risks: { type: "string", description: "Risk assessment" },
+      evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence for analysis" },
+      risks: { type: "string", description: "Risk assessment and mitigation strategies" },
+      timeframe_profile: {
+        type: "object",
+        properties: {
+          scalp: {
+            type: "object",
+            properties: {
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              strategy: { type: "string" },
+              probability: { type: "number" }
+            },
+            required: ["entry", "stop", "targets", "strategy", "probability"]
+          },
+          intraday: {
+            type: "object",
+            properties: {
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              strategy: { type: "string" },
+              probability: { type: "number" }
+            },
+            required: ["entry", "stop", "targets", "strategy", "probability"]
+          },
+          swing: {
+            type: "object",
+            properties: {
+              entry: { type: "number" },
+              stop: { type: "number" },
+              targets: { type: "array", items: { type: "number" } },
+              strategy: { type: "string" },
+              probability: { type: "number" }
+            },
+            required: ["entry", "stop", "targets", "strategy", "probability"]
+          }
+        },
+        required: ["scalp", "intraday", "swing"]
+      },
+      accuracy_metrics: {
+        type: "object",
+        properties: {
+          data_freshness_score: { type: "number", minimum: 0, maximum: 100, description: "How recent/fresh the candle data is" },
+          signal_clarity_score: { type: "number", minimum: 0, maximum: 100, description: "How clear the directional signal is" },
+          level_precision_score: { type: "number", minimum: 0, maximum: 100, description: "How precise support/resistance levels are" },
+          entry_validity_score: { type: "number", minimum: 0, maximum: 100, description: "How valid the entry price is relative to current price" },
+          overall_accuracy: { type: "number", minimum: 0, maximum: 100, description: "Overall accuracy score of the analysis" },
+          validation_notes: { type: "array", items: { type: "string" }, description: "Notes about analysis validation" }
+        },
+        required: ["data_freshness_score", "signal_clarity_score", "level_precision_score", "entry_validity_score", "overall_accuracy", "validation_notes"]
+      },
       json_version: { type: "string" }
     },
     required: [
       "summary", "action", "action_text", "outlook", "market_structure", "levels", "fibonacci", 
-      "trade_idea", "technical", 
-      "confidence_model", "confidence_calibrated", "evidence", "risks", "json_version"
+      "trading_strategies", "trade_idea", "technical", "quantitative_metrics", 
+      "confidence_model", "confidence_calibrated", "evidence", "risks", "timeframe_profile", 
+      "accuracy_metrics", "json_version"
     ]
   }
 };
@@ -296,9 +492,9 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
     // Add timeout wrapper for OpenAI call
-    const openaiTimeout = 60000; // 60 second timeout for gpt-4o
+    const openaiTimeout = 60000; // 60 second timeout for OpenAI
     const openaiPromise = client.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5-2025-08-07", // Latest flagship model with superior reasoning
       messages: [
         { 
           role: "system", 
@@ -311,7 +507,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_tokens: 8000,
+      max_completion_tokens: 4096, // Use max_completion_tokens for GPT-5
       temperature: 0.7,
     });
 
@@ -363,6 +559,17 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     try {
       parsed = JSON.parse(toolCall.function.arguments);
       console.log('[ai-analyze] Function call parsed successfully');
+      
+      // Log timeframe_profile to debug missing signals
+      console.log('[ai-analyze] timeframe_profile received:', JSON.stringify(parsed.timeframe_profile, null, 2));
+      if (!parsed.timeframe_profile || !parsed.timeframe_profile.scalp || !parsed.timeframe_profile.intraday || !parsed.timeframe_profile.swing) {
+        console.warn('[ai-analyze] ⚠️  Missing timeframe_profile signals!', {
+          has_timeframe_profile: !!parsed.timeframe_profile,
+          has_scalp: !!parsed.timeframe_profile?.scalp,
+          has_intraday: !!parsed.timeframe_profile?.intraday,
+          has_swing: !!parsed.timeframe_profile?.swing
+        });
+      }
     } catch (e) {
       console.error('[ai-analyze] Function arguments parse failed:', e);
       return new Response(JSON.stringify({ 
@@ -946,6 +1153,14 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     }
 
     console.log(`[ai-analyze] Deterministic analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);
+    
+    // Verify timeframe_profile is in final response
+    console.log('[ai-analyze] Final response includes timeframe_profile:', {
+      has_timeframe_profile: !!result.timeframe_profile,
+      has_scalp: !!result.timeframe_profile?.scalp,
+      has_intraday: !!result.timeframe_profile?.intraday,
+      has_swing: !!result.timeframe_profile?.swing
+    });
     
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
