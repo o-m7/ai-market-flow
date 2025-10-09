@@ -457,7 +457,7 @@ function calculateInformationRatio(prices: number[], benchmarkPrices: number[], 
   return annualizedExcessReturn / annualizedTrackingError;
 }
 
-// Generate REALISTIC, ACTIONABLE trading signals that traders can actually enter
+// Generate TREND-FOLLOWING, HIGH-PROBABILITY trading signals
 function generateTradingSignals(
   price: number,
   atr: number,
@@ -468,89 +468,157 @@ function generateTradingSignals(
   ema50: number,
   donchian: { high: number; low: number }
 ) {
-  // Determine direction from technical confluence (majority vote)
-  const emaTrend = price > ema20 && ema20 > ema50;
-  const rsiMomentum = rsi > 50;
-  const macdMomentum = macd.hist > 0;
+  // === STEP 1: Determine PRIMARY TREND (must have strong confluence) ===
+  const trendChecks = {
+    // Price position vs EMAs
+    priceAboveEMA20: price > ema20,
+    priceAboveEMA50: price > ema50,
+    emaAlignment: ema20 > ema50, // EMA20 above EMA50 = uptrend
+    
+    // Momentum indicators
+    rsiStrong: rsi > 55 || rsi < 45, // Not in neutral zone
+    rsiBullish: rsi > 50,
+    macdBullish: macd.hist > 0,
+    macdStrong: Math.abs(macd.hist) > 0.00001, // Has momentum
+    
+    // Price vs BB
+    aboveBBMid: price > bb.mid,
+    notOverbought: price < bb.upper * 1.01, // Not extended
+    notOversold: price > bb.lower * 0.99
+  };
+
+  // Count bullish signals (need STRONG confluence for quality signals)
+  const bullishCount = [
+    trendChecks.priceAboveEMA20,
+    trendChecks.priceAboveEMA50,
+    trendChecks.emaAlignment,
+    trendChecks.rsiBullish,
+    trendChecks.macdBullish,
+    trendChecks.aboveBBMid
+  ].filter(Boolean).length;
+
+  const bearishCount = 6 - bullishCount;
+
+  // REQUIRE at least 4/6 confluence - don't trade choppy markets
+  const hasStrongTrend = Math.max(bullishCount, bearishCount) >= 4;
+  const isLong = bullishCount > bearishCount;
+
+  // === STEP 2: Calculate CONFIDENCE (50-85% based on confluence) ===
+  let confidence = 50; // Base
   
-  // Count bullish signals - need at least 2/3 confluence
-  const bullishSignals = [emaTrend, rsiMomentum, macdMomentum].filter(Boolean).length;
-  const isLong = bullishSignals >= 2;
+  // Add confidence for trend strength
+  const trendStrength = Math.max(bullishCount, bearishCount);
+  if (trendStrength >= 5) confidence += 20; // Very strong trend
+  else if (trendStrength >= 4) confidence += 10; // Strong trend
   
-  // Calculate confidence based on indicator alignment
-  let baseConfidence = 60;
-  if (bullishSignals === 3 || bullishSignals === 0) baseConfidence += 15; // Full alignment
-  if (Math.abs(rsi - 50) > 20) baseConfidence += 5; // Strong momentum
+  // Add confidence for momentum alignment
+  if (trendChecks.rsiStrong && (isLong === trendChecks.rsiBullish)) confidence += 5;
+  if (trendChecks.macdStrong && (isLong === trendChecks.macdBullish)) confidence += 5;
   
-  // SCALP: Tight entry very close to current price (0.2-0.5% away)
-  // Entry at micro-level pullback/bounce - traders can actually enter these
+  // Add confidence for NOT being overextended
+  if (trendChecks.notOverbought && trendChecks.notOversold) confidence += 5;
+  
+  // Reduce confidence if weak trend
+  if (!hasStrongTrend) confidence -= 15;
+  
+  // Reduce confidence if RSI extreme
+  if (rsi > 75 || rsi < 25) confidence -= 10; // Too extended
+  
+  // Cap confidence between 45-85%
+  confidence = Math.max(45, Math.min(85, confidence));
+
+  // === STEP 3: Generate REALISTIC ENTRIES at technical levels ===
+  
+  // SCALP: Entry near current price with tight stops
+  // Only 0.1-0.3% away so traders can actually get filled
   const scalpEntry = isLong 
-    ? price * 0.998  // Enter 0.2% below on tiny dip
-    : price * 1.002; // Enter 0.2% above on tiny rally
+    ? price * 0.999  // 0.1% below (micro-pullback)
+    : price * 1.001; // 0.1% above (micro-bounce)
   
   const scalpStop = isLong
-    ? scalpEntry - (atr * 0.4) // Tight 0.4 ATR stop
-    : scalpEntry + (atr * 0.4);
+    ? scalpEntry - (atr * 0.5) // 0.5 ATR stop (tight but reasonable)
+    : scalpEntry + (atr * 0.5);
   
   const scalpTargets = isLong
-    ? [scalpEntry + (atr * 0.6), scalpEntry + (atr * 1.0), scalpEntry + (atr * 1.5)] // 0.6, 1.0, 1.5 ATR
-    : [scalpEntry - (atr * 0.6), scalpEntry - (atr * 1.0), scalpEntry - (atr * 1.5)];
+    ? [
+        scalpEntry + (atr * 1.0),  // TP1: 1 ATR (R:R = 2:1)
+        scalpEntry + (atr * 1.5),  // TP2: 1.5 ATR (R:R = 3:1)
+        scalpEntry + (atr * 2.0)   // TP3: 2 ATR (R:R = 4:1)
+      ]
+    : [
+        scalpEntry - (atr * 1.0),
+        scalpEntry - (atr * 1.5),
+        scalpEntry - (atr * 2.0)
+      ];
   
-  // INTRADAY: Entry at nearby technical level within 1-2%
-  // Use BB levels or EMA as entry - realistic pullback levels traders wait for
+  // INTRADAY: Entry at EMA20 or BB mid (realistic pullback level)
   const intradayEntry = isLong
-    ? Math.max(bb.mid, price * 0.985)  // Entry at BB mid or 1.5% below (pullback)
-    : Math.min(bb.mid, price * 1.015); // Entry at BB mid or 1.5% above (rally)
+    ? Math.min(ema20, bb.mid, price * 0.995) // Enter at EMA20/BBmid or 0.5% below
+    : Math.max(ema20, bb.mid, price * 1.005); // Enter at EMA20/BBmid or 0.5% above
   
   const intradayStop = isLong
-    ? intradayEntry - (atr * 1.2) // 1.2 ATR stop
-    : intradayEntry + (atr * 1.2);
+    ? intradayEntry - (atr * 1.5) // 1.5 ATR stop
+    : intradayEntry + (atr * 1.5);
   
   const intradayTargets = isLong
-    ? [intradayEntry + (atr * 2), intradayEntry + (atr * 3.5), intradayEntry + (atr * 5)]
-    : [intradayEntry - (atr * 2), intradayEntry - (atr * 3.5), intradayEntry - (atr * 5)];
+    ? [
+        intradayEntry + (atr * 2.5),  // TP1: R:R = 1.67:1
+        intradayEntry + (atr * 4.0),  // TP2: R:R = 2.67:1  
+        intradayEntry + (atr * 5.5)   // TP3: R:R = 3.67:1
+      ]
+    : [
+        intradayEntry - (atr * 2.5),
+        intradayEntry - (atr * 4.0),
+        intradayEntry - (atr * 5.5)
+      ];
   
-  // SWING: Entry at major level 2-4% away
-  // Use Donchian or major EMA as entry - real swing levels traders target
+  // SWING: Entry at EMA50 retest (major support/resistance)
   const swingEntry = isLong
-    ? Math.min(ema50, price * 0.97) // Entry at EMA50 or 3% below (retest)
-    : Math.max(ema50, price * 1.03); // Entry at EMA50 or 3% above (retest)
+    ? Math.min(ema50, price * 0.98) // Enter at EMA50 or 2% below
+    : Math.max(ema50, price * 1.02); // Enter at EMA50 or 2% above
   
   const swingStop = isLong
-    ? swingEntry - (atr * 2) // 2 ATR stop
-    : swingEntry + (atr * 2);
+    ? swingEntry - (atr * 2.5) // 2.5 ATR stop
+    : swingEntry + (atr * 2.5);
   
   const swingTargets = isLong
-    ? [swingEntry + (atr * 4), swingEntry + (atr * 6.5), swingEntry + (atr * 9)]
-    : [swingEntry - (atr * 4), swingEntry - (atr * 6.5), swingEntry - (atr * 9)];
+    ? [
+        swingEntry + (atr * 5.0),  // TP1: R:R = 2:1
+        swingEntry + (atr * 7.5),  // TP2: R:R = 3:1
+        swingEntry + (atr * 10.0)  // TP3: R:R = 4:1
+      ]
+    : [
+        swingEntry - (atr * 5.0),
+        swingEntry - (atr * 7.5),
+        swingEntry - (atr * 10.0)
+      ];
+
+  // === STEP 4: Build strategy descriptions ===
+  const direction = isLong ? 'LONG' : 'SHORT';
+  const trendDesc = isLong ? 'uptrend' : 'downtrend';
+  const action = isLong ? 'pullback' : 'bounce';
   
   return {
     scalp: {
       entry: Number(scalpEntry.toFixed(2)),
       stop: Number(scalpStop.toFixed(2)),
       targets: scalpTargets.map(t => Number(t.toFixed(2))),
-      strategy: isLong 
-        ? `Quick long on 0.2% pullback, targeting ${(atr * 1.5).toFixed(2)} move. Tight ${(atr * 0.4).toFixed(2)} stop.`
-        : `Quick short on 0.2% bounce, targeting ${(atr * 1.5).toFixed(2)} move. Tight ${(atr * 0.4).toFixed(2)} stop.`,
-      probability: Math.min(baseConfidence + 10, 85)
+      strategy: `${direction}: Quick scalp on ${action}. EMA20 at ${ema20.toFixed(2)} confirms ${trendDesc}. R:R up to 4:1.`,
+      probability: Math.min(confidence + 5, 85) // Scalp slightly higher confidence
     },
     intraday: {
       entry: Number(intradayEntry.toFixed(2)),
       stop: Number(intradayStop.toFixed(2)),
       targets: intradayTargets.map(t => Number(t.toFixed(2))),
-      strategy: isLong
-        ? `Enter at BB mid ${bb.mid.toFixed(2)} or 1.5% pullback. Target ${(atr * 5).toFixed(2)} move.`
-        : `Enter at BB mid ${bb.mid.toFixed(2)} or 1.5% rally. Target ${(atr * 5).toFixed(2)} move.`,
-      probability: baseConfidence
+      strategy: `${direction}: Enter at EMA20 (${ema20.toFixed(2)}) or BB mid (${bb.mid.toFixed(2)}) retest. ${trendStrength}/6 trend indicators aligned. Target ${(atr * 5.5).toFixed(2)} move.`,
+      probability: confidence
     },
     swing: {
       entry: Number(swingEntry.toFixed(2)),
       stop: Number(swingStop.toFixed(2)),
       targets: swingTargets.map(t => Number(t.toFixed(2))),
-      strategy: isLong
-        ? `Enter at EMA50 ${ema50.toFixed(2)} retest or 3% dip. Multi-day hold for ${(atr * 9).toFixed(2)} target.`
-        : `Enter at EMA50 ${ema50.toFixed(2)} retest or 3% rally. Multi-day hold for ${(atr * 9).toFixed(2)} target.`,
-      probability: Math.max(baseConfidence - 5, 60)
+      strategy: `${direction}: Multi-day position at EMA50 (${ema50.toFixed(2)}) support/resistance. Strong ${trendDesc} with RSI ${rsi.toFixed(1)}. R:R up to 4:1.`,
+      probability: Math.max(confidence - 5, 45) // Swing slightly lower confidence (longer hold)
     }
   };
 }
@@ -692,6 +760,29 @@ serve(async (req) => {
       throw new Error('No market data available');
     }
 
+    // === CRITICAL: Validate data freshness to prevent outdated signals ===
+    const latestCandleTime = candles[candles.length - 1].t;
+    const nowMs = Date.now();
+    const dataAgeMinutes = (nowMs - latestCandleTime) / (1000 * 60);
+    
+    // Data freshness thresholds by timeframe
+    const maxAgeMinutes: Record<string, number> = {
+      '1m': 10,    // 1min data should be < 10min old
+      '5m': 30,    // 5min data should be < 30min old
+      '15m': 60,   // 15min data should be < 1hr old
+      '1h': 180,   // 1hr data should be < 3hrs old
+      '1d': 1440   // Daily data should be < 1 day old
+    };
+    
+    const maxAge = maxAgeMinutes[tf] || 180;
+    
+    if (dataAgeMinutes > maxAge) {
+      console.warn(`⚠️ DATA STALE: Latest candle is ${dataAgeMinutes.toFixed(0)}min old (max ${maxAge}min). Signals may be outdated.`);
+      // Continue but mark as stale data warning
+    } else {
+      console.log(`✅ DATA FRESH: Latest candle is ${dataAgeMinutes.toFixed(0)}min old (< ${maxAge}min threshold)`);
+    }
+
     const prices = candles.map(c => c.c);
     const currentPrice = prices[prices.length - 1];
     const prevClose = prices.length > 1 ? prices[prices.length - 2] : null;
@@ -699,7 +790,7 @@ serve(async (req) => {
     // Log the actual candle timestamps to debug old data issue
     const firstCandleTime = new Date(candles[0].t).toISOString();
     const lastCandleTime = new Date(candles[candles.length - 1].t).toISOString();
-    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${currentPrice}), Total=${candles.length}`);
+    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${currentPrice}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
     console.log(`💰 Current price from latest candle: ${currentPrice}, Prev close: ${prevClose}`);
 
     // Calculate technical indicators
