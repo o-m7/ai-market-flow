@@ -66,50 +66,9 @@ const InstitutionalTaResultSchema = {
       levels: {
         type: "object",
         properties: {
-          support: { type: "array", items: { type: "number" }, description: "Key support levels from price action" },
-          resistance: { type: "array", items: { type: "number" }, description: "Key resistance levels from price action" },
-          vwap: { type: ["number", "null"], description: "VWAP level" },
-          pivot_points: { type: "array", items: { type: "number" }, description: "Daily pivot points" },
-          liquidity_zones: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                price: { type: "number" },
-                type: { type: "string", enum: ["buy", "sell"] },
-                strength: { type: "string", enum: ["weak", "moderate", "strong"] },
-                description: { type: "string" }
-              }
-            },
-            description: "Institutional liquidity zones where orders cluster"
-          },
-          breakout_zones: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                price: { type: "number" },
-                type: { type: "string", enum: ["bullish", "bearish"] },
-                strength: { type: "string", enum: ["weak", "moderate", "strong"] },
-                description: { type: "string" }
-              }
-            },
-            description: "Key psychological breakout levels"
-          },
-          order_blocks: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                high: { type: "number" },
-                low: { type: "number" },
-                type: { type: "string", enum: ["bullish", "bearish"] },
-                strength: { type: "string" },
-                description: { type: "string" }
-              }
-            },
-            description: "Institutional order block zones"
-          }
+          support: { type: "array", items: { type: "number" }, description: "Key support levels" },
+          resistance: { type: "array", items: { type: "number" }, description: "Key resistance levels" },
+          vwap: { type: ["number", "null"], description: "VWAP level" }
         },
         required: ["support", "resistance"]
       },
@@ -118,30 +77,9 @@ const InstitutionalTaResultSchema = {
         properties: {
           pivot_high: { type: "number" },
           pivot_low: { type: "number" },
-          retracements: {
-            type: "object",
-            properties: {
-              "23.6": { type: "number" },
-              "38.2": { type: "number" },
-              "50.0": { type: "number" },
-              "61.8": { type: "number" },
-              "78.6": { type: "number" }
-            },
-            required: ["23.6", "38.2", "50.0", "61.8", "78.6"]
-          },
-          extensions: {
-            type: "object",
-            properties: {
-              "127.2": { type: "number" },
-              "161.8": { type: "number" },
-              "261.8": { type: "number" }
-            },
-            required: ["127.2", "161.8", "261.8"]
-          },
-          direction: { type: "string", enum: ["up", "down"] },
-          confluence_zones: { type: "array", items: { type: "string" }, description: "Key Fibonacci confluence areas" }
+          key_levels: { type: "array", items: { type: "number" }, description: "Key Fibonacci retracement levels" }
         },
-        required: ["pivot_high", "pivot_low", "retracements", "extensions", "direction", "confluence_zones"]
+        required: ["pivot_high", "pivot_low", "key_levels"]
       },
       trade_idea: {
         type: "object",
@@ -166,56 +104,26 @@ const InstitutionalTaResultSchema = {
           ema50: { type: "number" },
           ema200: { type: "number" },
           rsi14: { type: "number" },
-          rsi_divergence: { type: "string", description: "RSI divergence analysis" },
-          macd: {
-            type: "object",
-            properties: {
-              line: { type: "number" },
-              signal: { type: "number" },
-              hist: { type: "number" },
-              analysis: { type: "string", description: "MACD signal quality and context" }
-            },
-            required: ["line", "signal", "hist", "analysis"]
-          },
+          macd_line: { type: "number" },
+          macd_signal: { type: "number" },
+          macd_hist: { type: "number" },
           atr14: { type: "number" },
-          bb: {
-            type: "object",
-            properties: {
-              mid: { type: "number" },
-              upper: { type: "number" },
-              lower: { type: "number" },
-              width: { type: "number" },
-              position: { type: "string", description: "Price position relative to bands" }
-            },
-            required: ["mid", "upper", "lower", "width", "position"]
-          },
-          volume_analysis: { type: "string", description: "Volume and order flow analysis" }
+          bb_upper: { type: "number" },
+          bb_mid: { type: "number" },
+          bb_lower: { type: "number" }
         },
-        required: ["ema20", "ema50", "ema200", "rsi14", "rsi_divergence", "macd", "atr14", "bb", "volume_analysis"]
+        required: ["ema20", "ema50", "ema200", "rsi14", "macd_line", "macd_signal", "macd_hist", "atr14", "bb_upper", "bb_mid", "bb_lower"]
       },
       confidence_model: { type: "number", minimum: 0, maximum: 100 },
       confidence_calibrated: { type: "number", minimum: 0, maximum: 100 },
-      evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence for analysis" },
-      risks: { type: "string", description: "Risk assessment and mitigation strategies" },
-      accuracy_metrics: {
-        type: "object",
-        properties: {
-          data_freshness_score: { type: "number", minimum: 0, maximum: 100, description: "How recent/fresh the candle data is" },
-          signal_clarity_score: { type: "number", minimum: 0, maximum: 100, description: "How clear the directional signal is" },
-          level_precision_score: { type: "number", minimum: 0, maximum: 100, description: "How precise support/resistance levels are" },
-          entry_validity_score: { type: "number", minimum: 0, maximum: 100, description: "How valid the entry price is relative to current price" },
-          overall_accuracy: { type: "number", minimum: 0, maximum: 100, description: "Overall accuracy score of the analysis" },
-          validation_notes: { type: "array", items: { type: "string" }, description: "Notes about analysis validation" }
-        },
-        required: ["data_freshness_score", "signal_clarity_score", "level_precision_score", "entry_validity_score", "overall_accuracy", "validation_notes"]
-      },
+      evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence" },
+      risks: { type: "string", description: "Risk assessment" },
       json_version: { type: "string" }
     },
     required: [
       "summary", "action", "action_text", "outlook", "market_structure", "levels", "fibonacci", 
       "trade_idea", "technical", 
-      "confidence_model", "confidence_calibrated", "evidence", "risks", 
-      "accuracy_metrics", "json_version"
+      "confidence_model", "confidence_calibrated", "evidence", "risks", "json_version"
     ]
   }
 };
@@ -403,7 +311,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_tokens: 6000,
+      max_tokens: 8000,
       temperature: 0.7,
     });
 
