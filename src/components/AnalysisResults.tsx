@@ -33,13 +33,16 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
             '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
             '60': '1h', '240': '4h', 'D': '1d'
           };
+          console.log('[AnalysisResults] Fetching quant-data for', symbol, timeframeMap[timeframe]);
           const { data: response, error } = await supabase.functions.invoke('quant-data', {
             body: { symbol, tf: timeframeMap[timeframe] || '1h', withSummary: false }
           });
+          console.log('[AnalysisResults] Quant-data response:', response, 'Error:', error);
+          
           if (!error && response) {
             setQuantSignals(response.timeframe_profile);
-            // Store all the raw quant data
-            setQuantMetrics({
+            // Store all the raw quant data including variance
+            const metrics = {
               rsi14: response.rsi14,
               ema20: response.ema?.['20'],
               ema50: response.ema?.['50'],
@@ -51,14 +54,19 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
               macd: response.macd,
               bb20: response.bb20,
               donchian20: response.donchian20,
-              ...response.quant_metrics // sharpe, sortino, alpha, beta, etc.
-            });
+              ...response.quant_metrics // sharpe, sortino, alpha, beta, std_dev, etc.
+            };
+            console.log('[AnalysisResults] Setting quant metrics:', metrics);
+            setQuantMetrics(metrics);
           }
         } catch (e) {
           console.error('Failed to fetch quant signals:', e);
         }
       };
       fetchQuantSignals();
+    } else {
+      setQuantSignals(null);
+      setQuantMetrics(null);
     }
   }, [symbol, timeframe, includeQuantSignals]);
   
@@ -1338,6 +1346,9 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
               <BarChart3 className="h-4 w-4" />
               QUANTITATIVE METRICS • RAW DATA
             </CardTitle>
+            <p className="text-xs font-mono-tabular text-terminal-secondary mt-2">
+              Live calculated metrics from quant-data function • Refreshes with each analysis
+            </p>
           </CardHeader>
           <CardContent className="pt-4">
             <div className="space-y-6">
@@ -1401,6 +1412,14 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                       <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">VOLATILITY (20D)</div>
                       <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
                         {safeFormatNumber(quantMetrics.vol20_annual, 2)}%
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.variance !== undefined && quantMetrics.variance !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">VARIANCE</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.variance, 2)}
                       </div>
                     </div>
                   )}

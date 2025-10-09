@@ -897,6 +897,7 @@ serve(async (req) => {
     const alpha = benchmarkPrices.length > 0 ? calculateAlpha(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
     const beta = benchmarkPrices.length > 0 ? calculateBeta(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
     const std_dev = calculateSampleStdDev(prices, 20);
+    const variance = std_dev * std_dev; // Variance is std dev squared
     const population_std_dev = calculatePopulationStdDev(prices, 20);
     const sample_std_dev = calculateSampleStdDev(prices, 20);
     const skewness = calculateSkewness(prices, 20);
@@ -965,6 +966,7 @@ serve(async (req) => {
         alpha,
         beta,
         std_dev,
+        variance,
         population_std_dev,
         sample_std_dev,
         skewness,
