@@ -377,11 +377,21 @@ serve(async (req) => {
 
     // Create comprehensive institutional analysis prompt
     const livePrice = currentPrice || features.technical.current;
+    const latestCandleTime = candles[candles.length - 1]?.t || Date.now();
+    const candleAge = Math.round((Date.now() - latestCandleTime) / 1000); // seconds
+    
+    console.log(`[ai-analyze] Using ${candles.length} candles, latest from ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)`);
+    
     const comprehensivePrompt = `You are an elite institutional trading desk providing multi-strategy quantitative analysis.
 
 MARKET DATA:
 Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
-CURRENT LIVE PRICE: ${livePrice}
+🔴 CURRENT LIVE PRICE: ${livePrice}
+📊 Latest Candle: ${new Date(latestCandleTime).toISOString()} (${candleAge} seconds ago)
+📈 Total Candles Analyzed: ${candles.length}
+
+⚠️ CRITICAL: ALL support/resistance/liquidity zones are calculated from LIVE CANDLES (most recent ${candles.length} bars)
+⚠️ CRITICAL: ALL entries must reference CURRENT PRICE ${livePrice} not historical data
 
 🚨 CRITICAL RULES FOR PROFESSIONAL ENTRIES:
 1. You MUST choose either "long" or "short" direction - NEVER "none"
@@ -391,7 +401,21 @@ CURRENT LIVE PRICE: ${livePrice}
    - RSI: <40 + bullish divergence = LONG, >60 + bearish divergence = SHORT
    - Pick the direction with MOST confluence of supporting indicators
 
-3. ENTRY PRICES - Think like an institutional trader:
+2. SUPPORT & RESISTANCE LEVELS:
+   - Use the support and resistance arrays provided in technical features
+   - These are calculated from LIVE candle data (last ${candles.length} candles)
+   - Support levels are swing lows BELOW current price ${livePrice}
+   - Resistance levels are swing highs ABOVE current price ${livePrice}
+   - Include these exact levels in your "levels" response
+
+3. LIQUIDITY & ORDER BLOCKS:
+   - Use liquidity_zones, breakout_zones, and order_blocks from technical features
+   - These zones are calculated from actual price action in recent candles
+   - Prioritize these institutional levels for entry placement
+   - Liquidity zones show where institutional orders cluster
+   - Order blocks show where smart money accumulated/distributed
+
+4. ENTRY PRICES - Think like an institutional trader:
    - LONG entries: Wait for pullbacks to support levels, liquidity zones, order blocks, EMA bounces, or breakout retests
    - SHORT entries: Wait for rallies to resistance levels, liquidity zones, order blocks, EMA rejections, or breakdown retests
    - DO NOT force market orders at current price ${livePrice}
@@ -399,17 +423,17 @@ CURRENT LIVE PRICE: ${livePrice}
    - Priority zones: Order blocks > Liquidity zones > Support/Resistance > Fibonacci retracements > VWAP > Round numbers > EMA levels
    - Use the liquidity_zones, breakout_zones, and order_blocks provided in technical features for optimal entry placement
 
-4. STOP LOSS placement:
+5. STOP LOSS placement:
    - LONG: Place stops below recent swing lows or support levels (invalidation point)
    - SHORT: Place stops above recent swing highs or resistance levels
    - Use ATR for buffer: Stop should be recent structure + (1-1.5 × ATR)
 
-5. TARGET placement:
+6. TARGET placement:
    - LONG: Resistance levels, Fibonacci extensions, previous highs
    - SHORT: Support levels, Fibonacci extensions, previous lows
    - Minimum 2:1 risk-reward ratio required
 
-TECHNICAL FEATURES:
+TECHNICAL FEATURES (calculated from LIVE ${candles.length} candles):
 ${JSON.stringify(features, null, 2)}
 
 NEWS/EVENT CONTEXT:

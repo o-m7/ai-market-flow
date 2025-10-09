@@ -30,9 +30,11 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     throw new Error('No backend configured. Set VITE_PUBLIC_API_URL or VITE_SUPABASE_URL.');
   }
 
-  // PHASE 1 FIX: Fetch latest 2 candles for real-time accuracy
+  // Fetch ALL fresh candles for live analysis - ignore stale payload data
   let currentPrice: number | null = null;
   let freshCandles = payload.candles;
+  
+  console.log('[analyze] Fetching completely fresh candles for', payload.symbol);
   
   try {
     const liveDataResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data`, {
@@ -42,34 +44,43 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
         symbol: payload.symbol,
         timeframe: payload.timeframe,
         asset: payload.market.toLowerCase(),
-        limit: 2,
-        lite: true
+        limit: 100, // Get 100 fresh candles for proper support/resistance calculation
+        lite: false // Get full data including volume
       })
     });
     
     if (liveDataResponse.ok) {
       const liveData = await liveDataResponse.json();
       if (liveData.candles && liveData.candles.length > 0) {
-        // Replace last candles with fresh ones
-        freshCandles = [...payload.candles.slice(0, -2), ...liveData.candles.map((c: any) => ({
+        // Use completely fresh candles
+        freshCandles = liveData.candles.map((c: any) => ({
           t: c.t,
           o: c.o,
           h: c.h,
           l: c.l,
           c: c.c,
           v: c.v
-        }))];
+        }));
+        
         // Get current live price from snapshot
         currentPrice = liveData.snapshotLastTrade || liveData.candles[liveData.candles.length - 1].c;
-        console.log('[analyze] Fresh data fetched:', { 
-          latestClose: liveData.candles[liveData.candles.length - 1].c,
+        
+        const latestCandle = liveData.candles[liveData.candles.length - 1];
+        console.log('[analyze] Fresh candles fetched:', { 
+          count: freshCandles.length,
+          latestClose: latestCandle.c,
           currentPrice,
+          latestTime: new Date(latestCandle.t).toISOString(),
           age: liveData.lastTimeUTC 
         });
+      } else {
+        console.warn('[analyze] No fresh candles returned, using provided data');
       }
+    } else {
+      console.warn('[analyze] Live data fetch failed:', liveDataResponse.status, await liveDataResponse.text());
     }
   } catch (err) {
-    console.warn('[analyze] Failed to fetch fresh candles, using provided data:', err);
+    console.error('[analyze] Failed to fetch fresh candles:', err);
   }
 
   // Fetch real news sentiment analysis
