@@ -1050,22 +1050,29 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </Card>
       )}
 
-      {/* Trade Idea - Only show if there's an actual trade signal (not hold) */}
-      {data.trade_idea && data.recommendation !== 'hold' && data.action !== 'hold' && data.trade_idea.direction !== 'hold' && (
+      {/* Trade Idea - Only show if there's actual trade data (not hold) */}
+      {data.trade_idea && data.trade_idea._type !== 'undefined' && data.recommendation !== 'hold' && data.action !== 'hold' && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
               <Target className="h-4 w-4" />
-              TRADE IDEA • {data.trade_idea.direction === 'long' || data.trade_idea.direction === 'buy' ? 'LONG (BUY)' : 'SHORT (SELL)'}
+              TRADE IDEA • {data.trade_idea.direction === 'long' || data.trade_idea.direction === 'buy' ? 'LONG (BUY)' : 
+                           data.trade_idea.direction === 'short' || data.trade_idea.direction === 'sell' ? 'SHORT (SELL)' : 
+                           data.trade_idea.direction?.toUpperCase()}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
             <div className="flex items-center gap-3 mb-4">
               <Badge className={`${
-                data.trade_idea.direction === 'long' || data.trade_idea.direction === 'buy' ? 'text-terminal-green bg-terminal-green/10 border-terminal-green/20' :
-                'text-terminal-red bg-terminal-red/10 border-terminal-red/20'
+                data.trade_idea.direction === 'long' || data.trade_idea.direction === 'buy' ? 
+                  'text-terminal-green bg-terminal-green/10 border-terminal-green/20' :
+                data.trade_idea.direction === 'short' || data.trade_idea.direction === 'sell' ?
+                  'text-terminal-red bg-terminal-red/10 border-terminal-red/20' :
+                  'text-terminal-accent bg-terminal-accent/10 border-terminal-accent/20'
               } font-mono-tabular`}>
-                {data.trade_idea.direction === 'long' || data.trade_idea.direction === 'buy' ? '↑ LONG (BUY)' : '↓ SHORT (SELL)'}
+                {data.trade_idea.direction === 'long' || data.trade_idea.direction === 'buy' ? '↑ LONG (BUY)' : 
+                 data.trade_idea.direction === 'short' || data.trade_idea.direction === 'sell' ? '↓ SHORT (SELL)' : 
+                 data.trade_idea.direction?.toUpperCase()}
               </Badge>
               {data.trade_idea.setup_type && (
                 <Badge variant="outline" className="font-mono-tabular text-xs">
