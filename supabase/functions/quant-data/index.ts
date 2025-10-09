@@ -780,29 +780,6 @@ serve(async (req) => {
     // Try to fetch indicators from Polygon API
     const polygonIndicators = await fetchPolygonIndicators(symbol, tf, polygonApiKey);
 
-    // === CRITICAL: Validate data freshness to prevent outdated signals ===
-    const latestCandleTime = candles[candles.length - 1].t;
-    const nowMs = Date.now();
-    const dataAgeMinutes = (nowMs - latestCandleTime) / (1000 * 60);
-    
-    // Data freshness thresholds by timeframe
-    const maxAgeMinutes: Record<string, number> = {
-      '1m': 10,    // 1min data should be < 10min old
-      '5m': 30,    // 5min data should be < 30min old
-      '15m': 60,   // 15min data should be < 1hr old
-      '1h': 180,   // 1hr data should be < 3hrs old
-      '1d': 1440   // Daily data should be < 1 day old
-    };
-    
-    const maxAge = maxAgeMinutes[tf] || 180;
-    
-    if (dataAgeMinutes > maxAge) {
-      console.warn(`⚠️ DATA STALE: Latest candle is ${dataAgeMinutes.toFixed(0)}min old (max ${maxAge}min). Signals may be outdated.`);
-      // Continue but mark as stale data warning
-    } else {
-      console.log(`✅ DATA FRESH: Latest candle is ${dataAgeMinutes.toFixed(0)}min old (< ${maxAge}min threshold)`);
-    }
-
     const prices = candles.map(c => c.c);
     const lastCandleClose = prices[prices.length - 1];
     const prevClose = prices.length > 1 ? prices[prices.length - 2] : null;
@@ -814,7 +791,7 @@ serve(async (req) => {
     // Log the actual candle timestamps to debug old data issue
     const firstCandleTime = new Date(candles[0].t).toISOString();
     const lastCandleTimeStr = new Date(candles[candles.length - 1].t).toISOString();
-    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTimeStr} (${lastCandleClose}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
+    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTimeStr} (${lastCandleClose}), Total=${candles.length}, Age=${lastCandleAge.toFixed(1)}min`);
     console.log(`💰 Price source: ${usingLivePrice ? `LIVE SNAPSHOT @ ${snapshotTime}` : 'LAST CANDLE'}`);
     console.log(`💰 Current price: ${currentPrice}, Last candle: ${lastCandleClose}, Prev close: ${prevClose}`);
 
