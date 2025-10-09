@@ -115,7 +115,6 @@ export const LandingPage = () => {
           <div className="flex justify-center items-center space-x-12 opacity-50 grayscale">
             <div className="text-2xl font-bold font-mono">POLYGON</div>
             <div className="text-2xl font-bold font-mono">BINANCE</div>
-            <div className="text-2xl font-bold font-mono">FINNHUB</div>
             <div className="text-2xl font-bold font-mono">KRAKEN</div>
           </div>
         </div>
@@ -476,7 +475,7 @@ export const LandingPage = () => {
           
           <div className="border-t border-border/50 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center text-muted-foreground font-mono text-sm">
             <p>&copy; 2025 FlowDesk Terminal. All rights reserved.</p>
-            <p>Market data provided by Polygon, Binance, and Finnhub</p>
+            <p>Market data provided by Polygon and Binance</p>
           </div>
         </div>
       </footer>

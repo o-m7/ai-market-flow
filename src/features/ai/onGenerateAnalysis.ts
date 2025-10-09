@@ -21,37 +21,11 @@ export async function onGenerateAnalysis({
   // 2) Use EXACT candles you render on the chart (last 150)
   const ohlcv = (seriesData || []).slice(-150);
 
-  // 3) Fetch Finnhub fundamental data for stocks
-  let finnhubData = null;
-  if (assetClass === "stock") {
-    try {
-      const finnhubRes = await fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/finnhub-data', {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          symbol, 
-          asset: assetClass, 
-          dataType: "all" // Get profile, metrics, and financials
-        })
-      });
-      
-      if (finnhubRes.ok) {
-        const finnhubResult = await finnhubRes.json();
-        if (finnhubResult.success) {
-          finnhubData = finnhubResult.data;
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to fetch Finnhub data:', error);
-      // Continue without fundamental data
-    }
-  }
-
-  // 4) Call backend to analyze (do NOT call OpenAI from browser)
+  // 3) Call backend to analyze (do NOT call OpenAI from browser)
   const res = await fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/ai-generate-analysis', {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ symbol, asset: assetClass, timeframe, ohlcv, snapshotBase64, finnhubData })
+    body: JSON.stringify({ symbol, asset: assetClass, timeframe, ohlcv, snapshotBase64 })
   });
 
   let json: any = null;

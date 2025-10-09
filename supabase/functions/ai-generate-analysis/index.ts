@@ -29,7 +29,7 @@ serve(async (req) => {
       });
     }
 
-    const { symbol, asset, timeframe, ohlcv = [], snapshotBase64, finnhubData } = await req.json();
+    const { symbol, asset, timeframe, ohlcv = [], snapshotBase64 } = await req.json();
 
     if (!Array.isArray(ohlcv) || ohlcv.length < 30) {
       return new Response(JSON.stringify({ 
@@ -53,21 +53,12 @@ serve(async (req) => {
 
     const system = `You are a cautious trading analyst. Use ONLY provided OHLCV. Do NOT invent values. If uncertain, return status="insufficient_data".`;
 
-    // Build fundamental data context for AI
-    let fundamentalContext = "";
-    if (finnhubData && Object.keys(finnhubData).length > 0) {
-      fundamentalContext = `
-
-FUNDAMENTAL DATA (Finnhub):
-${JSON.stringify(finnhubData, null, 2)}`;
-    }
-
     const userText = `
 Instrument: ${symbol} (${asset})
 Timeframe: ${timeframe}
 Columns: t(ms),o,h,l,c,v
 Data (most recent last):
-${rows}${fundamentalContext}
+${rows}
 
 Return ONLY valid JSON in this exact schema:
 {
