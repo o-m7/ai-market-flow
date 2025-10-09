@@ -32,6 +32,21 @@ interface QuantResponse {
   vwap?: number | null;
   tail?: { t: number; c: number }[];
   summary?: string;
+  // Advanced quantitative metrics
+  quant_metrics: {
+    sharpe_ratio: number | null;
+    sortino_ratio: number | null;
+    alpha: number | null;
+    beta: number | null;
+    std_dev: number;
+    population_std_dev: number;
+    sample_std_dev: number;
+    skewness: number | null;
+    kurtosis: number | null;
+    max_drawdown: number | null;
+    calmar_ratio: number | null;
+    information_ratio: number | null;
+  };
 }
 
 // Technical indicator calculations
@@ -180,6 +195,244 @@ function calculateZScore(prices: number[], period = 20): number | null {
   return (currentPrice - mean) / stdDev;
 }
 
+// Standard Deviation (population)
+function calculatePopulationStdDev(prices: number[], period = 20): number {
+  if (prices.length < period) return 0;
+  const recentPrices = prices.slice(-period);
+  const mean = recentPrices.reduce((sum, price) => sum + price, 0) / period;
+  const variance = recentPrices.reduce((sum, price) => sum + Math.pow(price - mean, 2), 0) / period;
+  return Math.sqrt(variance);
+}
+
+// Standard Deviation (sample)
+function calculateSampleStdDev(prices: number[], period = 20): number {
+  if (prices.length < 2) return 0;
+  const recentPrices = prices.slice(-period);
+  const n = recentPrices.length;
+  const mean = recentPrices.reduce((sum, price) => sum + price, 0) / n;
+  const variance = recentPrices.reduce((sum, price) => sum + Math.pow(price - mean, 2), 0) / (n - 1);
+  return Math.sqrt(variance);
+}
+
+// Sharpe Ratio (annualized, assuming risk-free rate = 0)
+function calculateSharpeRatio(prices: number[], period = 252): number | null {
+  if (prices.length < 2) return null;
+  
+  const returns = [];
+  for (let i = 1; i < prices.length; i++) {
+    returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+  }
+  
+  const recentReturns = returns.slice(-period);
+  const avgReturn = recentReturns.reduce((sum, ret) => sum + ret, 0) / recentReturns.length;
+  const stdDev = calculateSampleStdDev(recentReturns.map((r, i) => prices[prices.length - period + i]), period);
+  
+  if (stdDev === 0) return null;
+  
+  // Annualize: multiply by sqrt(252) for daily data
+  const annualizedReturn = avgReturn * 252;
+  const annualizedStdDev = stdDev * Math.sqrt(252);
+  
+  return annualizedReturn / annualizedStdDev;
+}
+
+// Sortino Ratio (downside deviation only)
+function calculateSortinoRatio(prices: number[], period = 252, targetReturn = 0): number | null {
+  if (prices.length < 2) return null;
+  
+  const returns = [];
+  for (let i = 1; i < prices.length; i++) {
+    returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+  }
+  
+  const recentReturns = returns.slice(-period);
+  const avgReturn = recentReturns.reduce((sum, ret) => sum + ret, 0) / recentReturns.length;
+  
+  // Calculate downside deviation (only negative returns)
+  const downsideReturns = recentReturns.filter(r => r < targetReturn);
+  if (downsideReturns.length === 0) return null;
+  
+  const downsideVariance = downsideReturns.reduce((sum, ret) => sum + Math.pow(ret - targetReturn, 2), 0) / downsideReturns.length;
+  const downsideDeviation = Math.sqrt(downsideVariance);
+  
+  if (downsideDeviation === 0) return null;
+  
+  // Annualize
+  const annualizedReturn = avgReturn * 252;
+  const annualizedDownsideDev = downsideDeviation * Math.sqrt(252);
+  
+  return annualizedReturn / annualizedDownsideDev;
+}
+
+// Alpha (excess return vs benchmark - using S&P 500 approximation)
+function calculateAlpha(prices: number[], benchmarkPrices: number[], period = 252): number | null {
+  if (prices.length < 2 || benchmarkPrices.length < 2) return null;
+  
+  const returns = [];
+  const benchmarkReturns = [];
+  
+  const minLength = Math.min(prices.length, benchmarkPrices.length);
+  for (let i = 1; i < minLength; i++) {
+    returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+    benchmarkReturns.push((benchmarkPrices[i] - benchmarkPrices[i - 1]) / benchmarkPrices[i - 1]);
+  }
+  
+  const recentReturns = returns.slice(-period);
+  const recentBenchmarkReturns = benchmarkReturns.slice(-period);
+  
+  const avgReturn = recentReturns.reduce((sum, ret) => sum + ret, 0) / recentReturns.length;
+  const avgBenchmarkReturn = recentBenchmarkReturns.reduce((sum, ret) => sum + ret, 0) / recentBenchmarkReturns.length;
+  
+  // Annualize
+  return (avgReturn - avgBenchmarkReturn) * 252;
+}
+
+// Beta (correlation to benchmark)
+function calculateBeta(prices: number[], benchmarkPrices: number[], period = 252): number | null {
+  if (prices.length < 2 || benchmarkPrices.length < 2) return null;
+  
+  const returns = [];
+  const benchmarkReturns = [];
+  
+  const minLength = Math.min(prices.length, benchmarkPrices.length);
+  for (let i = 1; i < minLength; i++) {
+    returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+    benchmarkReturns.push((benchmarkPrices[i] - benchmarkPrices[i - 1]) / benchmarkPrices[i - 1]);
+  }
+  
+  const recentReturns = returns.slice(-period);
+  const recentBenchmarkReturns = benchmarkReturns.slice(-period);
+  
+  const avgReturn = recentReturns.reduce((sum, ret) => sum + ret, 0) / recentReturns.length;
+  const avgBenchmarkReturn = recentBenchmarkReturns.reduce((sum, ret) => sum + ret, 0) / recentBenchmarkReturns.length;
+  
+  // Covariance
+  let covariance = 0;
+  for (let i = 0; i < recentReturns.length; i++) {
+    covariance += (recentReturns[i] - avgReturn) * (recentBenchmarkReturns[i] - avgBenchmarkReturn);
+  }
+  covariance /= recentReturns.length;
+  
+  // Variance of benchmark
+  const benchmarkVariance = recentBenchmarkReturns.reduce((sum, ret) => 
+    sum + Math.pow(ret - avgBenchmarkReturn, 2), 0) / recentBenchmarkReturns.length;
+  
+  if (benchmarkVariance === 0) return null;
+  
+  return covariance / benchmarkVariance;
+}
+
+// Skewness (asymmetry of distribution)
+function calculateSkewness(prices: number[], period = 20): number | null {
+  if (prices.length < period) return null;
+  
+  const recentPrices = prices.slice(-period);
+  const n = recentPrices.length;
+  const mean = recentPrices.reduce((sum, price) => sum + price, 0) / n;
+  const stdDev = calculateSampleStdDev(recentPrices, period);
+  
+  if (stdDev === 0) return 0;
+  
+  const skewness = recentPrices.reduce((sum, price) => 
+    sum + Math.pow((price - mean) / stdDev, 3), 0) / n;
+  
+  return skewness;
+}
+
+// Kurtosis (tailedness of distribution)
+function calculateKurtosis(prices: number[], period = 20): number | null {
+  if (prices.length < period) return null;
+  
+  const recentPrices = prices.slice(-period);
+  const n = recentPrices.length;
+  const mean = recentPrices.reduce((sum, price) => sum + price, 0) / n;
+  const stdDev = calculateSampleStdDev(recentPrices, period);
+  
+  if (stdDev === 0) return 0;
+  
+  const kurtosis = recentPrices.reduce((sum, price) => 
+    sum + Math.pow((price - mean) / stdDev, 4), 0) / n;
+  
+  // Excess kurtosis (subtract 3 for normal distribution baseline)
+  return kurtosis - 3;
+}
+
+// Maximum Drawdown
+function calculateMaxDrawdown(prices: number[]): number | null {
+  if (prices.length < 2) return null;
+  
+  let maxDrawdown = 0;
+  let peak = prices[0];
+  
+  for (const price of prices) {
+    if (price > peak) {
+      peak = price;
+    }
+    const drawdown = (peak - price) / peak;
+    if (drawdown > maxDrawdown) {
+      maxDrawdown = drawdown;
+    }
+  }
+  
+  return maxDrawdown;
+}
+
+// Calmar Ratio (return / max drawdown)
+function calculateCalmarRatio(prices: number[], period = 252): number | null {
+  if (prices.length < 2) return null;
+  
+  const returns = [];
+  for (let i = 1; i < prices.length; i++) {
+    returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+  }
+  
+  const recentReturns = returns.slice(-period);
+  const avgReturn = recentReturns.reduce((sum, ret) => sum + ret, 0) / recentReturns.length;
+  const annualizedReturn = avgReturn * 252;
+  
+  const recentPrices = prices.slice(-period);
+  const maxDD = calculateMaxDrawdown(recentPrices);
+  
+  if (!maxDD || maxDD === 0) return null;
+  
+  return annualizedReturn / maxDD;
+}
+
+// Information Ratio (excess return / tracking error)
+function calculateInformationRatio(prices: number[], benchmarkPrices: number[], period = 252): number | null {
+  if (prices.length < 2 || benchmarkPrices.length < 2) return null;
+  
+  const returns = [];
+  const benchmarkReturns = [];
+  
+  const minLength = Math.min(prices.length, benchmarkPrices.length);
+  for (let i = 1; i < minLength; i++) {
+    returns.push((prices[i] - prices[i - 1]) / prices[i - 1]);
+    benchmarkReturns.push((benchmarkPrices[i] - benchmarkPrices[i - 1]) / benchmarkPrices[i - 1]);
+  }
+  
+  const recentReturns = returns.slice(-period);
+  const recentBenchmarkReturns = benchmarkReturns.slice(-period);
+  
+  // Calculate excess returns
+  const excessReturns = recentReturns.map((r, i) => r - recentBenchmarkReturns[i]);
+  const avgExcessReturn = excessReturns.reduce((sum, ret) => sum + ret, 0) / excessReturns.length;
+  
+  // Tracking error (std dev of excess returns)
+  const trackingError = calculateSampleStdDev(
+    excessReturns.map((r, i) => recentReturns[i]), 
+    Math.min(period, excessReturns.length)
+  );
+  
+  if (trackingError === 0) return null;
+  
+  // Annualize
+  const annualizedExcessReturn = avgExcessReturn * 252;
+  const annualizedTrackingError = trackingError * Math.sqrt(252);
+  
+  return annualizedExcessReturn / annualizedTrackingError;
+}
+
 async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: string): Promise<CandleData[]> {
   const timeframes: Record<string, string> = {
     '1m': '1/minute',
@@ -295,6 +548,29 @@ serve(async (req) => {
     const zscore20 = calculateZScore(prices, 20);
     const vwap = calculateVWAP(candles);
 
+    // Fetch benchmark data (S&P 500 proxy) for alpha/beta calculations
+    let benchmarkPrices: number[] = [];
+    try {
+      const spyCandles = await fetchPolygonData('SPY', tf, polygonApiKey);
+      benchmarkPrices = spyCandles.map(c => c.c);
+    } catch (e) {
+      console.log('Benchmark data unavailable, alpha/beta will be null');
+    }
+
+    // Calculate advanced quantitative metrics
+    const sharpe_ratio = calculateSharpeRatio(prices, Math.min(252, prices.length));
+    const sortino_ratio = calculateSortinoRatio(prices, Math.min(252, prices.length));
+    const alpha = benchmarkPrices.length > 0 ? calculateAlpha(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
+    const beta = benchmarkPrices.length > 0 ? calculateBeta(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
+    const std_dev = calculateSampleStdDev(prices, 20);
+    const population_std_dev = calculatePopulationStdDev(prices, 20);
+    const sample_std_dev = calculateSampleStdDev(prices, 20);
+    const skewness = calculateSkewness(prices, 20);
+    const kurtosis = calculateKurtosis(prices, 20);
+    const max_drawdown = calculateMaxDrawdown(prices);
+    const calmar_ratio = calculateCalmarRatio(prices, Math.min(252, prices.length));
+    const information_ratio = benchmarkPrices.length > 0 ? calculateInformationRatio(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
+
     // Create tail data (last 50 points for sparkline)
     const tail = candles.slice(-50).map(c => ({ t: c.t, c: c.c }));
 
@@ -334,7 +610,21 @@ serve(async (req) => {
       zscore20,
       vwap,
       tail,
-      summary
+      summary,
+      quant_metrics: {
+        sharpe_ratio,
+        sortino_ratio,
+        alpha,
+        beta,
+        std_dev,
+        population_std_dev,
+        sample_std_dev,
+        skewness,
+        kurtosis,
+        max_drawdown,
+        calmar_ratio,
+        information_ratio,
+      }
     };
 
     return new Response(JSON.stringify(response), {

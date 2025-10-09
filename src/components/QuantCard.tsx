@@ -29,6 +29,20 @@ interface QuantResponse {
   vwap?: number | null;
   tail?: { t: number; c: number }[];
   summary?: string;
+  quant_metrics?: {
+    sharpe_ratio: number | null;
+    sortino_ratio: number | null;
+    alpha: number | null;
+    beta: number | null;
+    std_dev: number;
+    population_std_dev: number;
+    sample_std_dev: number;
+    skewness: number | null;
+    kurtosis: number | null;
+    max_drawdown: number | null;
+    calmar_ratio: number | null;
+    information_ratio: number | null;
+  };
 }
 
 const TF_OPTIONS = [
@@ -243,6 +257,42 @@ export default function QuantCard({ symbol: initialSymbol = "BTCUSD" }: { symbol
             <IndicatorCard title="VWAP (session)" icon={<LineChart className="h-4 w-4" />}
               items={[{ k: "VWAP", v: data?.vwap }]}
             />
+          )}
+
+          {data?.quant_metrics && (
+            <>
+              <IndicatorCard title="Risk-Adjusted Returns" icon={<Gauge className="h-4 w-4" />}
+                items={[
+                  { k: "Sharpe Ratio", v: data.quant_metrics.sharpe_ratio },
+                  { k: "Sortino Ratio", v: data.quant_metrics.sortino_ratio },
+                  { k: "Calmar Ratio", v: data.quant_metrics.calmar_ratio },
+                  { k: "Information Ratio", v: data.quant_metrics.information_ratio },
+                ]}
+              />
+
+              <IndicatorCard title="Alpha & Beta" icon={<TrendingUp className="h-4 w-4" />}
+                items={[
+                  { k: "Alpha (vs SPY)", v: data.quant_metrics.alpha },
+                  { k: "Beta (vs SPY)", v: data.quant_metrics.beta },
+                ]}
+              />
+
+              <IndicatorCard title="Distribution" icon={<Waves className="h-4 w-4" />}
+                items={[
+                  { k: "Std Dev (σ)", v: data.quant_metrics.std_dev },
+                  { k: "Population σ", v: data.quant_metrics.population_std_dev },
+                  { k: "Sample σ", v: data.quant_metrics.sample_std_dev },
+                  { k: "Skewness", v: data.quant_metrics.skewness },
+                  { k: "Kurtosis", v: data.quant_metrics.kurtosis },
+                ]}
+              />
+
+              <IndicatorCard title="Drawdown" icon={<TrendingDown className="h-4 w-4" />}
+                items={[
+                  { k: "Max Drawdown", v: data.quant_metrics.max_drawdown ? data.quant_metrics.max_drawdown * 100 : null },
+                ]}
+              />
+            </>
           )}
         </div>
 
