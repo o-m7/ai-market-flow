@@ -520,25 +520,42 @@ ANALYSIS REQUIREMENTS - Provide COMPREHENSIVE institutional-grade analysis:
    C) MOMENTUM: MACD bullish/bearish crossovers, RSI breakouts above 70 or below 30, volume confirmation on directional moves.
    D) RANGE TRADING: Support/resistance level trades, range-bound oscillator signals, mean reversion within established ranges.
 
-5. MULTI-TIMEFRAME SETUPS - Professional entry zones:
+5. MULTI-TIMEFRAME SETUPS - **CRITICAL: YOU MUST PROVIDE ALL THREE SIGNAL TYPES**:
    
-   SCALP (1-15min timeframe):
+   🚨 MANDATORY: Your response MUST include timeframe_profile with ALL THREE signal types:
+   - scalp (required)
+   - intraday (required)  
+   - swing (required)
+   
+   Each signal type MUST include:
+   - entry: exact price (number)
+   - stop: exact stop loss price (number)
+   - targets: array of 2-3 target prices ([number, number, number])
+   - strategy: strategy description (string)
+   - probability: confidence percentage (number, 0-100)
+   
+   SCALP (1-15min timeframe) - REQUIRED:
    - Entry: Nearest support/resistance bounce or micro-breakout level
    - Look for: 5-15min chart patterns, VWAP touches, EMA bounces
-   - Entry can be limit orders at key micro levels within 1-2% of current price
+   - Entry can be limit orders at key micro levels within 1-2% of current price ${livePrice}
+   - Tight stop (0.3-0.7% of price), quick targets (0.5-1.5% moves)
+   - Example LONG scalp: entry=${(livePrice * 0.995).toFixed(2)}, stop=${(livePrice * 0.990).toFixed(2)}, targets=[${(livePrice * 1.005).toFixed(2)}, ${(livePrice * 1.010).toFixed(2)}, ${(livePrice * 1.015).toFixed(2)}]
    
-   INTRADAY (30min-4h timeframe):  
+   INTRADAY (30min-4h timeframe) - REQUIRED:  
    - Entry: Session highs/lows, hourly chart patterns, major EMA levels
    - Look for: 1h/4h support/resistance, Fibonacci retracements, VWAP deviation
    - Entry can be 2-4% away waiting for pullback/rally to key level
+   - Moderate stop (1-2% of price), same-day targets (2-5% moves)
+   - Example LONG intraday: entry=${(livePrice * 0.98).toFixed(2)}, stop=${(livePrice * 0.97).toFixed(2)}, targets=[${(livePrice * 1.02).toFixed(2)}, ${(livePrice * 1.04).toFixed(2)}, ${(livePrice * 1.06).toFixed(2)}]
    
-   SWING (Daily+ timeframe):
+   SWING (Daily+ timeframe) - REQUIRED:
    - Entry: Daily support/resistance, weekly pivots, major Fibonacci levels
    - Look for: Daily chart patterns, multi-day consolidation breakouts
    - Entry can be 3-5% away waiting for ideal technical setup
+   - Wider stop (2-4% of price), multi-day targets (5-15% moves)
+   - Example LONG swing: entry=${(livePrice * 0.97).toFixed(2)}, stop=${(livePrice * 0.95).toFixed(2)}, targets=[${(livePrice * 1.05).toFixed(2)}, ${(livePrice * 1.10).toFixed(2)}, ${(livePrice * 1.15).toFixed(2)}]
    
-   Example for LONG bias: If ${livePrice} is current and nearest support is at ${Math.round(livePrice * 0.97)}, 
-   use ${Math.round(livePrice * 0.97)} as swing entry (not forcing entry at ${livePrice})
+   ⚠️ CRITICAL: All three signal types must follow the same direction (long or short) but with different entry levels and targets appropriate to their holding period.
 
 6. RISK-REWARD ANALYSIS: 
    - Stop loss at recent structure invalidation point (swing low/high + ATR buffer)
