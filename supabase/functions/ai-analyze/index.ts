@@ -1138,6 +1138,52 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       console.log(`[VALIDATION] 🔧 Entry correction applied and logged in response`);
     }
 
+    // ==================== STORE ANALYSIS FOR BACKTESTING ====================
+    console.log(`[BACKTESTING] 💾 Storing analysis in database for historical tracking...`);
+    
+    try {
+      // Initialize Supabase client
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      if (supabaseUrl && supabaseKey) {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.39.3');
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        const tradeIdea = parsed.trade_idea;
+        if (tradeIdea && tradeIdea.entry && tradeIdea.stop) {
+          const { error: insertError } = await supabase
+            .from('trade_analyses')
+            .insert({
+              symbol,
+              timeframe,
+              market,
+              direction: tradeIdea.direction || 'long',
+              entry_price: tradeIdea.entry,
+              stop_price: tradeIdea.stop,
+              target1_price: tradeIdea.target1 || null,
+              target2_price: tradeIdea.target2 || null,
+              target3_price: tradeIdea.target3 || null,
+              current_price_at_analysis: livePrice,
+              confidence: parsed.confidence_calibrated || 50,
+              signal_confidence_agreement: signal_confidence_agreement,
+              overall_accuracy: overall_accuracy,
+              analysis_data: result,
+              outcome: 'PENDING'
+            });
+          
+          if (insertError) {
+            console.error('[BACKTESTING] ❌ Failed to store analysis:', insertError);
+          } else {
+            console.log('[BACKTESTING] ✅ Analysis stored successfully for backtesting');
+          }
+        }
+      }
+    } catch (dbError) {
+      console.error('[BACKTESTING] ❌ Error storing analysis:', dbError);
+      // Don't fail the request if storage fails
+    }
+
     console.log(`[ai-analyze] Deterministic analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);
     
     return new Response(JSON.stringify(result), {

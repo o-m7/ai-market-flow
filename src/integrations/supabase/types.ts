@@ -83,6 +83,84 @@ export type Database = {
         }
         Relationships: []
       }
+      trade_analyses: {
+        Row: {
+          analysis_data: Json
+          checked_at: string | null
+          confidence: number
+          created_at: string
+          current_price_at_analysis: number
+          direction: string
+          entry_price: number
+          hours_to_outcome: number | null
+          id: string
+          market: string
+          outcome: string | null
+          outcome_price: number | null
+          outcome_time: string | null
+          overall_accuracy: number | null
+          pnl_percentage: number | null
+          signal_confidence_agreement: number | null
+          stop_price: number
+          symbol: string
+          target_hit: number | null
+          target1_price: number | null
+          target2_price: number | null
+          target3_price: number | null
+          timeframe: string
+        }
+        Insert: {
+          analysis_data: Json
+          checked_at?: string | null
+          confidence: number
+          created_at?: string
+          current_price_at_analysis: number
+          direction: string
+          entry_price: number
+          hours_to_outcome?: number | null
+          id?: string
+          market: string
+          outcome?: string | null
+          outcome_price?: number | null
+          outcome_time?: string | null
+          overall_accuracy?: number | null
+          pnl_percentage?: number | null
+          signal_confidence_agreement?: number | null
+          stop_price: number
+          symbol: string
+          target_hit?: number | null
+          target1_price?: number | null
+          target2_price?: number | null
+          target3_price?: number | null
+          timeframe: string
+        }
+        Update: {
+          analysis_data?: Json
+          checked_at?: string | null
+          confidence?: number
+          created_at?: string
+          current_price_at_analysis?: number
+          direction?: string
+          entry_price?: number
+          hours_to_outcome?: number | null
+          id?: string
+          market?: string
+          outcome?: string | null
+          outcome_price?: number | null
+          outcome_time?: string | null
+          overall_accuracy?: number | null
+          pnl_percentage?: number | null
+          signal_confidence_agreement?: number | null
+          stop_price?: number
+          symbol?: string
+          target_hit?: number | null
+          target1_price?: number | null
+          target2_price?: number | null
+          target3_price?: number | null
+          timeframe?: string
+        }
+        Relationships: []
+      }
       user_usage: {
         Row: {
           analysis_count: number
@@ -115,7 +193,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_historical_accuracy: {
+        Args: { p_days?: number; p_symbol: string }
+        Returns: {
+          accuracy_percentage: number
+          avg_hours_to_target: number
+          avg_pnl_on_wins: number
+          pending_count: number
+          stop_hit_count: number
+          symbol: string
+          target_hit_count: number
+          total_analyses: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

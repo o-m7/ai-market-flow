@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Target, AlertTriangle, Clock, TrendingUp, TrendingDown, Activity } from "lucide-react";
+import { Brain, Target, AlertTriangle, Clock, TrendingUp, TrendingDown, Activity, Award } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { useHistoricalAccuracy } from "@/hooks/useHistoricalAccuracy";
 
 interface AnalysisResultsProps {
   data: any;
@@ -12,6 +13,9 @@ interface AnalysisResultsProps {
 export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
   // Log the data structure for debugging
   console.log('AnalysisResults data:', data);
+  
+  // Fetch historical accuracy for this symbol
+  const { data: historicalData } = useHistoricalAccuracy(symbol, 30);
   
   const getRecommendationColor = (rec: string) => {
     switch (rec) {
@@ -38,6 +42,65 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4"
     >
+      {/* Historical Accuracy Banner */}
+      {historicalData && historicalData.total_analyses > 0 && (
+        <Card className="bg-gradient-to-r from-terminal-accent/10 to-terminal-green/10 border-2 border-terminal-accent">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Award className="h-6 w-6 text-terminal-accent" />
+                <div>
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">
+                    HISTORICAL ACCURACY (LAST 30 DAYS)
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className={`text-3xl font-mono-tabular font-bold ${
+                      historicalData.accuracy_percentage >= 70 ? 'text-terminal-green' :
+                      historicalData.accuracy_percentage >= 50 ? 'text-terminal-accent' :
+                      'text-terminal-red'
+                    }`}>
+                      {historicalData.accuracy_percentage}%
+                    </span>
+                    <span className="text-sm font-mono-tabular text-terminal-secondary">
+                      ({historicalData.target_hit_count}/{historicalData.target_hit_count + historicalData.stop_hit_count} wins)
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4 text-right">
+                <div>
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TOTAL TRADES</div>
+                  <div className="text-xl font-mono-tabular font-bold text-terminal-text">
+                    {historicalData.total_analyses}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">AVG TIME</div>
+                  <div className="text-xl font-mono-tabular font-bold text-terminal-text">
+                    {historicalData.avg_hours_to_target ? `${historicalData.avg_hours_to_target.toFixed(1)}h` : '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">AVG WIN</div>
+                  <div className="text-xl font-mono-tabular font-bold text-terminal-green">
+                    {historicalData.avg_pnl_on_wins ? `+${historicalData.avg_pnl_on_wins.toFixed(2)}%` : '—'}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {historicalData.pending_count > 0 && (
+              <div className="mt-3 pt-3 border-t border-terminal-border/30">
+                <p className="text-xs font-mono-tabular text-terminal-secondary">
+                  📊 {historicalData.pending_count} trade(s) still pending • System checks outcomes every hour
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header Card - Action & Confidence */}
       <Card className="bg-terminal border-terminal-border">
         <CardHeader className="bg-terminal-darker border-b border-terminal-border">
