@@ -620,7 +620,7 @@ async function fetchPolygonIndicators(symbol: string, tf: string, polygonApiKey:
   };
 }
 
-async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: string): Promise<CandleData[]> {
+async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: string): Promise<{ candles: CandleData[], livePrice: number | null, snapshotTime: string | null }> {
   // Use the unified polygon-chart-data function for consistent, fresh data
   const tfMap: Record<string, string> = {
     '1m': '1m',
@@ -637,7 +637,7 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   const isCrypto = cryptoPairs.some(pair => symbol.startsWith(pair)) && symbol.endsWith('USD');
   const asset = isCrypto ? 'crypto' : 'stock';
   
-  console.log(`📊 Fetching data via polygon-chart-data: ${symbol} (${asset}), timeframe=${timeframe}`);
+  console.log(`📊 Fetching LIVE data via polygon-chart-data: ${symbol} (${asset}), timeframe=${timeframe}`);
   
   // Call the polygon-chart-data edge function
   const response = await fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data', {
@@ -666,11 +666,16 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
     throw new Error(`No data available for ${symbol}`);
   }
   
+  // Extract live snapshot price (the most current real-time price)
+  const livePrice = data.snapshotLastTrade || null;
+  const snapshotTime = data.snapshotTimeUTC || null;
+  
   console.log(`✅ Received ${data.candles.length} fresh candles from polygon-chart-data`);
-  console.log(`📊 Latest: ${data.lastTimeUTC} (${data.candles[data.candles.length - 1].c})`);
+  console.log(`📊 Last candle: ${data.lastTimeUTC} (close: ${data.candles[data.candles.length - 1].c})`);
+  console.log(`🔴 LIVE PRICE: ${livePrice} @ ${snapshotTime}`);
   
   // Transform to expected format
-  return data.candles.map((c: any) => ({
+  const candles = data.candles.map((c: any) => ({
     t: c.t,
     o: c.o,
     h: c.h,
@@ -678,6 +683,8 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
     c: c.c,
     v: c.v
   }));
+  
+  return { candles, livePrice, snapshotTime };
 }
 
 async function generateSummary(symbol: string, indicators: any, openaiKey: string): Promise<string> {
@@ -735,8 +742,8 @@ serve(async (req) => {
 
     console.log(`[QUANT-DATA v2024.10.09] Fetching quant data for ${symbol}, timeframe: ${tf}, withSummary: ${withSummary}`);
 
-    // Fetch market data with fresh timestamps
-    const candles = await fetchPolygonData(symbol, tf, polygonApiKey);
+    // Fetch market data with fresh timestamps and live price
+    const { candles, livePrice, snapshotTime } = await fetchPolygonData(symbol, tf, polygonApiKey);
     if (candles.length === 0) {
       throw new Error('No market data available');
     }
@@ -768,14 +775,16 @@ serve(async (req) => {
     }
 
     const prices = candles.map(c => c.c);
-    const currentPrice = prices[prices.length - 1];
+    
+    // Use LIVE snapshot price if available, otherwise fall back to last candle close
+    const currentPrice = livePrice || prices[prices.length - 1];
     const prevClose = prices.length > 1 ? prices[prices.length - 2] : null;
     
     // Log the actual candle timestamps to debug old data issue
     const firstCandleTime = new Date(candles[0].t).toISOString();
     const lastCandleTime = new Date(candles[candles.length - 1].t).toISOString();
-    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${currentPrice}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
-    console.log(`💰 Current price from latest candle: ${currentPrice}, Prev close: ${prevClose}`);
+    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${prices[prices.length - 1]}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
+    console.log(`💰 LIVE CURRENT PRICE: ${currentPrice} @ ${snapshotTime || 'N/A'} | Last candle close: ${prices[prices.length - 1]} | Prev close: ${prevClose}`);
 
     // Calculate technical indicators (use Polygon indicators if available)
     const ema20 = calculateEMA(prices, 20);
@@ -797,7 +806,7 @@ serve(async (req) => {
     // Fetch benchmark data (S&P 500 proxy) for alpha/beta calculations
     let benchmarkPrices: number[] = [];
     try {
-      const spyCandles = await fetchPolygonData('SPY', tf, polygonApiKey);
+      const { candles: spyCandles } = await fetchPolygonData('SPY', tf, polygonApiKey);
       benchmarkPrices = spyCandles.map(c => c.c);
     } catch (e) {
       console.log('Benchmark data unavailable, alpha/beta will be null');
@@ -853,8 +862,8 @@ serve(async (req) => {
     const response: QuantResponse = {
       symbol,
       tf,
-      asOf: new Date(candles[candles.length - 1].t).toISOString(), // Use actual latest candle timestamp
-      price: currentPrice,
+      asOf: snapshotTime || new Date(candles[candles.length - 1].t).toISOString(), // Use live snapshot time if available
+      price: currentPrice, // This is now the LIVE price from snapshot
       prevClose,
       ema: {
         '20': ema20,
@@ -889,6 +898,7 @@ serve(async (req) => {
       }
     };
 
+    console.log(`✅ Using LIVE PRICE: ${currentPrice} @ ${snapshotTime}`);
     console.log('Quant metrics calculated:', JSON.stringify(response.quant_metrics, null, 2));
 
     return new Response(JSON.stringify(response), {
