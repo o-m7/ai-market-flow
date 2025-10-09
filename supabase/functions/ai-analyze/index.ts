@@ -452,7 +452,7 @@ Analyze the data objectively and provide signals that follow what the market is 
     // Add timeout wrapper for OpenAI call
     const openaiTimeout = 60000; // 60 second timeout for OpenAI
     const openaiPromise = client.chat.completions.create({
-      model: "gpt-4o-mini", // Use faster model to reduce latency
+      model: "gpt-4o", // Reliable model with good access
       messages: [
         { 
           role: "system", 
