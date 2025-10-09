@@ -513,17 +513,15 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const symbol = url.searchParams.get('symbol') || 'BTCUSD';
-    const tf = url.searchParams.get('tf') || '1h';
-    const withSummary = url.searchParams.get('withSummary') === 'true';
+    // Parse request body
+    const { symbol = 'BTCUSD', tf = '1h', withSummary = false } = await req.json();
 
     const polygonApiKey = Deno.env.get('POLYGON_API_KEY');
     if (!polygonApiKey) {
       throw new Error('POLYGON_API_KEY not configured');
     }
 
-    console.log(`Fetching quant data for ${symbol}, timeframe: ${tf}`);
+    console.log(`Fetching quant data for ${symbol}, timeframe: ${tf}, withSummary: ${withSummary}`);
 
     // Fetch market data
     const candles = await fetchPolygonData(symbol, tf, polygonApiKey);
@@ -626,6 +624,8 @@ serve(async (req) => {
         information_ratio,
       }
     };
+
+    console.log('Quant metrics calculated:', JSON.stringify(response.quant_metrics, null, 2));
 
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
