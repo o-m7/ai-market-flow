@@ -143,60 +143,6 @@ const InstitutionalTaResultSchema = {
         },
         required: ["pivot_high", "pivot_low", "retracements", "extensions", "direction", "confluence_zones"]
       },
-      trading_strategies: {
-        type: "object",
-        properties: {
-          trend_following: {
-            type: "object",
-            properties: {
-              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              probability: { type: "number", minimum: 0, maximum: 100 },
-              rationale: { type: "string" }
-            },
-            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
-          },
-          mean_reversion: {
-            type: "object",
-            properties: {
-              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              probability: { type: "number", minimum: 0, maximum: 100 },
-              rationale: { type: "string" }
-            },
-            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
-          },
-          momentum: {
-            type: "object",
-            properties: {
-              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              probability: { type: "number", minimum: 0, maximum: 100 },
-              rationale: { type: "string" }
-            },
-            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
-          },
-          range_trading: {
-            type: "object",
-            properties: {
-              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              probability: { type: "number", minimum: 0, maximum: 100 },
-              rationale: { type: "string" }
-            },
-            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
-          }
-        },
-        required: ["trend_following", "mean_reversion", "momentum", "range_trading"]
-      },
       trade_idea: {
         type: "object",
         properties: {
@@ -251,45 +197,6 @@ const InstitutionalTaResultSchema = {
       confidence_calibrated: { type: "number", minimum: 0, maximum: 100 },
       evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence for analysis" },
       risks: { type: "string", description: "Risk assessment and mitigation strategies" },
-      timeframe_profile: {
-        type: "object",
-        properties: {
-          scalp: {
-            type: "object",
-            properties: {
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              strategy: { type: "string" },
-              probability: { type: "number" }
-            },
-            required: ["entry", "stop", "targets", "strategy", "probability"]
-          },
-          intraday: {
-            type: "object",
-            properties: {
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              strategy: { type: "string" },
-              probability: { type: "number" }
-            },
-            required: ["entry", "stop", "targets", "strategy", "probability"]
-          },
-          swing: {
-            type: "object",
-            properties: {
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              strategy: { type: "string" },
-              probability: { type: "number" }
-            },
-            required: ["entry", "stop", "targets", "strategy", "probability"]
-          }
-        },
-        required: ["scalp", "intraday", "swing"]
-      },
       accuracy_metrics: {
         type: "object",
         properties: {
@@ -306,8 +213,8 @@ const InstitutionalTaResultSchema = {
     },
     required: [
       "summary", "action", "action_text", "outlook", "market_structure", "levels", "fibonacci", 
-      "trading_strategies", "trade_idea", "technical", 
-      "confidence_model", "confidence_calibrated", "evidence", "risks", "timeframe_profile", 
+      "trade_idea", "technical", 
+      "confidence_model", "confidence_calibrated", "evidence", "risks", 
       "accuracy_metrics", "json_version"
     ]
   }
@@ -481,7 +388,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
     // Add timeout wrapper for OpenAI call
-    const openaiTimeout = 120000; // 120 second timeout for GPT-5
+    const openaiTimeout = 90000; // 90 second timeout for simplified schema
     const openaiPromise = client.chat.completions.create({
       model: "gpt-5",
       messages: [
@@ -496,11 +403,11 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_completion_tokens: 12000,
+      max_completion_tokens: 6000,
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('OpenAI API timeout after 120 seconds')), openaiTimeout);
+      setTimeout(() => reject(new Error('OpenAI API timeout after 90 seconds')), openaiTimeout);
     });
 
     const response = await Promise.race([openaiPromise, timeoutPromise]);
@@ -547,17 +454,6 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     try {
       parsed = JSON.parse(toolCall.function.arguments);
       console.log('[ai-analyze] Function call parsed successfully');
-      
-      // Log timeframe_profile to debug missing signals
-      console.log('[ai-analyze] timeframe_profile received:', JSON.stringify(parsed.timeframe_profile, null, 2));
-      if (!parsed.timeframe_profile || !parsed.timeframe_profile.scalp || !parsed.timeframe_profile.intraday || !parsed.timeframe_profile.swing) {
-        console.warn('[ai-analyze] ⚠️  Missing timeframe_profile signals!', {
-          has_timeframe_profile: !!parsed.timeframe_profile,
-          has_scalp: !!parsed.timeframe_profile?.scalp,
-          has_intraday: !!parsed.timeframe_profile?.intraday,
-          has_swing: !!parsed.timeframe_profile?.swing
-        });
-      }
     } catch (e) {
       console.error('[ai-analyze] Function arguments parse failed:', e);
       return new Response(JSON.stringify({ 
@@ -1141,14 +1037,6 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     }
 
     console.log(`[ai-analyze] Deterministic analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);
-    
-    // Verify timeframe_profile is in final response
-    console.log('[ai-analyze] Final response includes timeframe_profile:', {
-      has_timeframe_profile: !!result.timeframe_profile,
-      has_scalp: !!result.timeframe_profile?.scalp,
-      has_intraday: !!result.timeframe_profile?.intraday,
-      has_swing: !!result.timeframe_profile?.swing
-    });
     
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
