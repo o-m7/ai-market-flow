@@ -70,16 +70,25 @@ function useQuant(symbol: string, tf: string, withSummary: boolean) {
       );
 
       if (functionError) {
+        console.error('Function error:', functionError);
         throw new Error(functionError.message);
       }
 
       if (response.error) {
+        console.error('Response error:', response.error);
         throw new Error(response.error);
       }
 
+      console.log('✅ Quant data received:', {
+        symbol: response.symbol,
+        price: response.price,
+        asOf: response.asOf,
+        dataPoints: response.tail?.length || 0
+      });
       setData(response);
     } catch (e: any) {
       if (e?.name !== "AbortError") {
+        console.error('Quant fetch error:', e);
         setError(e?.message || String(e));
       }
     } finally {
@@ -306,7 +315,11 @@ export default function QuantCard({ symbol: initialSymbol = "BTCUSD" }: { symbol
 
         {/* Footer */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <div>Timeframe: <span className="font-medium">{data?.tf || tf}</span> • Updated: {formatTime(data?.asOf)}</div>
+          <div>
+            Timeframe: <span className="font-medium">{data?.tf || tf}</span> • 
+            Data timestamp: <span className="font-medium">{formatTime(data?.asOf)}</span>
+            {data && ` • ${Math.round((Date.now() - new Date(data.asOf).getTime()) / 60000)}min ago`}
+          </div>
           <div>Source: Polygon OHLCV • Indicators computed on server</div>
         </div>
       </CardContent>

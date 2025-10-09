@@ -562,6 +562,12 @@ serve(async (req) => {
     const prices = candles.map(c => c.c);
     const currentPrice = prices[prices.length - 1];
     const prevClose = prices.length > 1 ? prices[prices.length - 2] : null;
+    
+    // Log the actual candle timestamps to debug old data issue
+    const firstCandleTime = new Date(candles[0].t).toISOString();
+    const lastCandleTime = new Date(candles[candles.length - 1].t).toISOString();
+    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${currentPrice}), Total=${candles.length}`);
+    console.log(`💰 Current price from latest candle: ${currentPrice}, Prev close: ${prevClose}`);
 
     // Calculate technical indicators
     const ema20 = calculateEMA(prices, 20);
@@ -621,7 +627,7 @@ serve(async (req) => {
     const response: QuantResponse = {
       symbol,
       tf,
-      asOf: new Date().toISOString(),
+      asOf: new Date(candles[candles.length - 1].t).toISOString(), // Use actual latest candle timestamp
       price: currentPrice,
       prevClose,
       ema: {
