@@ -4,6 +4,7 @@ import { Navigation } from "@/components/Navigation";
 import TechnicalChart from "@/components/TechnicalChart";
 import { OrderBookPanel } from "@/components/OrderBookPanel";
 import { AnalysisResults } from "@/components/AnalysisResults";
+import QuantCard from "@/components/QuantCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -547,7 +548,12 @@ export const AIAnalysis = () => {
               </Card>
             )}
 
-            {analysis && <AnalysisResults data={analysis} symbol={symbol} />}
+            {analysis && (
+              <>
+                <AnalysisResults data={analysis} symbol={symbol} />
+                {includeQuantData && <QuantCard symbol={symbol} />}
+              </>
+            )}
 
             {!analysis && !loading && !aiError && (
               <Card>
