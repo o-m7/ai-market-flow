@@ -616,6 +616,17 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
     try {
       parsed = JSON.parse(toolCall.function.arguments);
       console.log('[ai-analyze] Function call parsed successfully');
+      
+      // Log timeframe_profile to debug missing signals
+      console.log('[ai-analyze] timeframe_profile received:', JSON.stringify(parsed.timeframe_profile, null, 2));
+      if (!parsed.timeframe_profile || !parsed.timeframe_profile.scalp || !parsed.timeframe_profile.intraday || !parsed.timeframe_profile.swing) {
+        console.warn('[ai-analyze] ⚠️  Missing timeframe_profile signals!', {
+          has_timeframe_profile: !!parsed.timeframe_profile,
+          has_scalp: !!parsed.timeframe_profile?.scalp,
+          has_intraday: !!parsed.timeframe_profile?.intraday,
+          has_swing: !!parsed.timeframe_profile?.swing
+        });
+      }
     } catch (e) {
       console.error('[ai-analyze] Function arguments parse failed:', e);
       return new Response(JSON.stringify({ 
@@ -1199,6 +1210,14 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
     }
 
     console.log(`[ai-analyze] Deterministic analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);
+    
+    // Verify timeframe_profile is in final response
+    console.log('[ai-analyze] Final response includes timeframe_profile:', {
+      has_timeframe_profile: !!result.timeframe_profile,
+      has_scalp: !!result.timeframe_profile?.scalp,
+      has_intraday: !!result.timeframe_profile?.intraday,
+      has_swing: !!result.timeframe_profile?.swing
+    });
     
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
