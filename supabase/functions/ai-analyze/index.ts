@@ -668,7 +668,7 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       console.log(`[VALIDATION] ✅ Data is fresh (within 2-minute crypto threshold)`);
     }
     
-    const livePrice = currentPrice || features.technical.current;
+    // Reuse livePrice from earlier in the function
     console.log(`[VALIDATION] 💰 Live Price: ${livePrice.toFixed(2)}`);
     
     // Validate entry logic relative to direction and current price
