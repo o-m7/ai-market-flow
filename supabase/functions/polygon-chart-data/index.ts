@@ -146,13 +146,19 @@ const requestData: ChartDataRequest = await req.json();
     }
 
     const results = data.results.slice(-limit);
+    
+    // === CRITICAL: Sort by timestamp to ensure newest data is last ===
+    results.sort((a: any, b: any) => a.t - b.t);
+    
     const ohlcv = results.map((b: any) => ({
       t: b.t, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v
     }));
     
     const last = ohlcv[ohlcv.length - 1];
-
-    console.log(`Successfully processed ${ohlcv.length} bars for ${providerSymbol} (source: ${source})`);
+    
+    // Log data freshness
+    const dataAgeMinutes = last ? (Date.now() - last.t) / (1000 * 60) : null;
+    console.log(`Successfully processed ${ohlcv.length} bars for ${providerSymbol} (source: ${source}), data age: ${dataAgeMinutes?.toFixed(0)}min`);
     
     if (last) {
       console.log(`Last bar: ${last.c} @ ${new Date(last.t).toISOString()}`);

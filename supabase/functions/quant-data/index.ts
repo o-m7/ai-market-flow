@@ -757,6 +757,26 @@ serve(async (req) => {
       throw new Error('No market data available');
     }
     
+    // === CRITICAL FIX: Sort candles by time and ensure we have the MOST RECENT data ===
+    // Sort ascending by timestamp (oldest to newest)
+    candles.sort((a, b) => a.t - b.t);
+    
+    // Validate that the last candle is actually recent (not old data)
+    const lastCandleTime = candles[candles.length - 1].t;
+    const nowMs = Date.now();
+    const lastCandleAge = (nowMs - lastCandleTime) / (1000 * 60); // minutes
+    
+    console.log(`📅 Data validation: Last candle at ${new Date(lastCandleTime).toISOString()} (${lastCandleAge.toFixed(0)}min ago)`);
+    
+    // If last candle is more than 2 hours old for hourly data, something is wrong
+    const maxAllowedAge = tf === '1h' || tf === '60m' ? 180 : 1440; // 3 hours for hourly, 24h for daily
+    if (lastCandleAge > maxAllowedAge) {
+      console.error(`❌ DATA TOO OLD: Last candle is ${lastCandleAge.toFixed(0)}min old, limit is ${maxAllowedAge}min`);
+      throw new Error(`Historical data is stale - last candle is ${Math.floor(lastCandleAge/60)}h old`);
+    }
+    
+    console.log(`✅ Data freshness OK: Using ${candles.length} candles ending at ${new Date(lastCandleTime).toISOString()}`);
+    
     // Try to fetch indicators from Polygon API
     const polygonIndicators = await fetchPolygonIndicators(symbol, tf, polygonApiKey);
 
