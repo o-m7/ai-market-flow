@@ -163,6 +163,18 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Add GET handler for health check
+  if (req.method === 'GET') {
+    return new Response(JSON.stringify({
+      status: 'ok',
+      version: FUNCTION_VERSION,
+      hasOpenAI: !!Deno.env.get('OPENAI_API_KEY'),
+      timestamp: new Date().toISOString()
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
   try {
     const body = await req.json().catch(() => ({}));
     const { symbol, timeframe, market, candles, currentPrice, news, quantMetrics, debug } = body || {};
