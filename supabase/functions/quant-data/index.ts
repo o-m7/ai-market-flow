@@ -21,6 +21,7 @@ interface QuantResponse {
   asOf: string;
   price: number;
   prevClose: number | null;
+  dataPoints: number;
   ema: Record<string, number>;
   rsi14: number;
   macd: { line: number; signal: number; hist: number };
@@ -63,6 +64,7 @@ interface QuantResponse {
     alpha: number | null;
     beta: number | null;
     std_dev: number;
+    variance: number;
     population_std_dev: number;
     sample_std_dev: number;
     skewness: number | null;
@@ -505,11 +507,13 @@ function generateTradingSignals(
   const majorSupport = recentLows[Math.floor(recentLows.length * 0.25)]; // 25th percentile
   const majorResistance = recentHighs[Math.floor(recentHighs.length * 0.25)];
 
-  // === STEP 3: DIFFERENT stops per timeframe based on ACTUAL levels ===
+  // === STEP 3: REALISTIC entries based on CURRENT LIVE PRICE ===
   const direction = isLong ? 'LONG' : 'SHORT';
   
-  // SCALP: Stop at nearest micro swing (NOT 0.5 ATR formula)
-  const scalpEntry = isLong ? price * 0.999 : price * 1.001;
+  // SCALP: Entry VERY close to current market price (within 0.1%)
+  const scalpEntry = isLong 
+    ? Math.min(price, price * 1.001) // At or slightly above current
+    : Math.max(price, price * 0.999); // At or slightly below current
   const scalpStop = isLong 
     ? Math.max(scalpEntry - (atr * 0.3), nearestSupport * 0.998) // Near support OR 0.3 ATR
     : Math.min(scalpEntry + (atr * 0.3), nearestResistance * 1.002);
@@ -517,21 +521,21 @@ function generateTradingSignals(
     ? [price + (atr * 0.8), price + (atr * 1.2), bb.upper * 0.998]
     : [price - (atr * 0.8), price - (atr * 1.2), bb.lower * 1.002];
   
-  // INTRADAY: Stop below swing structure (NOT 1.5 ATR formula)
+  // INTRADAY: Entry at pullback to EMA20 or current price (within 0.5%)
   const intradayEntry = isLong 
-    ? Math.min(ema20, bb.mid, price * 0.995) 
-    : Math.max(ema20, bb.mid, price * 1.005);
+    ? Math.min(price * 1.003, ema20, bb.mid) // Max 0.3% above current
+    : Math.max(price * 0.997, ema20, bb.mid); // Max 0.3% below current
   const intradayStop = isLong
     ? Math.max(intradayEntry - (atr * 1.2), majorSupport * 0.997) // At major support
     : Math.min(intradayEntry + (atr * 1.2), majorResistance * 1.003);
   const intradayTargets = isLong
-    ? [ema20 + (atr * 2), majorResistance * 0.995, bb.upper]
-    : [ema20 - (atr * 2), majorSupport * 1.005, bb.lower];
+    ? [price + (atr * 2), majorResistance * 0.995, bb.upper]
+    : [price - (atr * 2), majorSupport * 1.005, bb.lower];
   
-  // SWING: Stop below major structure point (NOT 2.5 ATR formula)
+  // SWING: Entry at major structure point (within 2% of current)
   const swingEntry = isLong 
-    ? Math.min(ema50, majorSupport * 1.003, price * 0.98)
-    : Math.max(ema50, majorResistance * 0.997, price * 1.02);
+    ? Math.min(price * 1.01, ema50, majorSupport * 1.003) // Max 1% above current
+    : Math.max(price * 0.99, ema50, majorResistance * 0.997); // Max 1% below current
   const swingStop = isLong
     ? Math.max(swingEntry - (atr * 2), donchian.low * 0.995) // At Donchian low
     : Math.min(swingEntry + (atr * 2), donchian.high * 1.005);
@@ -620,7 +624,7 @@ async function fetchPolygonIndicators(symbol: string, tf: string, polygonApiKey:
   };
 }
 
-async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: string): Promise<CandleData[]> {
+async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: string): Promise<{ candles: CandleData[], livePrice: number | null, snapshotTime: string | null }> {
   // Use the unified polygon-chart-data function for consistent, fresh data
   const tfMap: Record<string, string> = {
     '1m': '1m',
@@ -667,10 +671,20 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   }
   
   console.log(`✅ Received ${data.candles.length} fresh candles from polygon-chart-data`);
-  console.log(`📊 Latest: ${data.lastTimeUTC} (${data.candles[data.candles.length - 1].c})`);
+  console.log(`📊 Latest candle: ${data.lastTimeUTC} (${data.candles[data.candles.length - 1].c})`);
+  
+  // Extract live price from snapshot if available (this is the CURRENT market price)
+  const livePrice = data.snapshotLastTrade;
+  const snapshotTime = data.snapshotTimeUTC;
+  
+  if (livePrice) {
+    console.log(`💰 LIVE snapshot price: ${livePrice} @ ${snapshotTime}`);
+  } else {
+    console.log(`⚠️ No live snapshot available, will use last candle close`);
+  }
   
   // Transform to expected format
-  return data.candles.map((c: any) => ({
+  const candles = data.candles.map((c: any) => ({
     t: c.t,
     o: c.o,
     h: c.h,
@@ -678,6 +692,8 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
     c: c.c,
     v: c.v
   }));
+  
+  return { candles, livePrice, snapshotTime };
 }
 
 async function generateSummary(symbol: string, indicators: any, openaiKey: string): Promise<string> {
@@ -735,8 +751,8 @@ serve(async (req) => {
 
     console.log(`[QUANT-DATA v2024.10.09] Fetching quant data for ${symbol}, timeframe: ${tf}, withSummary: ${withSummary}`);
 
-    // Fetch market data with fresh timestamps
-    const candles = await fetchPolygonData(symbol, tf, polygonApiKey);
+    // Fetch market data with fresh timestamps and live price
+    const { candles, livePrice, snapshotTime } = await fetchPolygonData(symbol, tf, polygonApiKey);
     if (candles.length === 0) {
       throw new Error('No market data available');
     }
@@ -768,14 +784,19 @@ serve(async (req) => {
     }
 
     const prices = candles.map(c => c.c);
-    const currentPrice = prices[prices.length - 1];
+    const lastCandleClose = prices[prices.length - 1];
     const prevClose = prices.length > 1 ? prices[prices.length - 2] : null;
+    
+    // Use LIVE price if available (snapshot is more current than last candle)
+    const currentPrice = livePrice && livePrice > 0 ? livePrice : lastCandleClose;
+    const usingLivePrice = livePrice && livePrice > 0;
     
     // Log the actual candle timestamps to debug old data issue
     const firstCandleTime = new Date(candles[0].t).toISOString();
     const lastCandleTime = new Date(candles[candles.length - 1].t).toISOString();
-    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${currentPrice}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
-    console.log(`💰 Current price from latest candle: ${currentPrice}, Prev close: ${prevClose}`);
+    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${lastCandleClose}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
+    console.log(`💰 Price source: ${usingLivePrice ? `LIVE SNAPSHOT @ ${snapshotTime}` : 'LAST CANDLE'}`);
+    console.log(`💰 Current price: ${currentPrice}, Last candle: ${lastCandleClose}, Prev close: ${prevClose}`);
 
     // Calculate technical indicators (use Polygon indicators if available)
     const ema20 = calculateEMA(prices, 20);
@@ -797,7 +818,7 @@ serve(async (req) => {
     // Fetch benchmark data (S&P 500 proxy) for alpha/beta calculations
     let benchmarkPrices: number[] = [];
     try {
-      const spyCandles = await fetchPolygonData('SPY', tf, polygonApiKey);
+      const { candles: spyCandles } = await fetchPolygonData('SPY', tf, polygonApiKey);
       benchmarkPrices = spyCandles.map(c => c.c);
     } catch (e) {
       console.log('Benchmark data unavailable, alpha/beta will be null');
@@ -853,9 +874,10 @@ serve(async (req) => {
     const response: QuantResponse = {
       symbol,
       tf,
-      asOf: new Date(candles[candles.length - 1].t).toISOString(), // Use actual latest candle timestamp
+      asOf: snapshotTime || new Date(candles[candles.length - 1].t).toISOString(), // Use snapshot time if available, otherwise last candle
       price: currentPrice,
       prevClose,
+      dataPoints: candles.length,
       ema: {
         '20': ema20,
         '50': ema50,
