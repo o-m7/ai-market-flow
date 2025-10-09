@@ -623,6 +623,102 @@ function generateTradingSignals(
   };
 }
 
+// Fetch historical data from S3 for better signal accuracy
+async function fetchS3HistoricalData(symbol: string, tf: string): Promise<CandleData[]> {
+  try {
+    const polygonS3AccessKey = Deno.env.get('POLYGON_S3_ACCESS_KEY');
+    const polygonS3SecretKey = Deno.env.get('POLYGON_S3_SECRET_KEY');
+    
+    if (!polygonS3AccessKey || !polygonS3SecretKey) {
+      console.log('S3 credentials not available, skipping historical data fetch');
+      return [];
+    }
+
+    // Construct S3 URL for historical data
+    // Format: s3://polygon-data/{symbol}/{timeframe}/history.json
+    const bucketUrl = `https://polygon-data.s3.amazonaws.com/${symbol}/${tf}/history.json`;
+    
+    const response = await fetch(bucketUrl, {
+      headers: {
+        'x-amz-access-key-id': polygonS3AccessKey,
+        'x-amz-secret-access-key': polygonS3SecretKey
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`S3 historical data not available for ${symbol}/${tf}`);
+      return [];
+    }
+
+    const historicalData = await response.json();
+    console.log(`✅ Loaded ${historicalData.length} historical candles from S3 for ${symbol}`);
+    
+    return historicalData.map((bar: any) => ({
+      t: bar.t,
+      o: bar.o,
+      h: bar.h,
+      l: bar.l,
+      c: bar.c,
+      v: bar.v
+    }));
+  } catch (e) {
+    console.error('Error fetching S3 historical data:', e);
+    return [];
+  }
+}
+
+// Fetch Polygon indicators instead of calculating manually
+async function fetchPolygonIndicators(symbol: string, tf: string, polygonApiKey: string) {
+  const timeframes: Record<string, string> = {
+    '1m': '1/minute',
+    '5m': '5/minute', 
+    '15m': '15/minute',
+    '1h': '1/hour',
+    '1d': '1/day'
+  };
+  
+  const cryptoPairs = ['BTC', 'ETH', 'XRP', 'ADA', 'SOL', 'DOT', 'MATIC', 'AVAX', 'LINK', 'UNI', 'ATOM', 'ALGO', 'VET', 'ICP', 'FIL', 'THETA', 'TRX', 'ETC', 'XMR', 'BCH', 'LTC', 'DOGE', 'SHIB', 'NEAR', 'FTM', 'SAND', 'MANA', 'CRV', 'AAVE', 'BNB'];
+  const forexCurrencies = ['EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK', 'NOK', 'DKK'];
+  
+  const isCrypto = cryptoPairs.some(pair => symbol.startsWith(pair)) && symbol.endsWith('USD');
+  const isForex = forexCurrencies.some(curr => symbol.startsWith(curr)) && 
+                  (symbol.includes('USD') || forexCurrencies.some(curr => symbol.includes(curr)));
+  
+  let polygonSymbol = symbol;
+  if (isCrypto) {
+    polygonSymbol = `X:${symbol}`;
+  } else if (isForex) {
+    polygonSymbol = `C:${symbol}`;
+  }
+
+  // Try to fetch technical indicators from Polygon's technical indicators endpoint
+  try {
+    const url = `https://api.polygon.io/v1/indicators/rsi/${polygonSymbol}?timespan=${tf}&window=14&series_type=close&order=desc&limit=1&apiKey=${polygonApiKey}`;
+    const rsiResponse = await fetch(url);
+    
+    if (rsiResponse.ok) {
+      const rsiData = await rsiResponse.json();
+      console.log('✅ Fetched RSI from Polygon API:', rsiData.results?.values?.[0]?.value);
+      
+      // Fetch other indicators from Polygon if available
+      // For now, we'll still calculate most indicators manually but log that we should use Polygon
+      console.log('📊 Note: Using Polygon for RSI, calculating other indicators manually');
+      
+      return {
+        rsi: rsiData.results?.values?.[0]?.value,
+        usePolygonIndicators: true
+      };
+    }
+  } catch (e) {
+    console.log('Polygon indicators not available, using manual calculation');
+  }
+
+  return {
+    rsi: null,
+    usePolygonIndicators: false
+  };
+}
+
 async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: string): Promise<CandleData[]> {
   const timeframes: Record<string, string> = {
     '1m': '1/minute',
@@ -633,9 +729,6 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   };
   
   // Format symbol for Polygon API
-  // Crypto pairs like BTCUSD, ETHUSD need X: prefix
-  // Forex pairs like EURUSD, GBPUSD need C: prefix
-  // Stock tickers like SPY, AAPL don't need prefix
   const cryptoPairs = ['BTC', 'ETH', 'XRP', 'ADA', 'SOL', 'DOT', 'MATIC', 'AVAX', 'LINK', 'UNI', 'ATOM', 'ALGO', 'VET', 'ICP', 'FIL', 'THETA', 'TRX', 'ETC', 'XMR', 'BCH', 'LTC', 'DOGE', 'SHIB', 'NEAR', 'FTM', 'SAND', 'MANA', 'CRV', 'AAVE', 'BNB'];
   const forexCurrencies = ['EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK', 'NOK', 'DKK'];
   
@@ -651,7 +744,10 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   }
   
   const timeframe = timeframes[tf] || '1/hour';
-  const now = new Date();
+  const now = Date.now(); // Use milliseconds for fresh data
+  
+  // Fetch historical data from S3 first
+  const historicalData = await fetchS3HistoricalData(symbol, tf);
   
   // Use shorter lookback periods to ensure we get recent data
   const lookbackDays: Record<string, number> = {
@@ -663,11 +759,12 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   };
   
   const daysToFetch = lookbackDays[tf] || 30;
-  const from = new Date(now.getTime() - (daysToFetch * 24 * 60 * 60 * 1000));
+  const fromMs = now - (daysToFetch * 24 * 60 * 60 * 1000);
   
-  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${timeframe}/${from.toISOString().split('T')[0]}/${now.toISOString().split('T')[0]}?adjusted=true&sort=desc&limit=5000&apikey=${polygonApiKey}`;
+  // Use millisecond timestamps for fresh data - Polygon supports both
+  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${timeframe}/${fromMs}/${now}?adjusted=true&sort=asc&limit=5000&apiKey=${polygonApiKey}`;
   
-  console.log(`Fetching quant data: symbol=${symbol}, polygonSymbol=${polygonSymbol}, timeframe=${tf}, days=${daysToFetch}`);
+  console.log(`Fetching FRESH data: symbol=${symbol}, polygonSymbol=${polygonSymbol}, timeframe=${tf}, from=${new Date(fromMs).toISOString()}, to=${new Date(now).toISOString()}`);
   
   const response = await fetch(url);
   if (!response.ok) {
@@ -684,10 +781,12 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
     throw new Error(`No data available for ${symbol}`);
   }
   
-  console.log(`Successfully fetched ${data.results.length} candles for ${polygonSymbol}, latest timestamp: ${new Date(data.results[0].t).toISOString()}`);
+  const latestTimestamp = data.results[data.results.length - 1].t;
+  const dataAge = (now - latestTimestamp) / (1000 * 60); // Age in minutes
+  console.log(`✅ Fetched ${data.results.length} FRESH candles for ${polygonSymbol}`);
+  console.log(`📊 Latest candle: ${new Date(latestTimestamp).toISOString()} (${dataAge.toFixed(1)} minutes old)`);
   
-  // Reverse to chronological order (oldest first) since we fetched desc
-  const candles = data.results.reverse().map((bar: any) => ({
+  const candles = data.results.map((bar: any) => ({
     t: bar.t,
     o: bar.o,
     h: bar.h,
@@ -695,6 +794,13 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
     c: bar.c,
     v: bar.v
   }));
+  
+  // Merge with historical data if available (older data first)
+  if (historicalData.length > 0) {
+    const historicalUpToRecent = historicalData.filter(h => h.t < candles[0].t);
+    console.log(`📚 Merged ${historicalUpToRecent.length} historical candles with ${candles.length} fresh candles`);
+    return [...historicalUpToRecent, ...candles];
+  }
   
   return candles;
 }
@@ -754,11 +860,14 @@ serve(async (req) => {
 
     console.log(`[QUANT-DATA v2024.10.09] Fetching quant data for ${symbol}, timeframe: ${tf}, withSummary: ${withSummary}`);
 
-    // Fetch market data
+    // Fetch market data with fresh timestamps
     const candles = await fetchPolygonData(symbol, tf, polygonApiKey);
     if (candles.length === 0) {
       throw new Error('No market data available');
     }
+    
+    // Try to fetch indicators from Polygon API
+    const polygonIndicators = await fetchPolygonIndicators(symbol, tf, polygonApiKey);
 
     // === CRITICAL: Validate data freshness to prevent outdated signals ===
     const latestCandleTime = candles[candles.length - 1].t;
@@ -793,11 +902,15 @@ serve(async (req) => {
     console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${currentPrice}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
     console.log(`💰 Current price from latest candle: ${currentPrice}, Prev close: ${prevClose}`);
 
-    // Calculate technical indicators
+    // Calculate technical indicators (use Polygon indicators if available)
     const ema20 = calculateEMA(prices, 20);
     const ema50 = calculateEMA(prices, 50);
     const ema200 = calculateEMA(prices, 200);
-    const rsi14 = calculateRSI(prices, 14);
+    const rsi14 = polygonIndicators.rsi || calculateRSI(prices, 14);
+    
+    if (polygonIndicators.usePolygonIndicators) {
+      console.log('✅ Using Polygon API indicators for enhanced accuracy');
+    }
     const macd = calculateMACD(prices);
     const bb20 = calculateBollingerBands(prices, 20);
     const atr14 = calculateATR(candles, 14);

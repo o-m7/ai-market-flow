@@ -550,8 +550,7 @@ export const AIAnalysis = () => {
 
             {analysis && (
               <>
-                <AnalysisResults data={analysis} symbol={symbol} />
-                {includeQuantData && <QuantCard symbol={symbol} />}
+                <AnalysisResults data={analysis} symbol={symbol} timeframe={timeframe} includeQuantSignals={includeQuantData} />
               </>
             )}
 

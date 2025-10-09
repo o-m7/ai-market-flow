@@ -1,3 +1,4 @@
+import React from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,14 +9,42 @@ import { useHistoricalAccuracy } from "@/hooks/useHistoricalAccuracy";
 interface AnalysisResultsProps {
   data: any;
   symbol: string;
+  timeframe?: string;
+  includeQuantSignals?: boolean;
 }
 
-export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
+export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSignals = true }: AnalysisResultsProps) => {
   // Log the data structure for debugging
   console.log('AnalysisResults data:', data);
   
   // Fetch historical accuracy for this symbol
   const { data: historicalData } = useHistoricalAccuracy(symbol, 30);
+  
+  // Fetch quant signals for this symbol and timeframe
+  const [quantSignals, setQuantSignals] = React.useState<any>(null);
+  
+  React.useEffect(() => {
+    if (includeQuantSignals) {
+      const fetchQuantSignals = async () => {
+        try {
+          const { supabase } = await import('@/integrations/supabase/client');
+          const timeframeMap: Record<string, string> = {
+            '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
+            '60': '1h', '240': '4h', 'D': '1d'
+          };
+          const { data: response, error } = await supabase.functions.invoke('quant-data', {
+            body: { symbol, tf: timeframeMap[timeframe] || '1h', withSummary: false }
+          });
+          if (!error && response?.timeframe_profile) {
+            setQuantSignals(response.timeframe_profile);
+          }
+        } catch (e) {
+          console.error('Failed to fetch quant signals:', e);
+        }
+      };
+      fetchQuantSignals();
+    }
+  }, [symbol, timeframe, includeQuantSignals]);
   
   const getRecommendationColor = (rec: string) => {
     switch (rec) {
@@ -466,19 +495,27 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </CardContent>
       </Card>
 
-      {/* Trading Signals - All Timeframes */}
-      {data.timeframe_profile && (
+      {/* Trading Signals - All Timeframes (from both AI and Quant) */}
+      {(data.timeframe_profile || quantSignals) && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               TRADING SIGNALS - ALL TIMEFRAMES
             </CardTitle>
+            <p className="text-xs font-mono-tabular text-terminal-secondary mt-2">
+              {data.timeframe_profile && quantSignals ? 'Combined AI & Quantitative Analysis' : 
+               data.timeframe_profile ? 'AI Analysis Signals' : 'Quantitative Analysis Signals'}
+            </p>
           </CardHeader>
           <CardContent className="pt-4">
             <div className="space-y-4">
               {/* Helper function to determine if signal is long or short */}
               {(() => {
+                // Prioritize AI signals, fallback to quant signals
+                const signalsToUse = data.timeframe_profile || quantSignals;
+                if (!signalsToUse) return null;
+                
                 // Use trade_idea.direction for accurate signal direction (always long or short now)
                 const tradeDirection = data.trade_idea?.direction || 'long';
                 const isLong = tradeDirection === 'long';
@@ -507,7 +544,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                 return (
                   <>
                     {/* Scalp Signals - Quick exits, tight stops, 1-5 min holding */}
-                    {data.timeframe_profile?.scalp && data.timeframe_profile.scalp.entry && (
+                    {signalsToUse.scalp && signalsToUse.scalp.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -516,21 +553,21 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                               {direction}
                             </Badge>
                             <span className="text-xs font-mono-tabular text-terminal-accent uppercase">SCALP</span>
-                            {data.timeframe_profile.scalp.strategy && (
+                            {signalsToUse.scalp.strategy && (
                               <Badge variant="outline" className="text-xs font-mono-tabular">
-                                {data.timeframe_profile.scalp.strategy}
+                                {signalsToUse.scalp.strategy}
                               </Badge>
                             )}
                           </div>
-                          {data.timeframe_profile.scalp.probability && (
+                          {signalsToUse.scalp.probability && (
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
                               <span className={`text-xs font-mono-tabular font-bold ${
-                                data.timeframe_profile.scalp.probability >= 70 ? 'text-terminal-green' :
-                                data.timeframe_profile.scalp.probability >= 50 ? 'text-terminal-accent' :
+                                signalsToUse.scalp.probability >= 70 ? 'text-terminal-green' :
+                                signalsToUse.scalp.probability >= 50 ? 'text-terminal-accent' :
                                 'text-terminal-red'
                               }`}>
-                                {data.timeframe_profile.scalp.probability}%
+                                {signalsToUse.scalp.probability}%
                               </span>
                             </div>
                           )}
@@ -542,19 +579,19 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
                             <div className="text-sm font-mono-tabular text-terminal-foreground font-bold">
-                              {safeFormatNumber(data.timeframe_profile.scalp.entry)}
+                              {safeFormatNumber(signalsToUse.scalp.entry)}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
                             <div className="text-sm font-mono-tabular text-terminal-red font-bold">
-                              {safeFormatNumber(data.timeframe_profile.scalp.stop)}
+                              {safeFormatNumber(signalsToUse.scalp.stop)}
                             </div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                              {calculatePercent(data.timeframe_profile.scalp.entry, data.timeframe_profile.scalp.stop)}%
+                              {calculatePercent(signalsToUse.scalp.entry, signalsToUse.scalp.stop)}%
                             </div>
                           </div>
-                          {data.timeframe_profile.scalp.targets?.map((target: number, idx: number) => {
+                          {signalsToUse.scalp.targets?.map((target: number, idx: number) => {
                             const timeEstimates = ['2-5 min', '5-10 min', '10-15 min'];
                             return (
                               <div key={idx}>
@@ -575,7 +612,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     )}
 
                     {/* Intraday Signals - Same-day exits, moderate stops, 15min-4hr holding */}
-                    {data.timeframe_profile?.intraday && data.timeframe_profile.intraday.entry && (
+                    {signalsToUse.intraday && signalsToUse.intraday.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -584,21 +621,21 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                               {direction}
                             </Badge>
                             <span className="text-xs font-mono-tabular text-terminal-accent uppercase">INTRADAY</span>
-                            {data.timeframe_profile.intraday.strategy && (
+                            {signalsToUse.intraday.strategy && (
                               <Badge variant="outline" className="text-xs font-mono-tabular">
-                                {data.timeframe_profile.intraday.strategy}
+                                {signalsToUse.intraday.strategy}
                               </Badge>
                             )}
                           </div>
-                          {data.timeframe_profile.intraday.probability && (
+                          {signalsToUse.intraday.probability && (
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
                               <span className={`text-xs font-mono-tabular font-bold ${
-                                data.timeframe_profile.intraday.probability >= 70 ? 'text-terminal-green' :
-                                data.timeframe_profile.intraday.probability >= 50 ? 'text-terminal-accent' :
+                                signalsToUse.intraday.probability >= 70 ? 'text-terminal-green' :
+                                signalsToUse.intraday.probability >= 50 ? 'text-terminal-accent' :
                                 'text-terminal-red'
                               }`}>
-                                {data.timeframe_profile.intraday.probability}%
+                                {signalsToUse.intraday.probability}%
                               </span>
                             </div>
                           )}
@@ -610,19 +647,19 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
                             <div className="text-sm font-mono-tabular text-terminal-foreground font-bold">
-                              {safeFormatNumber(data.timeframe_profile.intraday.entry)}
+                              {safeFormatNumber(signalsToUse.intraday.entry)}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
                             <div className="text-sm font-mono-tabular text-terminal-red font-bold">
-                              {safeFormatNumber(data.timeframe_profile.intraday.stop)}
+                              {safeFormatNumber(signalsToUse.intraday.stop)}
                             </div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                              {calculatePercent(data.timeframe_profile.intraday.entry, data.timeframe_profile.intraday.stop)}%
+                              {calculatePercent(signalsToUse.intraday.entry, signalsToUse.intraday.stop)}%
                             </div>
                           </div>
-                          {data.timeframe_profile.intraday.targets?.map((target: number, idx: number) => {
+                          {signalsToUse.intraday.targets?.map((target: number, idx: number) => {
                             const timeEstimates = ['1-3 hrs', '3-5 hrs', '5-8 hrs'];
                             return (
                               <div key={idx}>
@@ -633,7 +670,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                                   {safeFormatNumber(target)}
                                 </div>
                                 <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                                  {calculatePercent(data.timeframe_profile.intraday.entry, target)}% • R:{calculateRR(data.timeframe_profile.intraday.entry, data.timeframe_profile.intraday.stop, target)}
+                                  {calculatePercent(signalsToUse.intraday.entry, target)}% • R:{calculateRR(signalsToUse.intraday.entry, signalsToUse.intraday.stop, target)}
                                 </div>
                               </div>
                             );
@@ -643,7 +680,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                     )}
 
                     {/* Swing Signals - Multi-day holds, wider stops, larger targets */}
-                    {data.timeframe_profile?.swing && data.timeframe_profile.swing.entry && (
+                    {signalsToUse.swing && signalsToUse.swing.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -652,21 +689,21 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                               {direction}
                             </Badge>
                             <span className="text-xs font-mono-tabular text-terminal-accent uppercase">SWING</span>
-                            {data.timeframe_profile.swing.strategy && (
+                            {signalsToUse.swing.strategy && (
                               <Badge variant="outline" className="text-xs font-mono-tabular">
-                                {data.timeframe_profile.swing.strategy}
+                                {signalsToUse.swing.strategy}
                               </Badge>
                             )}
                           </div>
-                          {data.timeframe_profile.swing.probability && (
+                          {signalsToUse.swing.probability && (
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
                               <span className={`text-xs font-mono-tabular font-bold ${
-                                data.timeframe_profile.swing.probability >= 70 ? 'text-terminal-green' :
-                                data.timeframe_profile.swing.probability >= 50 ? 'text-terminal-accent' :
+                                signalsToUse.swing.probability >= 70 ? 'text-terminal-green' :
+                                signalsToUse.swing.probability >= 50 ? 'text-terminal-accent' :
                                 'text-terminal-red'
                               }`}>
-                                {data.timeframe_profile.swing.probability}%
+                                {signalsToUse.swing.probability}%
                               </span>
                             </div>
                           )}
@@ -678,19 +715,19 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
                             <div className="text-sm font-mono-tabular text-terminal-foreground font-bold">
-                              {safeFormatNumber(data.timeframe_profile.swing.entry)}
+                              {safeFormatNumber(signalsToUse.swing.entry)}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
                             <div className="text-sm font-mono-tabular text-terminal-red font-bold">
-                              {safeFormatNumber(data.timeframe_profile.swing.stop)}
+                              {safeFormatNumber(signalsToUse.swing.stop)}
                             </div>
                             <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                              {calculatePercent(data.timeframe_profile.swing.entry, data.timeframe_profile.swing.stop)}%
+                              {calculatePercent(signalsToUse.swing.entry, signalsToUse.swing.stop)}%
                             </div>
                           </div>
-                          {data.timeframe_profile.swing.targets?.map((target: number, idx: number) => {
+                          {signalsToUse.swing.targets?.map((target: number, idx: number) => {
                             const timeEstimates = ['1-2 days', '2-4 days', '4-7 days'];
                             return (
                               <div key={idx}>
@@ -701,7 +738,7 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                                   {safeFormatNumber(target)}
                                 </div>
                                 <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                                  {calculatePercent(data.timeframe_profile.swing.entry, target)}% • R:{calculateRR(data.timeframe_profile.swing.entry, data.timeframe_profile.swing.stop, target)}
+                                  {calculatePercent(signalsToUse.swing.entry, target)}% • R:{calculateRR(signalsToUse.swing.entry, signalsToUse.swing.stop, target)}
                                 </div>
                               </div>
                             );
