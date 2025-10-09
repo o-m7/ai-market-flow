@@ -716,6 +716,123 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </Card>
       )}
 
+      {/* Liquidity Zones */}
+      {data.keyLevels?.liquidity_zones && data.keyLevels.liquidity_zones.length > 0 && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
+            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">LIQUIDITY ZONES</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-3">
+              {data.keyLevels.liquidity_zones.map((zone: any, idx: number) => (
+                <div key={idx} className={`p-3 border-l-2 ${
+                  zone.type === 'buy' ? 'bg-terminal-green/5 border-terminal-green' : 'bg-terminal-red/5 border-terminal-red'
+                }`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge className={`${
+                        zone.type === 'buy' ? 'bg-terminal-green/20 text-terminal-green' : 'bg-terminal-red/20 text-terminal-red'
+                      } text-xs font-mono-tabular`}>
+                        {zone.type.toUpperCase()} SIDE
+                      </Badge>
+                      <Badge className="bg-terminal-darker text-terminal-secondary text-xs font-mono-tabular">
+                        {zone.strength.toUpperCase()}
+                      </Badge>
+                    </div>
+                    <span className={`text-sm font-mono-tabular font-bold ${
+                      zone.type === 'buy' ? 'text-terminal-green' : 'text-terminal-red'
+                    }`}>
+                      {safeFormatNumber(zone.price, 2)}
+                    </span>
+                  </div>
+                  <div className="text-xs font-mono text-terminal-secondary">
+                    {zone.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Breakout Zones */}
+      {data.keyLevels?.breakout_zones && data.keyLevels.breakout_zones.length > 0 && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
+            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">BREAKOUT ZONES</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-3">
+              {data.keyLevels.breakout_zones.map((zone: any, idx: number) => (
+                <div key={idx} className={`p-3 border-l-2 ${
+                  zone.type === 'bullish' ? 'bg-terminal-green/5 border-terminal-green' : 'bg-terminal-red/5 border-terminal-red'
+                }`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge className={`${
+                        zone.type === 'bullish' ? 'bg-terminal-green/20 text-terminal-green' : 'bg-terminal-red/20 text-terminal-red'
+                      } text-xs font-mono-tabular`}>
+                        {zone.type.toUpperCase()}
+                      </Badge>
+                      <Badge className="bg-terminal-darker text-terminal-secondary text-xs font-mono-tabular">
+                        {zone.strength.toUpperCase()}
+                      </Badge>
+                    </div>
+                    <span className={`text-sm font-mono-tabular font-bold ${
+                      zone.type === 'bullish' ? 'text-terminal-green' : 'text-terminal-red'
+                    }`}>
+                      {safeFormatNumber(zone.price, 2)}
+                    </span>
+                  </div>
+                  <div className="text-xs font-mono text-terminal-secondary">
+                    {zone.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Order Blocks */}
+      {data.keyLevels?.order_blocks && data.keyLevels.order_blocks.length > 0 && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
+            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">ORDER BLOCKS</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-3">
+              {data.keyLevels.order_blocks.map((block: any, idx: number) => (
+                <div key={idx} className={`p-3 border-l-2 ${
+                  block.type === 'bullish' ? 'bg-terminal-green/5 border-terminal-green' : 'bg-terminal-red/5 border-terminal-red'
+                }`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge className={`${
+                        block.type === 'bullish' ? 'bg-terminal-green/20 text-terminal-green' : 'bg-terminal-red/20 text-terminal-red'
+                      } text-xs font-mono-tabular`}>
+                        {block.type.toUpperCase()}
+                      </Badge>
+                      <Badge className="bg-terminal-darker text-terminal-secondary text-xs font-mono-tabular">
+                        {block.strength.toUpperCase()}
+                      </Badge>
+                    </div>
+                    <span className={`text-xs font-mono-tabular ${
+                      block.type === 'bullish' ? 'text-terminal-green' : 'text-terminal-red'
+                    }`}>
+                      {safeFormatNumber(block.low, 2)} - {safeFormatNumber(block.high, 2)}
+                    </span>
+                  </div>
+                  <div className="text-xs font-mono text-terminal-secondary">
+                    {block.description}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Evidence & Signals - Comprehensive */}
       {data.evidence && Array.isArray(data.evidence) && data.evidence.length > 0 && (
         <Card className="bg-terminal border-terminal-border">
