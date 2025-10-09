@@ -14,6 +14,7 @@ import { format } from "date-fns";
 export const TradeAccuracy = () => {
   const { toast } = useToast();
   const [checking, setChecking] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [symbol] = useState("BTCUSD");
   const [days] = useState(30);
   
@@ -70,6 +71,42 @@ export const TradeAccuracy = () => {
     }
   };
 
+  const handleReset = async () => {
+    if (!confirm('Are you sure you want to reset all trade outcomes? This will clear all historical results.')) {
+      return;
+    }
+
+    setResetting(true);
+    try {
+      toast({
+        title: "Resetting Trade Data",
+        description: "Clearing all trade outcomes...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('reset-trade-outcomes');
+      
+      if (error) throw error;
+
+      toast({
+        title: "Reset Complete",
+        description: `Reset ${data.resetCount} trade outcomes. Fresh start!`,
+      });
+
+      // Refresh accuracy data
+      refetch();
+      refetchTargetHits();
+    } catch (error: any) {
+      console.error('Error resetting outcomes:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reset trade outcomes',
+        variant: 'destructive',
+      });
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -89,31 +126,51 @@ export const TradeAccuracy = () => {
           {/* Action Card */}
           <Card>
             <CardHeader>
-              <CardTitle>Trade Outcome Checker</CardTitle>
+              <CardTitle>Trade Outcome Management</CardTitle>
               <CardDescription>
-                Manually trigger a check of pending trades to update accuracy statistics
+                System automatically checks trades every hour. You can also manually trigger checks or reset data.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={handleCheckOutcomes}
-                disabled={checking}
-              >
-                {checking ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Checking...
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-4 w-4 mr-2" />
-                    Check Pending Trades
-                  </>
-                )}
-              </Button>
-              <p className="text-sm text-muted-foreground mt-2">
-                This checks all pending trade analyses against recent price action
-              </p>
+            <CardContent className="space-y-4">
+              <div className="flex gap-3">
+                <Button 
+                  onClick={handleCheckOutcomes}
+                  disabled={checking || resetting}
+                >
+                  {checking ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Checking...
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="h-4 w-4 mr-2" />
+                      Check Now
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  onClick={handleReset}
+                  disabled={checking || resetting}
+                  variant="destructive"
+                >
+                  {resetting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      Reset All Data
+                    </>
+                  )}
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>• Automatic checks run every hour to update trade outcomes</p>
+                <p>• Manual check analyzes all pending trades immediately</p>
+                <p>• Reset clears all outcomes to start fresh tracking</p>
+              </div>
             </CardContent>
           </Card>
 
