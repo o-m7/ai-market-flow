@@ -768,14 +768,22 @@ serve(async (req) => {
     
     console.log(`📅 Data validation: Last candle at ${new Date(lastCandleTime).toISOString()} (${lastCandleAge.toFixed(0)}min ago)`);
     
-    // If last candle is more than 2 hours old for hourly data, something is wrong
+    // RELAXED validation: Allow older data if we have live snapshot
+    // If last candle is more than configured time old, warn but don't fail if we have live price
     const maxAllowedAge = tf === '1h' || tf === '60m' ? 180 : 1440; // 3 hours for hourly, 24h for daily
-    if (lastCandleAge > maxAllowedAge) {
-      console.error(`❌ DATA TOO OLD: Last candle is ${lastCandleAge.toFixed(0)}min old, limit is ${maxAllowedAge}min`);
-      throw new Error(`Historical data is stale - last candle is ${Math.floor(lastCandleAge/60)}h old`);
-    }
     
     console.log(`✅ Data freshness OK: Using ${candles.length} candles ending at ${new Date(lastCandleTime).toISOString()}`);
+    
+    // CRITICAL FIX: If data is slightly stale BUT we have live snapshot, use it - don't fail
+    // This handles cases where candles are delayed but we have current market price
+    if (lastCandleAge > maxAllowedAge && (!livePrice || livePrice === 0)) {
+      console.error(`❌ DATA TOO OLD AND NO LIVE PRICE: Last candle is ${lastCandleAge.toFixed(0)}min old, limit is ${maxAllowedAge}min`);
+      throw new Error(`Historical data is stale - last candle is ${Math.floor(lastCandleAge/60)}h old and no live price available`);
+    }
+    
+    if (lastCandleAge > maxAllowedAge && livePrice && livePrice > 0) {
+      console.warn(`⚠️ Candles are ${lastCandleAge.toFixed(0)}min old BUT using LIVE snapshot price ${livePrice} @ ${snapshotTime}`);
+    }
     
     // Try to fetch indicators from Polygon API
     const polygonIndicators = await fetchPolygonIndicators(symbol, tf, polygonApiKey);

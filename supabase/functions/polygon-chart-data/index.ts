@@ -65,8 +65,10 @@ const requestData: ChartDataRequest = await req.json();
     // Compute dynamic lookback based on requested limit and timeframe
     const unitMs = span === "minute" ? 60_000 : span === "hour" ? 3_600_000 : 86_400_000;
     const isLite = Boolean(lite);
+    // CRITICAL FIX: Reduce buffer dramatically to get RECENT data, not ancient history
+    // For 500 bars: old was 500*3=1500hrs (62 days). New: 500*1.2=600hrs (25 days)
     const desiredBars = isLite ? Math.max(limit ?? 2, 2) : Math.max(limit ?? 300, 150);
-    const marketBuffer = isLite ? 1 : (asset === "stock" ? 3 : 2); // smaller buffer for lite/meta requests
+    const marketBuffer = isLite ? 1.05 : 1.2; // Much smaller buffer to stay recent
     const lookbackMs = desiredBars * mult * unitMs * marketBuffer;
 
     const fromMs = nowMs - lookbackMs;
