@@ -332,7 +332,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { symbol, timeframe, market, candles, currentPrice, news, debug } = body || {};
+    const { symbol, timeframe, market, candles, currentPrice, news, quantMetrics, debug } = body || {};
 
     console.log(`[ai-analyze v${FUNCTION_VERSION}] Processing analysis request: ${symbol} (${timeframe}, ${market})`);
     if (currentPrice) {
@@ -395,181 +395,57 @@ serve(async (req) => {
     
     console.log(`[ai-analyze] Using ${candles.length} candles, latest from ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)`);
     
-    const comprehensivePrompt = `You are an elite institutional trading desk providing multi-strategy quantitative analysis.
+    // Data-driven analysis prompt - let AI analyze the data naturally
+    const comprehensivePrompt = `You are an elite institutional quantitative analyst. Analyze the provided market data and derive trading signals based on what the data shows.
 
-🎯 CRITICAL: ACCURACY IS PARAMOUNT - Provide PRECISE, DETAILED numbers for ALL metrics
-
-MARKET DATA:
+LIVE MARKET DATA:
 Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
-🔴 CURRENT LIVE PRICE: ${livePrice}
-📊 Latest Candle: ${new Date(latestCandleTime).toISOString()} (${candleAge} seconds ago)
-📈 Total Candles Analyzed: ${candles.length}
+Current Price: $${livePrice}
+Latest Data: ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)
+Candles: ${candles.length} bars
 
-⚠️ CRITICAL: ALL support/resistance/liquidity zones are calculated from LIVE CANDLES (most recent ${candles.length} bars)
-⚠️ CRITICAL: ALL entries must reference CURRENT PRICE ${livePrice} not historical data
-⚠️ CRITICAL: Provide EXACT numbers with 2 decimal precision for ALL price levels
+ANALYZE THE FOLLOWING DATA:
 
-🚨 CRITICAL RULES FOR PROFESSIONAL ENTRIES:
-1. You MUST choose either "long" or "short" direction - NEVER "none"
-2. Determine directional bias from:
-   - EMA alignment: Price above 20/50/200 EMAs = LONG bias, below = SHORT bias
-   - MACD: Positive histogram = LONG bias, negative = SHORT bias  
-   - RSI: <40 + bullish divergence = LONG, >60 + bearish divergence = SHORT
-   - Pick the direction with MOST confluence of supporting indicators
+1. TECHNICAL INDICATORS (from Polygon API):
+${JSON.stringify(features.technical, null, 2)}
 
-2. SUPPORT & RESISTANCE LEVELS:
-   - Use the support and resistance arrays provided in technical features
-   - These are calculated from LIVE candle data (last ${candles.length} candles)
-   - Support levels MUST be BELOW current price ${livePrice}
-   - Resistance levels MUST be ABOVE current price ${livePrice}
-   - Include these exact levels in your "levels" response
-   - Provide AT LEAST 2-3 support and 2-3 resistance levels
+2. PRICE STRUCTURE (calculated from ${candles.length} recent candles):
+${JSON.stringify(features.levels, null, 2)}
 
-3. LIQUIDITY & ORDER BLOCKS:
-   - Use liquidity_zones, breakout_zones, and order_blocks from technical features
-   - These zones are calculated from actual price action in recent candles
-   - Prioritize these institutional levels for entry placement
-   - Liquidity zones show where institutional orders cluster
-   - Order blocks show where smart money accumulated/distributed
+3. NEWS SENTIMENT:
+${JSON.stringify(news, null, 2)}
 
-4. ENTRY PRICES - CRITICAL PRICE RANGE VALIDATION:
-   🚨 MANDATORY ENTRY PRICE RULES (AI MUST FOLLOW):
-   
-   FOR LONG TRADES:
-   - Entry MUST be between ${(livePrice * 0.98).toFixed(2)} and ${(livePrice * 1.02).toFixed(2)} (±2% of current price ${livePrice})
-   - OR at nearest support level within 3% of current price (${(livePrice * 0.97).toFixed(2)} - ${(livePrice * 1.03).toFixed(2)})
-   - NEVER place LONG entry above current price + 2% unless at a critical support retest
-   - Entry justification: buying dips, pullbacks to support, order blocks, or at current market price
-   
-   FOR SHORT TRADES:
-   - Entry MUST be between ${(livePrice * 0.98).toFixed(2)} and ${(livePrice * 1.02).toFixed(2)} (±2% of current price ${livePrice})
-   - OR at nearest resistance level within 3% of current price (${(livePrice * 0.97).toFixed(2)} - ${(livePrice * 1.03).toFixed(2)})
-   - NEVER place SHORT entry below current price - 2% unless at a critical resistance retest
-   - Entry justification: selling rallies, bounces to resistance, order blocks, or at current market price
-   
-   VALID ENTRY PLACEMENT (in order of priority):
-   1. At current price ±0.5% (market entry with tight range)
-   2. At order block level within 3% of current price
-   3. At liquidity zone within 3% of current price  
-   4. At support/resistance within 3% of current price
-   5. At Fibonacci retracement level (38.2%, 50%, 61.8%) within 3% of current price
-   6. At VWAP or major EMA (20/50/200) within 3% of current price
-   
-   ⚠️ If NO valid technical level exists within ±3% of current price ${livePrice}:
-   - Place entry at current price ${livePrice} (market entry)
-   - Provide EXACT entry price with 2 decimal precision
+${quantMetrics ? `4. QUANTITATIVE METRICS:
+${JSON.stringify(quantMetrics, null, 2)}` : ''}
 
-5. STOP LOSS placement:
-   - LONG: Stop MUST be BELOW entry (at invalidation point: recent swing low - ATR buffer)
-   - SHORT: Stop MUST be ABOVE entry (at invalidation point: recent swing high + ATR buffer)
-   - Use ATR for buffer: Stop = structure ± (1-1.5 × ATR)
-   - Provide EXACT stop price with 2 decimal precision
+YOUR TASK:
+Analyze ALL the data above and derive trading signals. Look for:
+- Trend patterns in EMAs, MACD, and price action
+- Support/resistance levels where price reacts
+- RSI and momentum divergences
+- Volume patterns and liquidity zones
+- News impact on price direction
+- Quant metrics showing statistical edges
+- Confluence of multiple factors
 
-6. TARGET placement:
-   - Provide AT LEAST 2-3 targets at key levels
-   - LONG targets: Resistance levels, Fibonacci extensions, previous highs (MUST be ABOVE entry)
-   - SHORT targets: Support levels, Fibonacci extensions, previous lows (MUST be BELOW entry)
-   - Minimum 2:1 risk-reward ratio required
-   - Provide EXACT target prices with 2 decimal precision
-   - Provide probability estimates for each target (0-100)
+Based on your analysis:
+1. Determine the directional bias (long or short) from the data
+2. Identify entry opportunities at technical levels shown in the data
+3. Set stop losses at invalidation points from price structure
+4. Target resistance (long) or support (short) levels from the data
+5. Provide signals for 3 timeframes (scalp, intraday, swing)
 
-7. ACCURACY METRICS - You MUST provide:
-   - data_freshness_score: Rate how fresh the data is (0-100, consider candle age ${candleAge}s)
-   - signal_clarity_score: Rate how clear the directional signal is (0-100)
-   - level_precision_score: Rate how precise your support/resistance levels are (0-100)
-   - entry_validity_score: Rate how valid your entry is relative to current price (0-100)
-   - overall_accuracy: Overall confidence in analysis accuracy (0-100)
-   - validation_notes: Array of strings noting validation points or warnings
+CRITICAL REQUIREMENTS:
+- Use ONLY the data provided - no assumptions
+- Direction must be "long" or "short" based on data confluence
+- Entry prices must align with levels in the data
+- Stops must be at structure invalidation points
+- Targets must be at support/resistance from the data
+- All signals must follow the same direction
+- Provide exact prices with 2 decimal precision
+- Explain your reasoning based on the data
 
-TECHNICAL FEATURES (calculated from LIVE ${candles.length} candles):
-${JSON.stringify(features, null, 2)}
-   - LONG entries: Wait for pullbacks to support levels, liquidity zones, order blocks, EMA bounces, or breakout retests
-   - SHORT entries: Wait for rallies to resistance levels, liquidity zones, order blocks, EMA rejections, or breakdown retests
-   - DO NOT force market orders at current price ${livePrice}
-   - Entries can be at key technical levels even if 3-5% away from current price
-   - Priority zones: Order blocks > Liquidity zones > Support/Resistance > Fibonacci retracements > VWAP > Round numbers > EMA levels
-   - Use the liquidity_zones, breakout_zones, and order_blocks provided in technical features for optimal entry placement
-
-5. STOP LOSS placement:
-   - LONG: Place stops below recent swing lows or support levels (invalidation point)
-   - SHORT: Place stops above recent swing highs or resistance levels
-   - Use ATR for buffer: Stop should be recent structure + (1-1.5 × ATR)
-
-6. TARGET placement:
-   - LONG: Resistance levels, Fibonacci extensions, previous highs
-   - SHORT: Support levels, Fibonacci extensions, previous lows
-   - Minimum 2:1 risk-reward ratio required
-
-TECHNICAL FEATURES (calculated from LIVE ${candles.length} candles):
-${JSON.stringify(features, null, 2)}
-
-NEWS/EVENT CONTEXT:
-${JSON.stringify(news || { event_risk: false, headline_hits_30m: 0 }, null, 2)}
-
-ANALYSIS REQUIREMENTS - Provide COMPREHENSIVE institutional-grade analysis:
-
-1. MARKET STRUCTURE: Identify trend direction (EMA 20/50/200 alignment), market phase (trending/range/consolidation/breakout), volatility regime (low/normal/high based on ATR), and session liquidity context.
-
-2. TECHNICAL ANALYSIS: Analyze RSI divergence patterns, MACD crossovers and histogram strength, Bollinger Band position and squeeze/expansion signals, VWAP deviation for mean reversion probability, and volume profile for institutional order flow.
-
-3. FIBONACCI RETRACEMENT: Calculate precise Fibonacci levels from significant swing high/low. Identify key retracement zones (23.6%, 38.2%, 50%, 61.8%, 78.6%) and extension targets (127.2%, 161.8%, 261.8%) for breakout scenarios. Note confluence with other technical levels.
-
-4. MULTIPLE TRADING STRATEGIES: 
-   A) TREND FOLLOWING: EMA alignment with momentum confirmation, breakout setups above resistance with volume, pullback entries to moving averages in trends.
-   B) MEAN REVERSION: Oversold/overbought RSI conditions, Bollinger Band touch reversals, VWAP mean reversion trades.
-   C) MOMENTUM: MACD bullish/bearish crossovers, RSI breakouts above 70 or below 30, volume confirmation on directional moves.
-   D) RANGE TRADING: Support/resistance level trades, range-bound oscillator signals, mean reversion within established ranges.
-
-5. MULTI-TIMEFRAME SETUPS - **CRITICAL: YOU MUST PROVIDE ALL THREE SIGNAL TYPES**:
-   
-   🚨 MANDATORY: Your response MUST include timeframe_profile with ALL THREE signal types:
-   - scalp (required)
-   - intraday (required)  
-   - swing (required)
-   
-   Each signal type MUST include:
-   - entry: exact price (number)
-   - stop: exact stop loss price (number)
-   - targets: array of 2-3 target prices ([number, number, number])
-   - strategy: strategy description (string)
-   - probability: confidence percentage (number, 0-100)
-   
-   SCALP (1-15min timeframe) - REQUIRED:
-   - Entry: Nearest support/resistance bounce or micro-breakout level
-   - Look for: 5-15min chart patterns, VWAP touches, EMA bounces
-   - Entry can be limit orders at key micro levels within 1-2% of current price ${livePrice}
-   - Tight stop (0.3-0.7% of price), quick targets (0.5-1.5% moves)
-   - Example LONG scalp: entry=${(livePrice * 0.995).toFixed(2)}, stop=${(livePrice * 0.990).toFixed(2)}, targets=[${(livePrice * 1.005).toFixed(2)}, ${(livePrice * 1.010).toFixed(2)}, ${(livePrice * 1.015).toFixed(2)}]
-   
-   INTRADAY (30min-4h timeframe) - REQUIRED:  
-   - Entry: Session highs/lows, hourly chart patterns, major EMA levels
-   - Look for: 1h/4h support/resistance, Fibonacci retracements, VWAP deviation
-   - Entry can be 2-4% away waiting for pullback/rally to key level
-   - Moderate stop (1-2% of price), same-day targets (2-5% moves)
-   - Example LONG intraday: entry=${(livePrice * 0.98).toFixed(2)}, stop=${(livePrice * 0.97).toFixed(2)}, targets=[${(livePrice * 1.02).toFixed(2)}, ${(livePrice * 1.04).toFixed(2)}, ${(livePrice * 1.06).toFixed(2)}]
-   
-   SWING (Daily+ timeframe) - REQUIRED:
-   - Entry: Daily support/resistance, weekly pivots, major Fibonacci levels
-   - Look for: Daily chart patterns, multi-day consolidation breakouts
-   - Entry can be 3-5% away waiting for ideal technical setup
-   - Wider stop (2-4% of price), multi-day targets (5-15% moves)
-   - Example LONG swing: entry=${(livePrice * 0.97).toFixed(2)}, stop=${(livePrice * 0.95).toFixed(2)}, targets=[${(livePrice * 1.05).toFixed(2)}, ${(livePrice * 1.10).toFixed(2)}, ${(livePrice * 1.15).toFixed(2)}]
-   
-   ⚠️ CRITICAL: All three signal types must follow the same direction (long or short) but with different entry levels and targets appropriate to their holding period.
-
-6. RISK-REWARD ANALYSIS: 
-   - Stop loss at recent structure invalidation point (swing low/high + ATR buffer)
-   - Minimum 2:1 reward:risk ratio required for all setups
-   - Multiple targets: 1st target at 1R, 2nd at 2R, 3rd at 3R+
-   - Position sizing based on stop distance and volatility
-
-7. QUANTITATIVE METRICS: Include probability estimates for directional moves, expected value calculations for trade setups, historical win rates for similar market conditions, and risk-adjusted return expectations.
-
-8. INSTITUTIONAL PERSPECTIVE: Analyze smart money flow indicators, level significance and institutional interest, market maker positioning insights, and liquidity/slippage considerations.
-
-REMEMBER: Think like a professional trader - patience for optimal entries at key levels beats forcing entries at current price. Your entries should be where institutional traders would actually place their limit orders based on technical structure, not random prices near current market price.
-
-CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never "none"). Return analysis in the exact JSON structure defined by the function schema.`;
+Analyze the data objectively and provide signals that follow what the market is actually showing.`;
 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     

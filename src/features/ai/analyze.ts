@@ -134,14 +134,49 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     console.warn('[analyze] Failed to fetch news sentiment, continuing without it:', err instanceof Error ? err.message : 'Unknown error');
   }
 
-  // Send candles to ai-analyze - it will fetch technicals from Polygon
+  // Fetch quant metrics from quant-data function
+  let quantMetrics = null;
+  try {
+    const quantController = new AbortController();
+    const quantTimeout = setTimeout(() => quantController.abort(), 10000); // 10s timeout
+    
+    const quantResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/quant-data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol: payload.symbol,
+        tf: payload.timeframe,
+        withSummary: false
+      }),
+      signal: quantController.signal
+    });
+
+    clearTimeout(quantTimeout);
+
+    if (quantResponse.ok) {
+      const quantResult = await quantResponse.json();
+      quantMetrics = {
+        indicators: quantResult.indicators,
+        signals: quantResult.signals,
+        metrics: quantResult.metrics
+      };
+      console.log('[analyze] Quant metrics fetched:', Object.keys(quantMetrics));
+    } else {
+      console.warn('[analyze] Quant API returned error:', quantResponse.status);
+    }
+  } catch (err) {
+    console.warn('[analyze] Failed to fetch quant metrics, continuing without them:', err instanceof Error ? err.message : 'Unknown error');
+  }
+
+  // Send ALL data to ai-analyze - let AI derive signals from the data
   const analysisPayload = {
     symbol: payload.symbol,
     timeframe: payload.timeframe,
     market: payload.market,
     candles: freshCandles,
     currentPrice, // Pass live price for context
-    news: newsData
+    news: newsData,
+    quantMetrics // Pass quant data for AI to analyze
   };
 
   console.log('[analyze] Calling ai-analyze with', freshCandles.length, 'candles, currentPrice:', currentPrice);
