@@ -894,7 +894,7 @@ CRITICAL VALIDATION RULES:
     // ==================== SIGNAL QUALITY FILTERS ====================
     
     // Check if direction is "hold" OR if action is "hold" - return early without saving to database
-    if (parsed.trade_idea.direction === 'hold' || parsed.action === 'hold') {
+    if (parsed.trade_idea?.direction === 'hold' || parsed.action === 'hold') {
       console.log(`[VALIDATION] ⚪ AI returned "hold" signal - no trade recommended`);
       
       // Build a proper response with the hold recommendation
@@ -903,7 +903,7 @@ CRITICAL VALIDATION RULES:
         timestamp: new Date().toISOString(),
         recommendation: 'hold',
         confidence: 0, // Hold signals have 0 confidence for trading
-        holdReason: parsed.trade_idea.rationale || parsed.action_text || 'Market conditions are unclear or conflicting. Waiting for better setup.',
+        holdReason: parsed.trade_idea?.rationale || parsed.action_text || 'Market conditions are unclear or conflicting. Waiting for better setup.',
         analysis: parsed.summary || 'Technical indicators do not show strong directional bias. Recommend waiting for clearer signals.',
         outlook: parsed.outlook || 'neutral',
         action: 'hold',
@@ -997,7 +997,7 @@ CRITICAL VALIDATION RULES:
     }
     
     // Validate risk-reward ratio (reusing variables from earlier validation)
-    const target1Price = parsed.trade_idea.targets?.[0];
+    const target1Price = parsed.trade_idea?.targets?.[0];
     
     if (entryPrice && stopPrice && target1Price) {
       const isLong = tradeDirection === 'long';
