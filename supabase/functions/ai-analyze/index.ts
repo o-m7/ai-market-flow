@@ -507,8 +507,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_completion_tokens: 4096, // Use max_completion_tokens for GPT-5
-      temperature: 0.7,
+      max_completion_tokens: 4096,
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
