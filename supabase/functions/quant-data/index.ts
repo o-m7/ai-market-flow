@@ -1,3 +1,12 @@
+// ============= QUANT-DATA v3.0.0 - LIVE PRICE INTEGRATION =============
+// CRITICAL UPDATES:
+// 1. Uses gpt-5 for AI summaries (when requested)
+// 2. EMAs/RSI/MACD calculated with LIVE snapshot price appended to historical data
+// 3. Ensures indicators always reflect current market state (not just last candle)
+// 4. Full news integration for comprehensive analysis
+// 5. Real-time accuracy at all times
+// =========================================================================
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
@@ -706,10 +715,10 @@ Focus on momentum, trend, and volatility signals. Be specific and actionable.`;
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-2025-08-07', // Use latest model for better analysis
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 200,
-        temperature: 0.7
+        max_completion_tokens: 200,
+        // Note: temperature not supported in GPT-5
       })
     });
 
@@ -740,7 +749,7 @@ serve(async (req) => {
       throw new Error('POLYGON_API_KEY not configured');
     }
 
-    console.log(`[QUANT-DATA v2024.10.09] Fetching quant data for ${symbol}, timeframe: ${tf}, withSummary: ${withSummary}`);
+    console.log(`[QUANT-DATA v3.0.0 LIVE] Fetching quant data for ${symbol}, timeframe: ${tf}, withSummary: ${withSummary}`);
 
     // Fetch market data with fresh timestamps and live price
     const { candles, livePrice, snapshotTime } = await fetchPolygonData(symbol, tf, polygonApiKey);
@@ -780,27 +789,40 @@ serve(async (req) => {
     const currentPrice = livePrice || prices[prices.length - 1];
     const prevClose = prices.length > 1 ? prices[prices.length - 2] : null;
     
+    // CRITICAL: Add live price to prices array for REAL-TIME EMA calculation
+    // This ensures EMAs reflect the current market state, not just historical candles
+    const pricesWithLive = livePrice && livePrice !== prices[prices.length - 1]
+      ? [...prices, livePrice]  // Append live price if it's different from last candle
+      : prices;  // Otherwise use prices as-is
+    
+    console.log(`📊 Price array for indicators: ${prices.length} historical candles + ${pricesWithLive.length > prices.length ? '1 LIVE price' : '0 live'}`);
+    
     // Log the actual candle timestamps to debug old data issue
     const firstCandleTime = new Date(candles[0].t).toISOString();
     const lastCandleTime = new Date(candles[candles.length - 1].t).toISOString();
     console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${prices[prices.length - 1]}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
     console.log(`💰 LIVE CURRENT PRICE: ${currentPrice} @ ${snapshotTime || 'N/A'} | Last candle close: ${prices[prices.length - 1]} | Prev close: ${prevClose}`);
 
-    // Calculate technical indicators (use Polygon indicators if available)
-    const ema20 = calculateEMA(prices, 20);
-    const ema50 = calculateEMA(prices, 50);
-    const ema200 = calculateEMA(prices, 200);
-    const rsi14 = polygonIndicators.rsi || calculateRSI(prices, 14);
+    // Calculate technical indicators using LIVE price data (use Polygon indicators if available)
+    const ema20 = calculateEMA(pricesWithLive, 20);
+    const ema50 = calculateEMA(pricesWithLive, 50);
+    const ema200 = calculateEMA(pricesWithLive, 200);
+    const rsi14 = polygonIndicators.rsi || calculateRSI(pricesWithLive, 14);
     
     if (polygonIndicators.usePolygonIndicators) {
       console.log('✅ Using Polygon API indicators for enhanced accuracy');
     }
-    const macd = calculateMACD(prices);
-    const bb20 = calculateBollingerBands(prices, 20);
+    
+    console.log(`📊 REAL-TIME INDICATORS (with live price ${currentPrice}):`);
+    console.log(`  EMA20: ${ema20.toFixed(2)} | EMA50: ${ema50.toFixed(2)} | EMA200: ${ema200.toFixed(2)}`);
+    console.log(`  RSI14: ${rsi14.toFixed(2)} | Price position: ${currentPrice > ema20 ? 'ABOVE' : 'BELOW'} EMA20`);
+    
+    const macd = calculateMACD(pricesWithLive);
+    const bb20 = calculateBollingerBands(pricesWithLive, 20);
     const atr14 = calculateATR(candles, 14);
     const donchian20 = calculateDonchian(candles, 20);
-    const vol20_annual = calculateRealizedVolatility(prices, 20);
-    const zscore20 = calculateZScore(prices, 20);
+    const vol20_annual = calculateRealizedVolatility(pricesWithLive, 20);
+    const zscore20 = calculateZScore(pricesWithLive, 20);
     const vwap = calculateVWAP(candles);
 
     // Fetch benchmark data (S&P 500 proxy) for alpha/beta calculations
@@ -812,20 +834,20 @@ serve(async (req) => {
       console.log('Benchmark data unavailable, alpha/beta will be null');
     }
 
-    // Calculate advanced quantitative metrics
-    const sharpe_ratio = calculateSharpeRatio(prices, Math.min(252, prices.length));
-    const sortino_ratio = calculateSortinoRatio(prices, Math.min(252, prices.length));
-    const alpha = benchmarkPrices.length > 0 ? calculateAlpha(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
-    const beta = benchmarkPrices.length > 0 ? calculateBeta(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
-    const std_dev = calculateSampleStdDev(prices, 20);
+    // Calculate advanced quantitative metrics using LIVE price data
+    const sharpe_ratio = calculateSharpeRatio(pricesWithLive, Math.min(252, pricesWithLive.length));
+    const sortino_ratio = calculateSortinoRatio(pricesWithLive, Math.min(252, pricesWithLive.length));
+    const alpha = benchmarkPrices.length > 0 ? calculateAlpha(pricesWithLive, benchmarkPrices, Math.min(252, Math.min(pricesWithLive.length, benchmarkPrices.length))) : null;
+    const beta = benchmarkPrices.length > 0 ? calculateBeta(pricesWithLive, benchmarkPrices, Math.min(252, Math.min(pricesWithLive.length, benchmarkPrices.length))) : null;
+    const std_dev = calculateSampleStdDev(pricesWithLive, 20);
     const variance = std_dev * std_dev; // Variance is std dev squared
-    const population_std_dev = calculatePopulationStdDev(prices, 20);
-    const sample_std_dev = calculateSampleStdDev(prices, 20);
-    const skewness = calculateSkewness(prices, 20);
-    const kurtosis = calculateKurtosis(prices, 20);
-    const max_drawdown = calculateMaxDrawdown(prices);
-    const calmar_ratio = calculateCalmarRatio(prices, Math.min(252, prices.length));
-    const information_ratio = benchmarkPrices.length > 0 ? calculateInformationRatio(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
+    const population_std_dev = calculatePopulationStdDev(pricesWithLive, 20);
+    const sample_std_dev = calculateSampleStdDev(pricesWithLive, 20);
+    const skewness = calculateSkewness(pricesWithLive, 20);
+    const kurtosis = calculateKurtosis(pricesWithLive, 20);
+    const max_drawdown = calculateMaxDrawdown(pricesWithLive);
+    const calmar_ratio = calculateCalmarRatio(pricesWithLive, Math.min(252, pricesWithLive.length));
+    const information_ratio = benchmarkPrices.length > 0 ? calculateInformationRatio(pricesWithLive, benchmarkPrices, Math.min(252, Math.min(pricesWithLive.length, benchmarkPrices.length))) : null;
 
     // Create tail data (last 50 points for sparkline)
     const tail = candles.slice(-50).map(c => ({ t: c.t, c: c.c }));
