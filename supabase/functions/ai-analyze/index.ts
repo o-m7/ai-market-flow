@@ -429,9 +429,9 @@ CRITICAL RULES:
       '1m': 90,     // 1.5 minutes (tightened from 2)
       '5m': 360,    // 6 minutes (tightened from 10)
       '15m': 900,   // 15 minutes (tightened from 20)
-      '30m': 1500,  // 25 minutes (tightened from 35)
-      '1h': 1200,   // 20 minutes (tightened from 65) - KEY CHANGE for crypto
-      '4h': 7200,   // 2 hours (tightened from 250 min)
+      '30m': 1800,  // 30 minutes (tightened from 35)
+      '1h': 4200,   // 70 minutes - allows current hour + buffer (was 65, then 20 which was too strict)
+      '4h': 15600,  // 4.3 hours (tightened from 250 min)
       '1d': 28800   // 8 hours (tightened from 1500 min)
     };
     
