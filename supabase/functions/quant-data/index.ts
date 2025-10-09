@@ -761,8 +761,11 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   const daysToFetch = lookbackDays[tf] || 30;
   const fromMs = now - (daysToFetch * 24 * 60 * 60 * 1000);
   
-  // Use millisecond timestamps for fresh data - Polygon supports both
-  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${timeframe}/${fromMs}/${now}?adjusted=true&sort=asc&limit=5000&apiKey=${polygonApiKey}`;
+  // CRITICAL: Convert to Unix seconds for Polygon API (not milliseconds!)
+  const fromUnix = Math.floor(fromMs / 1000);
+  const toUnix = Math.floor(now / 1000);
+  
+  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${timeframe}/${fromUnix}/${toUnix}?adjusted=true&sort=asc&limit=5000&apiKey=${polygonApiKey}`;
   
   console.log(`Fetching FRESH data: symbol=${symbol}, polygonSymbol=${polygonSymbol}, timeframe=${tf}, from=${new Date(fromMs).toISOString()}, to=${new Date(now).toISOString()}`);
   
@@ -783,8 +786,25 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   
   const latestTimestamp = data.results[data.results.length - 1].t;
   const dataAge = (now - latestTimestamp) / (1000 * 60); // Age in minutes
+  
+  // Define max acceptable data age by timeframe (in minutes)
+  const maxDataAge: Record<string, number> = {
+    '1m': 10,   // 1min data should be < 10 min old
+    '5m': 30,   // 5min data should be < 30 min old  
+    '15m': 60,  // 15min data should be < 1 hour old
+    '1h': 180,  // 1h data should be < 3 hours old
+    '1d': 1440  // Daily data should be < 1 day old
+  };
+  
+  const maxAge = maxDataAge[tf] || 180;
+  
   console.log(`✅ Fetched ${data.results.length} FRESH candles for ${polygonSymbol}`);
   console.log(`📊 Latest candle: ${new Date(latestTimestamp).toISOString()} (${dataAge.toFixed(1)} minutes old)`);
+  
+  if (dataAge > maxAge) {
+    console.error(`❌ DATA TOO STALE: Latest candle is ${dataAge.toFixed(0)} minutes old (max ${maxAge} min for ${tf} timeframe)`);
+    throw new Error(`Data is too stale for ${symbol}. Latest: ${new Date(latestTimestamp).toISOString()}, Age: ${dataAge.toFixed(0)} min`);
+  }
   
   const candles = data.results.map((bar: any) => ({
     t: bar.t,

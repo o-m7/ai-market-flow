@@ -144,12 +144,36 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     news: newsData
   };
 
-  const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(analysisPayload) });
-  if (!r.ok) {
-    const text = await r.text().catch(()=> '');
-    throw new Error(`AI analyze failed: ${r.status} - ${text || r.statusText}`);
+  console.log('[analyze] Calling ai-analyze with', freshCandles.length, 'candles, currentPrice:', currentPrice);
+
+  const analysisController = new AbortController();
+  const analysisTimeout = setTimeout(() => analysisController.abort(), 45000); // 45s timeout for AI analysis
+
+  try {
+    const r = await fetch(url, { 
+      method: 'POST', 
+      headers, 
+      body: JSON.stringify(analysisPayload),
+      signal: analysisController.signal
+    });
+    
+    clearTimeout(analysisTimeout);
+    
+    if (!r.ok) {
+      const text = await r.text().catch(()=> '');
+      throw new Error(`AI analyze failed: ${r.status} - ${text || r.statusText}`);
+    }
+    
+    const result = await r.json();
+    console.log('[analyze] AI analysis completed successfully');
+    return result; // { summary, outlook, levels, trade_idea, confidence, risks, json_version }
+  } catch (err) {
+    clearTimeout(analysisTimeout);
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('AI analysis timed out after 45 seconds. Please try again.');
+    }
+    throw err;
   }
-  return r.json(); // { summary, outlook, levels, trade_idea, confidence, risks, json_version }
 }
 
 // Technical indicators are now fetched by the ai-analyze edge function from Polygon API
