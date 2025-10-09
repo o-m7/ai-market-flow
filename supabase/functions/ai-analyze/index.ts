@@ -631,8 +631,7 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
     const validationStartTime = Date.now();
     console.log(`[VALIDATION] ⏱️  Starting validation pipeline at ${new Date().toISOString()}`);
     
-    // Validate and calculate accuracy metrics
-    const latestCandleTime = candles[candles.length - 1]?.t || Date.now();
+    // Validate and calculate accuracy metrics (reusing latestCandleTime from above)
     const dataAgeSeconds = Math.round((Date.now() - latestCandleTime) / 1000);
     const dataAgeMinutes = (dataAgeSeconds / 60).toFixed(2);
     
