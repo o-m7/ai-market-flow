@@ -44,6 +44,8 @@ interface AnalysisResult {
     factors: string[];
   };
   timestamp: string;
+  holdReason?: string; // Added for hold signals
+  rejectionDetails?: any; // Added for rejection details
 }
 
 const POPULAR_SYMBOLS = [
@@ -257,6 +259,47 @@ export const AIAnalysis = () => {
       console.log('Analysis result:', result);
 
       // Convert to the format expected by AiResult component
+      // Check if we got a "hold" signal or rejection
+      if (result.signal === 'hold' || result.error) {
+        const isHold = result.signal === 'hold';
+        const message = isHold 
+          ? result.message || 'Conditions unclear - waiting for better setup'
+          : result.details?.message || result.error || 'Signal quality insufficient';
+        
+        toast({
+          title: isHold ? '⏸️ Hold Signal' : '⚠️ Signal Rejected',
+          description: message,
+          variant: isHold ? 'default' : 'destructive',
+        });
+        
+        // Display hold/rejection info in the analysis panel
+        const holdAnalysis = {
+          symbol: symbol.toUpperCase(),
+          analysis: result.rationale || message,
+          recommendation: 'hold' as const,
+          confidence: result.confidence_agreement || 0,
+          keyLevels: { support: [], resistance: [] },
+          technicalIndicators: {
+            rsi: 50,
+            trend: 'neutral' as const,
+            momentum: 'neutral' as const
+          },
+          chartPatterns: [],
+          priceTargets: { bullish: 0, bearish: 0 },
+          riskAssessment: {
+            level: 'medium' as const,
+            factors: [message]
+          },
+          timestamp: new Date().toISOString(),
+          holdReason: message,
+          rejectionDetails: result.details
+        };
+        
+        setAnalysis(holdAnalysis);
+        setLoading(false);
+        return;
+      }
+      
       const analysisForDisplay = {
         symbol: symbol.toUpperCase(),
         analysis: result.summary || 'Analysis completed successfully',

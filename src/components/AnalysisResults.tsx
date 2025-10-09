@@ -74,6 +74,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
     switch (rec) {
       case 'buy': return 'text-green-500 bg-green-500/10 border-green-500/20';
       case 'sell': return 'text-red-500 bg-red-500/10 border-red-500/20';
+      case 'hold': return 'text-terminal-accent bg-terminal-accent/10 border-terminal-accent/20';
       default: return 'text-muted-foreground bg-muted border-border';
     }
   };
@@ -179,6 +180,47 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
           </div>
         </CardHeader>
       </Card>
+
+      {/* Hold Signal Notice - Shows when AI returns "hold" */}
+      {data.recommendation === 'hold' && (data.holdReason || data.rejectionDetails) && (
+        <Card className="border-2 bg-terminal-accent/5 border-terminal-accent">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <Activity className="h-5 w-5 flex-shrink-0 mt-0.5 text-terminal-accent" />
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="font-mono-tabular bg-terminal-accent/20 text-terminal-accent border-terminal-accent">
+                    ⏸️ HOLD SIGNAL
+                  </Badge>
+                  <span className="text-xs font-mono-tabular text-terminal-secondary">
+                    NO TRADE RECOMMENDED
+                  </span>
+                </div>
+                <p className="text-sm font-mono-tabular text-terminal-text">
+                  {data.holdReason || 'Conditions unclear - waiting for better setup'}
+                </p>
+                {data.rejectionDetails && (
+                  <div className="mt-2 space-y-1">
+                    {data.rejectionDetails.confidence_agreement !== undefined && (
+                      <p className="text-xs font-mono-tabular text-terminal-secondary">
+                        • Confidence Agreement: {data.rejectionDetails.confidence_agreement}% (Minimum: {data.rejectionDetails.threshold}%)
+                      </p>
+                    )}
+                    {data.rejectionDetails.rr_ratio && (
+                      <p className="text-xs font-mono-tabular text-terminal-secondary">
+                        • Risk:Reward Ratio: {data.rejectionDetails.rr_ratio} (Minimum: {data.rejectionDetails.threshold})
+                      </p>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs font-mono-tabular text-terminal-accent mt-2">
+                  💡 Wait for clearer technical setup or stronger indicator confluence before entering
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Data Staleness Warning - Critical Alert */}
       {data.data_staleness_warning && (

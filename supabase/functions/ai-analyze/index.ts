@@ -272,13 +272,33 @@ AI DECISION-MAKING INSTRUCTIONS:
    - RSI: Overbought (>70), oversold (<30), or neutral?
    - Bollinger Bands: Is price at upper/lower band? Squeeze or expansion?
    - Support/Resistance: Where are the nearest key levels?
+   
+   ⭐ CONFLUENCE CHECK:
+   - Do at least 4 out of 6 major indicators agree on direction?
+   - If indicators conflict significantly, strongly consider returning "hold"
 
-3. DETERMINE SINGLE TRADE SIGNAL:
-   - Direction: LONG or SHORT based on combined analysis of news + technicals
-   - Entry: Use current price or nearest key level (support for long, resistance for short)
-   - Stop: Place at structure invalidation point (recent swing + buffer)
-   - Targets: Use actual resistance/support levels from data (NOT formulas)
-   - Time Horizon: Choose ONE that best fits the setup (scalp/intraday/swing/position)
+3. DETERMINE TRADE SIGNAL:
+   - Direction: LONG, SHORT, or HOLD
+     * Return "hold" if:
+       - Fewer than 4 indicators agree on direction
+       - News sentiment strongly conflicts with technicals
+       - Price is in consolidation/chop (ATR declining, inside bars)
+       - High event risk but unclear directional bias
+   
+   - Entry: Current price OR nearest key level (support for long, resistance for short)
+   
+   - Stop: Place BEYOND recent swing structure
+     * LONG: Below recent swing low + 1.5 ATR buffer
+     * SHORT: Above recent swing high + 1.5 ATR buffer
+     * Minimum 1.5 ATR distance from entry to account for normal volatility
+   
+   - Targets: Use REAL support/resistance levels from data
+     * Target 1: Nearest resistance (long) / support (short)
+     * Target 2: Next major level
+     * Target 3: Extended objective (optional)
+     * Ensure Target 1 is at least 2x the stop distance (R:R ≥ 2.0)
+   
+   - Time Horizon: scalp (<1h), intraday (1-8h), swing (1-5 days), position (>5 days)
 
 4. NEWS IMPACT SECTION:
    - Explain how news influenced your decision
@@ -286,13 +306,17 @@ AI DECISION-MAKING INSTRUCTIONS:
    - Assess whether news creates opportunity or risk
 
 CRITICAL RULES:
-✅ Generate ONE trade signal optimized for current conditions
+✅ Generate "hold" signal if conditions are unclear or conflicting
+✅ Ensure Risk:Reward ratio ≥ 2.0 (Target 1 distance must be 2x stop distance)
+✅ Stops must be at least 1.5 ATR from entry
 ✅ Let NEWS influence your confidence and risk management
 ✅ Use REAL levels from data for entry/stop/targets
+✅ Require at least 4 out of 6 indicators to agree before generating long/short signal
 ✅ Explain how news + technicals combine to create the signal
-❌ Do NOT ignore news sentiment - it MUST factor into your decision
-❌ Do NOT use formula-based stops (like "1.5 ATR") - use actual price levels
-❌ Do NOT generate multiple signals - just ONE optimized setup`;
+❌ Do NOT generate long/short in choppy/unclear markets
+❌ Do NOT use formula-based stops - use structure + ATR buffer
+❌ Do NOT generate signals with R:R < 2.0
+❌ Do NOT ignore news sentiment - it MUST factor into your decision`;
 
     console.log('[ai-analyze] Calling OpenAI with news-integrated analysis...');
     
@@ -390,13 +414,13 @@ CRITICAL RULES:
     // TIMEFRAME-AWARE FRESHNESS CHECK
     // Adjust threshold based on timeframe (allow slightly more than the candle interval)
     const timeframeThresholds: Record<string, number> = {
-      '1m': 120,    // 2 minutes
-      '5m': 600,    // 10 minutes
-      '15m': 1200,  // 20 minutes
-      '30m': 2100,  // 35 minutes
-      '1h': 3900,   // 65 minutes
-      '4h': 15000,  // 250 minutes
-      '1d': 90000   // 1500 minutes
+      '1m': 90,     // 1.5 minutes (tightened from 2)
+      '5m': 360,    // 6 minutes (tightened from 10)
+      '15m': 900,   // 15 minutes (tightened from 20)
+      '30m': 1500,  // 25 minutes (tightened from 35)
+      '1h': 1200,   // 20 minutes (tightened from 65) - KEY CHANGE for crypto
+      '4h': 7200,   // 2 hours (tightened from 250 min)
+      '1d': 28800   // 8 hours (tightened from 1500 min)
     };
     
     const maxAgeSeconds = timeframeThresholds[timeframe] || 300; // default 5min for unknown
