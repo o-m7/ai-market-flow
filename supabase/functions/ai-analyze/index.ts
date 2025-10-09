@@ -621,11 +621,33 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
     console.log(`  - Latest candle: ${new Date(latestCandleTime).toISOString()}`);
     console.log(`  - Data age: ${dataAgeSeconds}s (${dataAgeMinutes} minutes)`);
     
-    const freshness_score = Math.max(0, 100 - (dataAgeSeconds / 60) * 10); // Lose 10 points per minute of age
-    console.log(`  - Freshness score: ${freshness_score.toFixed(2)}/100`);
+    // CRYPTO SPECIFIC: 2-minute freshness threshold (lose 15 points per minute)
+    // At 2 minutes = 70% (warning threshold)
+    // At 3 minutes = 55% (stale)
+    // At 5 minutes = 25% (very stale)
+    const freshness_score = Math.max(0, 100 - (dataAgeSeconds / 60) * 15);
+    console.log(`  - Freshness score: ${freshness_score.toFixed(2)}/100 (crypto threshold: 2min)`);
+    
+    // Critical: Block analysis if data is extremely stale (>5 minutes old)
+    if (dataAgeSeconds > 300) {
+      console.error(`[VALIDATION] ❌ CRITICAL: Data is ${dataAgeMinutes} minutes old (>5min threshold). Analysis blocked.`);
+      return new Response(JSON.stringify({ 
+        error: "Data too stale for accurate analysis",
+        data_age_seconds: dataAgeSeconds,
+        data_age_minutes: parseFloat(dataAgeMinutes),
+        freshness_score: Math.round(freshness_score),
+        message: `Market data is ${dataAgeMinutes} minutes old. For crypto analysis, data must be less than 5 minutes old. Please refresh and try again.`,
+        timestamp: new Date().toISOString()
+      }), {
+        status: 422,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
     if (freshness_score < 70) {
-      console.warn(`[VALIDATION] ⚠️  DATA STALENESS WARNING: Score ${freshness_score.toFixed(2)} < 70 (data is ${dataAgeMinutes} minutes old)`);
+      console.warn(`[VALIDATION] ⚠️  DATA STALENESS WARNING: Score ${freshness_score.toFixed(2)} < 70 (data is ${dataAgeMinutes} minutes old - exceeds 2min crypto threshold)`);
+    } else {
+      console.log(`[VALIDATION] ✅ Data is fresh (within 2-minute crypto threshold)`);
     }
     
     const livePrice = currentPrice || features.technical.current;
@@ -840,6 +862,16 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       warnings_count: validationNotes.length
     });
 
+    // Add data staleness warning to result if needed
+    const stalenessWarning = freshness_score < 70 ? {
+      warning: "DATA_STALENESS",
+      severity: freshness_score < 40 ? "HIGH" : "MEDIUM",
+      message: `Market data is ${dataAgeMinutes} minutes old. For volatile crypto markets, fresher data (<2min) provides more accurate signals.`,
+      data_age_seconds: dataAgeSeconds,
+      freshness_score: Math.round(freshness_score),
+      recommendation: "Consider refreshing data for more reliable analysis"
+    } : null;
+    
     // Validate and ensure all required fields
     const result = {
       ...parsed,
@@ -850,6 +882,7 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       function_version: FUNCTION_VERSION,
       json_version: "1.0.0",
       analyzed_at: new Date().toISOString(),
+      data_staleness_warning: stalenessWarning,
       input_features: features,
       input_news: news || { event_risk: false, headline_hits_30m: 0 },
       accuracy_metrics: {
@@ -858,9 +891,19 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
         level_precision_score: Math.round(level_precision),
         entry_validity_score: Math.round(entry_validity),
         overall_accuracy,
-        validation_notes: validationNotes
+        validation_notes: validationNotes,
+        data_age_info: {
+          age_seconds: dataAgeSeconds,
+          age_minutes: parseFloat(dataAgeMinutes),
+          latest_candle_time: new Date(latestCandleTime).toISOString(),
+          current_time: new Date().toISOString()
+        }
       }
     };
+    
+    if (stalenessWarning) {
+      console.warn(`[VALIDATION] ⚠️  Adding staleness warning to response: ${stalenessWarning.severity} severity`);
+    }
 
     console.log(`[ai-analyze] Deterministic analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);
     

@@ -64,6 +64,45 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </CardHeader>
       </Card>
 
+      {/* Data Staleness Warning - Critical Alert */}
+      {data.data_staleness_warning && (
+        <Card className={`border-2 ${
+          data.data_staleness_warning.severity === 'HIGH' 
+            ? 'bg-terminal-red/5 border-terminal-red' 
+            : 'bg-terminal-accent/5 border-terminal-accent'
+        }`}>
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                data.data_staleness_warning.severity === 'HIGH' 
+                  ? 'text-terminal-red' 
+                  : 'text-terminal-accent'
+              }`} />
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className={`font-mono-tabular ${
+                    data.data_staleness_warning.severity === 'HIGH' 
+                      ? 'bg-terminal-red/20 text-terminal-red border-terminal-red' 
+                      : 'bg-terminal-accent/20 text-terminal-accent border-terminal-accent'
+                  }`}>
+                    {data.data_staleness_warning.severity} SEVERITY
+                  </Badge>
+                  <span className="text-xs font-mono-tabular text-terminal-secondary">
+                    DATA AGE: {data.data_staleness_warning.data_age_seconds}s ({data.accuracy_metrics?.data_age_info?.age_minutes || 0}m)
+                  </span>
+                </div>
+                <p className="text-sm font-mono-tabular text-terminal-text">
+                  {data.data_staleness_warning.message}
+                </p>
+                <p className="text-xs font-mono-tabular text-terminal-secondary">
+                  💡 {data.data_staleness_warning.recommendation}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Accuracy Metrics - Quantitative Validation */}
       {data.accuracy_metrics && (
         <Card className="bg-terminal border-terminal-border">
