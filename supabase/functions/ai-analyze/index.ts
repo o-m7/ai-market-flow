@@ -864,52 +864,166 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
     
     console.log(`[VALIDATION] 📊 Updated Entry Validity Score: ${entry_validity}/100`);
     
-    // Calculate signal clarity score
-    console.log(`[VALIDATION] 🎯 Signal Clarity Calculation (starting at 50):`);
+    // ==================== SIGNAL CONFIDENCE AGREEMENT SCORE ====================
+    console.log(`[VALIDATION] 🎯 Signal Confidence Agreement Analysis:`);
+    
     const ema20 = features.technical.ema20;
     const ema50 = features.technical.ema50;
+    const ema200 = features.technical.ema200;
     const macd_hist = features.technical.macd.hist;
     const rsi = features.technical.rsi14;
     
     console.log(`  - Technical Indicators:`);
+    console.log(`    • Current Price: ${livePrice.toFixed(2)}`);
     console.log(`    • EMA20: ${ema20.toFixed(2)}`);
     console.log(`    • EMA50: ${ema50.toFixed(2)}`);
+    console.log(`    • EMA200: ${ema200.toFixed(2)}`);
     console.log(`    • MACD Hist: ${macd_hist.toFixed(4)}`);
     console.log(`    • RSI: ${rsi.toFixed(2)}`);
+    console.log(`    • Trade Direction: ${tradeDirection?.toUpperCase()}`);
     
-    let signal_clarity = 50;
+    // Define strict indicator agreement rules
+    const indicatorChecks = [];
+    const conflictingSignals = [];
+    let agreementCount = 0;
+    let totalChecks = 0;
     
-    // EMA alignment adds clarity
-    const priceAboveEmas = livePrice > ema20 && livePrice > ema50;
-    const priceBelowEmas = livePrice < ema20 && livePrice < ema50;
-    if (priceAboveEmas || priceBelowEmas) {
-      signal_clarity += 20;
-      console.log(`[VALIDATION] ✅ EMA Alignment (+20): Price ${priceAboveEmas ? 'above' : 'below'} both EMAs`);
-    } else {
-      console.log(`[VALIDATION] ⚠️  EMA Mixed: Price between EMAs (+0)`);
+    if (tradeDirection === 'long') {
+      console.log(`  - Checking LONG signal validity against indicators:`);
+      
+      // RSI Check: Should be < 70 for valid LONG
+      totalChecks++;
+      if (rsi < 70) {
+        agreementCount++;
+        indicatorChecks.push({ indicator: 'RSI', status: 'AGREE', detail: `RSI ${rsi.toFixed(2)} < 70 ✓`, weight: 1 });
+        console.log(`    ✅ RSI: ${rsi.toFixed(2)} < 70 (valid for LONG)`);
+      } else {
+        indicatorChecks.push({ indicator: 'RSI', status: 'CONFLICT', detail: `RSI ${rsi.toFixed(2)} >= 70 (overbought)`, weight: 1 });
+        conflictingSignals.push(`RSI ${rsi.toFixed(2)} is overbought (>= 70) for LONG entry`);
+        console.warn(`    ❌ RSI: ${rsi.toFixed(2)} >= 70 (OVERBOUGHT - conflicts with LONG)`);
+      }
+      
+      // MACD Check: Should be > -0.0001 for valid LONG
+      totalChecks++;
+      if (macd_hist > -0.0001) {
+        agreementCount++;
+        indicatorChecks.push({ indicator: 'MACD', status: 'AGREE', detail: `MACD ${macd_hist.toFixed(4)} > -0.0001 ✓`, weight: 1 });
+        console.log(`    ✅ MACD: ${macd_hist.toFixed(4)} > -0.0001 (valid for LONG)`);
+      } else {
+        indicatorChecks.push({ indicator: 'MACD', status: 'CONFLICT', detail: `MACD ${macd_hist.toFixed(4)} <= -0.0001 (bearish)`, weight: 1 });
+        conflictingSignals.push(`MACD histogram ${macd_hist.toFixed(4)} is bearish (<= -0.0001) for LONG entry`);
+        console.warn(`    ❌ MACD: ${macd_hist.toFixed(4)} <= -0.0001 (BEARISH - conflicts with LONG)`);
+      }
+      
+      // EMA200 Check: Price should be above EMA200 for valid LONG
+      totalChecks++;
+      if (livePrice > ema200) {
+        agreementCount++;
+        indicatorChecks.push({ indicator: 'EMA200', status: 'AGREE', detail: `Price ${livePrice.toFixed(2)} > EMA200 ${ema200.toFixed(2)} ✓`, weight: 1 });
+        console.log(`    ✅ EMA200: Price ${livePrice.toFixed(2)} > EMA200 ${ema200.toFixed(2)} (valid for LONG)`);
+      } else {
+        indicatorChecks.push({ indicator: 'EMA200', status: 'CONFLICT', detail: `Price ${livePrice.toFixed(2)} <= EMA200 ${ema200.toFixed(2)} (bearish trend)`, weight: 1 });
+        conflictingSignals.push(`Price ${livePrice.toFixed(2)} is below EMA200 ${ema200.toFixed(2)} (bearish long-term trend)`);
+        console.warn(`    ❌ EMA200: Price ${livePrice.toFixed(2)} <= EMA200 ${ema200.toFixed(2)} (BEARISH TREND - conflicts with LONG)`);
+      }
+      
+      // Additional momentum checks for LONG
+      totalChecks++;
+      if (livePrice > ema20 && livePrice > ema50) {
+        agreementCount++;
+        indicatorChecks.push({ indicator: 'EMA 20/50', status: 'AGREE', detail: 'Price above both EMAs ✓', weight: 0.5 });
+        console.log(`    ✅ EMA 20/50: Price above both (bullish short-term)`);
+      } else if (livePrice < ema20 && livePrice < ema50) {
+        indicatorChecks.push({ indicator: 'EMA 20/50', status: 'CONFLICT', detail: 'Price below both EMAs', weight: 0.5 });
+        conflictingSignals.push(`Price is below EMA20 and EMA50 (bearish short-term momentum)`);
+        console.warn(`    ❌ EMA 20/50: Price below both (BEARISH SHORT-TERM - conflicts with LONG)`);
+      } else {
+        indicatorChecks.push({ indicator: 'EMA 20/50', status: 'NEUTRAL', detail: 'Mixed EMA signals', weight: 0.5 });
+        console.log(`    ⚠️  EMA 20/50: Mixed signals (neutral)`);
+      }
+      
+    } else if (tradeDirection === 'short') {
+      console.log(`  - Checking SHORT signal validity against indicators:`);
+      
+      // RSI Check: Should be > 30 for valid SHORT
+      totalChecks++;
+      if (rsi > 30) {
+        agreementCount++;
+        indicatorChecks.push({ indicator: 'RSI', status: 'AGREE', detail: `RSI ${rsi.toFixed(2)} > 30 ✓`, weight: 1 });
+        console.log(`    ✅ RSI: ${rsi.toFixed(2)} > 30 (valid for SHORT)`);
+      } else {
+        indicatorChecks.push({ indicator: 'RSI', status: 'CONFLICT', detail: `RSI ${rsi.toFixed(2)} <= 30 (oversold)`, weight: 1 });
+        conflictingSignals.push(`RSI ${rsi.toFixed(2)} is oversold (<= 30) for SHORT entry`);
+        console.warn(`    ❌ RSI: ${rsi.toFixed(2)} <= 30 (OVERSOLD - conflicts with SHORT)`);
+      }
+      
+      // MACD Check: Should be < 0.0001 for valid SHORT
+      totalChecks++;
+      if (macd_hist < 0.0001) {
+        agreementCount++;
+        indicatorChecks.push({ indicator: 'MACD', status: 'AGREE', detail: `MACD ${macd_hist.toFixed(4)} < 0.0001 ✓`, weight: 1 });
+        console.log(`    ✅ MACD: ${macd_hist.toFixed(4)} < 0.0001 (valid for SHORT)`);
+      } else {
+        indicatorChecks.push({ indicator: 'MACD', status: 'CONFLICT', detail: `MACD ${macd_hist.toFixed(4)} >= 0.0001 (bullish)`, weight: 1 });
+        conflictingSignals.push(`MACD histogram ${macd_hist.toFixed(4)} is bullish (>= 0.0001) for SHORT entry`);
+        console.warn(`    ❌ MACD: ${macd_hist.toFixed(4)} >= 0.0001 (BULLISH - conflicts with SHORT)`);
+      }
+      
+      // EMA200 Check: Price should be below EMA200 for valid SHORT
+      totalChecks++;
+      if (livePrice < ema200) {
+        agreementCount++;
+        indicatorChecks.push({ indicator: 'EMA200', status: 'AGREE', detail: `Price ${livePrice.toFixed(2)} < EMA200 ${ema200.toFixed(2)} ✓`, weight: 1 });
+        console.log(`    ✅ EMA200: Price ${livePrice.toFixed(2)} < EMA200 ${ema200.toFixed(2)} (valid for SHORT)`);
+      } else {
+        indicatorChecks.push({ indicator: 'EMA200', status: 'CONFLICT', detail: `Price ${livePrice.toFixed(2)} >= EMA200 ${ema200.toFixed(2)} (bullish trend)`, weight: 1 });
+        conflictingSignals.push(`Price ${livePrice.toFixed(2)} is above EMA200 ${ema200.toFixed(2)} (bullish long-term trend)`);
+        console.warn(`    ❌ EMA200: Price ${livePrice.toFixed(2)} >= EMA200 ${ema200.toFixed(2)} (BULLISH TREND - conflicts with SHORT)`);
+      }
+      
+      // Additional momentum checks for SHORT
+      totalChecks++;
+      if (livePrice < ema20 && livePrice < ema50) {
+        agreementCount++;
+        indicatorChecks.push({ indicator: 'EMA 20/50', status: 'AGREE', detail: 'Price below both EMAs ✓', weight: 0.5 });
+        console.log(`    ✅ EMA 20/50: Price below both (bearish short-term)`);
+      } else if (livePrice > ema20 && livePrice > ema50) {
+        indicatorChecks.push({ indicator: 'EMA 20/50', status: 'CONFLICT', detail: 'Price above both EMAs', weight: 0.5 });
+        conflictingSignals.push(`Price is above EMA20 and EMA50 (bullish short-term momentum)`);
+        console.warn(`    ❌ EMA 20/50: Price above both (BULLISH SHORT-TERM - conflicts with SHORT)`);
+      } else {
+        indicatorChecks.push({ indicator: 'EMA 20/50', status: 'NEUTRAL', detail: 'Mixed EMA signals', weight: 0.5 });
+        console.log(`    ⚠️  EMA 20/50: Mixed signals (neutral)`);
+      }
     }
     
-    // MACD agreement adds clarity
-    const macdAgreesLong = macd_hist > 0 && tradeDirection === 'long';
-    const macdAgreesShort = macd_hist < 0 && tradeDirection === 'short';
-    if (macdAgreesLong || macdAgreesShort) {
-      signal_clarity += 15;
-      console.log(`[VALIDATION] ✅ MACD Agreement (+15): MACD ${macd_hist > 0 ? 'positive' : 'negative'} matches ${tradeDirection}`);
+    // Calculate signal confidence agreement score (0-100%)
+    const signal_confidence_agreement = Math.round((agreementCount / totalChecks) * 100);
+    console.log(`\n[VALIDATION] 📊 Signal Confidence Agreement: ${agreementCount}/${totalChecks} checks passed = ${signal_confidence_agreement}%`);
+    
+    // Determine signal quality
+    let signalQuality = 'STRONG';
+    if (signal_confidence_agreement < 50) {
+      signalQuality = 'WEAK';
+      console.warn(`[VALIDATION] ⚠️  WEAK SIGNAL: Only ${signal_confidence_agreement}% indicator agreement`);
+    } else if (signal_confidence_agreement < 75) {
+      signalQuality = 'MODERATE';
+      console.log(`[VALIDATION] ⚠️  MODERATE SIGNAL: ${signal_confidence_agreement}% indicator agreement`);
     } else {
-      console.log(`[VALIDATION] ⚠️  MACD Conflict: MACD ${macd_hist > 0 ? 'positive' : 'negative'} conflicts with ${tradeDirection} (+0)`);
+      console.log(`[VALIDATION] ✅ STRONG SIGNAL: ${signal_confidence_agreement}% indicator agreement`);
     }
     
-    // RSI extreme adds clarity
-    const rsiSupportsLong = rsi < 35 && tradeDirection === 'long';
-    const rsiSupportsShort = rsi > 65 && tradeDirection === 'short';
-    if (rsiSupportsLong || rsiSupportsShort) {
-      signal_clarity += 15;
-      console.log(`[VALIDATION] ✅ RSI Extreme (+15): RSI ${rsi.toFixed(2)} supports ${tradeDirection}`);
-    } else {
-      console.log(`[VALIDATION] ⚠️  RSI Neutral: RSI ${rsi.toFixed(2)} not at extreme (+0)`);
+    // Log conflicts
+    if (conflictingSignals.length > 0) {
+      console.warn(`[VALIDATION] ⚠️  ${conflictingSignals.length} CONFLICTING SIGNAL(S) DETECTED:`);
+      conflictingSignals.forEach((conflict, i) => {
+        console.warn(`  ${i + 1}. ${conflict}`);
+      });
     }
     
-    console.log(`[VALIDATION] 📊 Signal Clarity Score: ${signal_clarity}/100`);
+    // Use signal_confidence_agreement as the signal_clarity score
+    const signal_clarity = signal_confidence_agreement;
+    console.log(`[VALIDATION] 📊 Signal Clarity Score (from agreement): ${signal_clarity}/100`);
     
     // Level precision score
     const totalLevels = support.length + resistance.length;
@@ -994,10 +1108,19 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       accuracy_metrics: {
         data_freshness_score: Math.round(freshness_score),
         signal_clarity_score: Math.round(signal_clarity),
+        signal_confidence_agreement: signal_confidence_agreement,
+        signal_quality: signalQuality,
         level_precision_score: Math.round(level_precision),
         entry_validity_score: Math.round(entry_validity),
         overall_accuracy,
         validation_notes: validationNotes,
+        indicator_agreement: {
+          checks: indicatorChecks,
+          agreement_count: agreementCount,
+          total_checks: totalChecks,
+          agreement_percentage: signal_confidence_agreement,
+          conflicting_signals: conflictingSignals
+        },
         data_age_info: {
           age_seconds: dataAgeSeconds,
           age_minutes: parseFloat(dataAgeMinutes),

@@ -140,6 +140,87 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </Card>
       )}
 
+      {/* Signal Confidence Agreement Analysis */}
+      {data.accuracy_metrics?.indicator_agreement && (
+        <Card className={`border-2 ${
+          data.accuracy_metrics.signal_confidence_agreement >= 75 ? 'bg-terminal-green/5 border-terminal-green' :
+          data.accuracy_metrics.signal_confidence_agreement >= 50 ? 'bg-terminal-accent/5 border-terminal-accent' :
+          'bg-terminal-red/5 border-terminal-red'
+        }`}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-mono-tabular flex items-center gap-2">
+                <Activity className={`h-4 w-4 ${
+                  data.accuracy_metrics.signal_confidence_agreement >= 75 ? 'text-terminal-green' :
+                  data.accuracy_metrics.signal_confidence_agreement >= 50 ? 'text-terminal-accent' :
+                  'text-terminal-red'
+                }`} />
+                SIGNAL CONFIDENCE AGREEMENT
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge className={`font-mono-tabular ${
+                  data.accuracy_metrics.signal_quality === 'STRONG' ? 'bg-terminal-green/20 text-terminal-green border-terminal-green' :
+                  data.accuracy_metrics.signal_quality === 'MODERATE' ? 'bg-terminal-accent/20 text-terminal-accent border-terminal-accent' :
+                  'bg-terminal-red/20 text-terminal-red border-terminal-red'
+                }`}>
+                  {data.accuracy_metrics.signal_quality}
+                </Badge>
+                <span className={`text-2xl font-mono-tabular font-bold ${
+                  data.accuracy_metrics.signal_confidence_agreement >= 75 ? 'text-terminal-green' :
+                  data.accuracy_metrics.signal_confidence_agreement >= 50 ? 'text-terminal-accent' :
+                  'text-terminal-red'
+                }`}>
+                  {data.accuracy_metrics.signal_confidence_agreement}%
+                </span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-2">
+            <div className="space-y-3">
+              <div className="text-xs font-mono-tabular text-terminal-secondary mb-2">
+                INDICATOR AGREEMENT: {data.accuracy_metrics.indicator_agreement.agreement_count}/{data.accuracy_metrics.indicator_agreement.total_checks} checks passed
+              </div>
+              
+              {/* Indicator Checks */}
+              <div className="space-y-2">
+                {data.accuracy_metrics.indicator_agreement.checks.map((check: any, idx: number) => (
+                  <div key={idx} className={`flex items-center justify-between p-2 border-l-2 text-xs font-mono ${
+                    check.status === 'AGREE' ? 'bg-terminal-green/5 border-terminal-green text-terminal-green' :
+                    check.status === 'CONFLICT' ? 'bg-terminal-red/5 border-terminal-red text-terminal-red' :
+                    'bg-terminal-accent/5 border-terminal-accent text-terminal-accent'
+                  }`}>
+                    <span className="font-bold">{check.indicator}</span>
+                    <span>{check.detail}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Conflicting Signals Warning */}
+              {data.accuracy_metrics.indicator_agreement.conflicting_signals.length > 0 && (
+                <div className="bg-terminal-red/10 border-2 border-terminal-red p-3 space-y-2 mt-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-terminal-red flex-shrink-0" />
+                    <span className="text-xs font-mono-tabular font-bold text-terminal-red">
+                      {data.accuracy_metrics.indicator_agreement.conflicting_signals.length} CONFLICTING SIGNAL(S) DETECTED
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {data.accuracy_metrics.indicator_agreement.conflicting_signals.map((signal: string, idx: number) => (
+                      <p key={idx} className="text-xs font-mono-tabular text-terminal-red pl-6">
+                        • {signal}
+                      </p>
+                    ))}
+                  </div>
+                  <p className="text-xs font-mono-tabular text-terminal-red/80 pt-2 border-t border-terminal-red/30">
+                    ⚠️ Trade with caution: Indicators are not aligned with the signal direction. Consider waiting for better confluence or reducing position size.
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Accuracy Metrics - Quantitative Validation */}
       {data.accuracy_metrics && (
         <Card className="bg-terminal border-terminal-border">
