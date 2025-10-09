@@ -551,6 +551,11 @@ export const AIAnalysis = () => {
             {analysis && (
               <>
                 <AnalysisResults data={analysis} symbol={symbol} timeframe={timeframe} includeQuantSignals={includeQuantData} />
+                
+                {/* Quant Metrics Card with Sparkline */}
+                {includeQuantData && (
+                  <QuantCard symbol={symbol} />
+                )}
               </>
             )}
 
