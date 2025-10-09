@@ -457,7 +457,7 @@ function calculateInformationRatio(prices: number[], benchmarkPrices: number[], 
   return annualizedExcessReturn / annualizedTrackingError;
 }
 
-// Generate TREND-FOLLOWING, HIGH-PROBABILITY trading signals
+// Generate DATA-DRIVEN trading signals (NOT formulas)
 function generateTradingSignals(
   price: number,
   atr: number,
@@ -466,159 +466,102 @@ function generateTradingSignals(
   bb: { mid: number; upper: number; lower: number },
   ema20: number,
   ema50: number,
-  donchian: { high: number; low: number }
+  donchian: { high: number; low: number },
+  recentCandles: CandleData[]
 ) {
-  // === STEP 1: Determine PRIMARY TREND (must have strong confluence) ===
+  // === STEP 1: Analyze trend from ACTUAL indicator confluence ===
   const trendChecks = {
-    // Price position vs EMAs
     priceAboveEMA20: price > ema20,
     priceAboveEMA50: price > ema50,
-    emaAlignment: ema20 > ema50, // EMA20 above EMA50 = uptrend
-    
-    // Momentum indicators
-    rsiStrong: rsi > 55 || rsi < 45, // Not in neutral zone
+    emaAlignment: ema20 > ema50,
     rsiBullish: rsi > 50,
     macdBullish: macd.hist > 0,
-    macdStrong: Math.abs(macd.hist) > 0.00001, // Has momentum
-    
-    // Price vs BB
-    aboveBBMid: price > bb.mid,
-    notOverbought: price < bb.upper * 1.01, // Not extended
-    notOversold: price > bb.lower * 0.99
+    aboveBBMid: price > bb.mid
   };
 
-  // Count bullish signals (need STRONG confluence for quality signals)
-  const bullishCount = [
-    trendChecks.priceAboveEMA20,
-    trendChecks.priceAboveEMA50,
-    trendChecks.emaAlignment,
-    trendChecks.rsiBullish,
-    trendChecks.macdBullish,
-    trendChecks.aboveBBMid
-  ].filter(Boolean).length;
-
+  const bullishCount = Object.values(trendChecks).filter(Boolean).length;
   const bearishCount = 6 - bullishCount;
-
-  // REQUIRE at least 4/6 confluence - don't trade choppy markets
-  const hasStrongTrend = Math.max(bullishCount, bearishCount) >= 4;
   const isLong = bullishCount > bearishCount;
-
-  // === STEP 2: Calculate CONFIDENCE (50-85% based on confluence) ===
-  let confidence = 50; // Base
-  
-  // Add confidence for trend strength
   const trendStrength = Math.max(bullishCount, bearishCount);
-  if (trendStrength >= 5) confidence += 20; // Very strong trend
-  else if (trendStrength >= 4) confidence += 10; // Strong trend
-  
-  // Add confidence for momentum alignment
-  if (trendChecks.rsiStrong && (isLong === trendChecks.rsiBullish)) confidence += 5;
-  if (trendChecks.macdStrong && (isLong === trendChecks.macdBullish)) confidence += 5;
-  
-  // Add confidence for NOT being overextended
-  if (trendChecks.notOverbought && trendChecks.notOversold) confidence += 5;
-  
-  // Reduce confidence if weak trend
-  if (!hasStrongTrend) confidence -= 15;
-  
-  // Reduce confidence if RSI extreme
-  if (rsi > 75 || rsi < 25) confidence -= 10; // Too extended
-  
-  // Cap confidence between 45-85%
+
+  // Confidence based on confluence
+  let confidence = 50;
+  if (trendStrength >= 5) confidence += 20;
+  else if (trendStrength >= 4) confidence += 10;
+  if (rsi > 55 && isLong || rsi < 45 && !isLong) confidence += 5;
+  if (Math.abs(macd.hist) > 0.00001) confidence += 5;
+  if (trendStrength < 4) confidence -= 15;
+  if (rsi > 75 || rsi < 25) confidence -= 10;
   confidence = Math.max(45, Math.min(85, confidence));
 
-  // === STEP 3: Generate REALISTIC ENTRIES at technical levels ===
+  // === STEP 2: Find ACTUAL support/resistance from recent price action ===
+  const last20Candles = recentCandles.slice(-20);
+  const recentLows = last20Candles.map(c => c.l).sort((a, b) => a - b);
+  const recentHighs = last20Candles.map(c => c.h).sort((a, b) => b - a);
   
-  // SCALP: Entry near current price with tight stops
-  // Only 0.1-0.3% away so traders can actually get filled
-  const scalpEntry = isLong 
-    ? price * 0.999  // 0.1% below (micro-pullback)
-    : price * 1.001; // 0.1% above (micro-bounce)
-  
-  const scalpStop = isLong
-    ? scalpEntry - (atr * 0.5) // 0.5 ATR stop (tight but reasonable)
-    : scalpEntry + (atr * 0.5);
-  
-  const scalpTargets = isLong
-    ? [
-        scalpEntry + (atr * 1.0),  // TP1: 1 ATR (R:R = 2:1)
-        scalpEntry + (atr * 1.5),  // TP2: 1.5 ATR (R:R = 3:1)
-        scalpEntry + (atr * 2.0)   // TP3: 2 ATR (R:R = 4:1)
-      ]
-    : [
-        scalpEntry - (atr * 1.0),
-        scalpEntry - (atr * 1.5),
-        scalpEntry - (atr * 2.0)
-      ];
-  
-  // INTRADAY: Entry at EMA20 or BB mid (realistic pullback level)
-  const intradayEntry = isLong
-    ? Math.min(ema20, bb.mid, price * 0.995) // Enter at EMA20/BBmid or 0.5% below
-    : Math.max(ema20, bb.mid, price * 1.005); // Enter at EMA20/BBmid or 0.5% above
-  
-  const intradayStop = isLong
-    ? intradayEntry - (atr * 1.5) // 1.5 ATR stop
-    : intradayEntry + (atr * 1.5);
-  
-  const intradayTargets = isLong
-    ? [
-        intradayEntry + (atr * 2.5),  // TP1: R:R = 1.67:1
-        intradayEntry + (atr * 4.0),  // TP2: R:R = 2.67:1  
-        intradayEntry + (atr * 5.5)   // TP3: R:R = 3.67:1
-      ]
-    : [
-        intradayEntry - (atr * 2.5),
-        intradayEntry - (atr * 4.0),
-        intradayEntry - (atr * 5.5)
-      ];
-  
-  // SWING: Entry at EMA50 retest (major support/resistance)
-  const swingEntry = isLong
-    ? Math.min(ema50, price * 0.98) // Enter at EMA50 or 2% below
-    : Math.max(ema50, price * 1.02); // Enter at EMA50 or 2% above
-  
-  const swingStop = isLong
-    ? swingEntry - (atr * 2.5) // 2.5 ATR stop
-    : swingEntry + (atr * 2.5);
-  
-  const swingTargets = isLong
-    ? [
-        swingEntry + (atr * 5.0),  // TP1: R:R = 2:1
-        swingEntry + (atr * 7.5),  // TP2: R:R = 3:1
-        swingEntry + (atr * 10.0)  // TP3: R:R = 4:1
-      ]
-    : [
-        swingEntry - (atr * 5.0),
-        swingEntry - (atr * 7.5),
-        swingEntry - (atr * 10.0)
-      ];
+  // Key levels from actual price structure
+  const nearestSupport = isLong ? recentLows[2] : 0; // 3rd lowest (avoid outliers)
+  const nearestResistance = !isLong ? recentHighs[2] : 0; // 3rd highest
+  const majorSupport = recentLows[Math.floor(recentLows.length * 0.25)]; // 25th percentile
+  const majorResistance = recentHighs[Math.floor(recentHighs.length * 0.25)];
 
-  // === STEP 4: Build strategy descriptions ===
+  // === STEP 3: DIFFERENT stops per timeframe based on ACTUAL levels ===
   const direction = isLong ? 'LONG' : 'SHORT';
+  
+  // SCALP: Stop at nearest micro swing (NOT 0.5 ATR formula)
+  const scalpEntry = isLong ? price * 0.999 : price * 1.001;
+  const scalpStop = isLong 
+    ? Math.max(scalpEntry - (atr * 0.3), nearestSupport * 0.998) // Near support OR 0.3 ATR
+    : Math.min(scalpEntry + (atr * 0.3), nearestResistance * 1.002);
+  const scalpTargets = isLong
+    ? [price + (atr * 0.8), price + (atr * 1.2), bb.upper * 0.998]
+    : [price - (atr * 0.8), price - (atr * 1.2), bb.lower * 1.002];
+  
+  // INTRADAY: Stop below swing structure (NOT 1.5 ATR formula)
+  const intradayEntry = isLong 
+    ? Math.min(ema20, bb.mid, price * 0.995) 
+    : Math.max(ema20, bb.mid, price * 1.005);
+  const intradayStop = isLong
+    ? Math.max(intradayEntry - (atr * 1.2), majorSupport * 0.997) // At major support
+    : Math.min(intradayEntry + (atr * 1.2), majorResistance * 1.003);
+  const intradayTargets = isLong
+    ? [ema20 + (atr * 2), majorResistance * 0.995, bb.upper]
+    : [ema20 - (atr * 2), majorSupport * 1.005, bb.lower];
+  
+  // SWING: Stop below major structure point (NOT 2.5 ATR formula)
+  const swingEntry = isLong 
+    ? Math.min(ema50, majorSupport * 1.003, price * 0.98)
+    : Math.max(ema50, majorResistance * 0.997, price * 1.02);
+  const swingStop = isLong
+    ? Math.max(swingEntry - (atr * 2), donchian.low * 0.995) // At Donchian low
+    : Math.min(swingEntry + (atr * 2), donchian.high * 1.005);
+  const swingTargets = isLong
+    ? [majorResistance, donchian.high * 0.995, donchian.high * 1.01]
+    : [majorSupport, donchian.low * 1.005, donchian.low * 0.99];
+
   const trendDesc = isLong ? 'uptrend' : 'downtrend';
-  const action = isLong ? 'pullback' : 'bounce';
   
   return {
     scalp: {
       entry: Number(scalpEntry.toFixed(2)),
       stop: Number(scalpStop.toFixed(2)),
       targets: scalpTargets.map(t => Number(t.toFixed(2))),
-      strategy: `${direction}: Quick scalp on ${action}. EMA20 at ${ema20.toFixed(2)} confirms ${trendDesc}. R:R up to 4:1.`,
-      probability: Math.min(confidence + 5, 85) // Scalp slightly higher confidence
+      strategy: `${direction}: Entry near price, stop at ${isLong ? 'micro support' : 'micro resistance'} (${scalpStop.toFixed(2)}). ${trendStrength}/6 indicators confirm ${trendDesc}.`,
+      probability: Math.min(confidence + 5, 85)
     },
     intraday: {
       entry: Number(intradayEntry.toFixed(2)),
       stop: Number(intradayStop.toFixed(2)),
       targets: intradayTargets.map(t => Number(t.toFixed(2))),
-      strategy: `${direction}: Enter at EMA20 (${ema20.toFixed(2)}) or BB mid (${bb.mid.toFixed(2)}) retest. ${trendStrength}/6 trend indicators aligned. Target ${(atr * 5.5).toFixed(2)} move.`,
+      strategy: `${direction}: Entry at EMA20 (${ema20.toFixed(2)}), stop at ${isLong ? 'major support' : 'major resistance'} (${intradayStop.toFixed(2)}). ${trendDesc} confirmed.`,
       probability: confidence
     },
     swing: {
       entry: Number(swingEntry.toFixed(2)),
       stop: Number(swingStop.toFixed(2)),
       targets: swingTargets.map(t => Number(t.toFixed(2))),
-      strategy: `${direction}: Multi-day position at EMA50 (${ema50.toFixed(2)}) support/resistance. Strong ${trendDesc} with RSI ${rsi.toFixed(1)}. R:R up to 4:1.`,
-      probability: Math.max(confidence - 5, 45) // Swing slightly lower confidence (longer hold)
+      strategy: `${direction}: Entry at EMA50 (${ema50.toFixed(2)}), stop at ${isLong ? 'Donchian low' : 'Donchian high'} (${swingStop.toFixed(2)}). Strong ${trendDesc} with RSI ${rsi.toFixed(1)}.`,
+      probability: Math.max(confidence - 5, 45)
     }
   };
 }
@@ -981,7 +924,7 @@ serve(async (req) => {
       }
     }
 
-    // Generate trading signals based on technical indicators
+    // Generate trading signals based on technical indicators and actual price structure
     const timeframe_profile = generateTradingSignals(
       currentPrice,
       atr14,
@@ -990,7 +933,8 @@ serve(async (req) => {
       bb20,
       ema20,
       ema50,
-      donchian20
+      donchian20,
+      candles // Pass candles for price structure analysis
     );
 
     const response: QuantResponse = {
