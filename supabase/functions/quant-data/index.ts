@@ -813,8 +813,8 @@ serve(async (req) => {
     
     // Log the actual candle timestamps to debug old data issue
     const firstCandleTime = new Date(candles[0].t).toISOString();
-    const lastCandleTime = new Date(candles[candles.length - 1].t).toISOString();
-    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTime} (${lastCandleClose}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
+    const lastCandleTimeStr = new Date(candles[candles.length - 1].t).toISOString();
+    console.log(`📊 Candle range: FIRST=${firstCandleTime} (${candles[0].c}), LAST=${lastCandleTimeStr} (${lastCandleClose}), Total=${candles.length}, Age=${dataAgeMinutes.toFixed(1)}min`);
     console.log(`💰 Price source: ${usingLivePrice ? `LIVE SNAPSHOT @ ${snapshotTime}` : 'LAST CANDLE'}`);
     console.log(`💰 Current price: ${currentPrice}, Last candle: ${lastCandleClose}, Prev close: ${prevClose}`);
 
