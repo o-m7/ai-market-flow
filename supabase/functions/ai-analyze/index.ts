@@ -498,7 +498,6 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
       max_tokens: 4096,
-      temperature: 0.7,
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
