@@ -674,17 +674,17 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   console.log(`📊 Latest candle: ${data.lastTimeUTC} (${data.candles[data.candles.length - 1].c})`);
   
   // Extract live price from snapshot if available (this is the CURRENT market price)
-  const livePrice = data.snapshotLastTrade;
-  const snapshotTime = data.snapshotTimeUTC;
+  const liveSnapshot = data.snapshotLastTrade;
+  const snapshotTimestamp = data.snapshotTimeUTC;
   
-  if (livePrice) {
-    console.log(`💰 LIVE snapshot price: ${livePrice} @ ${snapshotTime}`);
+  if (liveSnapshot) {
+    console.log(`💰 LIVE snapshot price: ${liveSnapshot} @ ${snapshotTimestamp}`);
   } else {
     console.log(`⚠️ No live snapshot available, will use last candle close`);
   }
   
   // Transform to expected format
-  const candles = data.candles.map((c: any) => ({
+  const candleList = data.candles.map((c: any) => ({
     t: c.t,
     o: c.o,
     h: c.h,
@@ -693,7 +693,7 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
     v: c.v
   }));
   
-  return { candles, livePrice, snapshotTime };
+  return { candles: candleList, livePrice: liveSnapshot, snapshotTime: snapshotTimestamp };
 }
 
 async function generateSummary(symbol: string, indicators: any, openaiKey: string): Promise<string> {
