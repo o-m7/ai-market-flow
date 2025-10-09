@@ -395,8 +395,8 @@ serve(async (req) => {
     
     console.log(`[ai-analyze] Using ${candles.length} candles, latest from ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)`);
     
-    // Data-driven analysis prompt - let AI analyze the data naturally
-    const comprehensivePrompt = `You are an elite institutional quantitative analyst. Analyze the provided market data and derive trading signals based on what the data shows.
+    // Data-driven analysis prompt - AI derives signals from confluence, not formulas
+    const comprehensivePrompt = `You are an elite institutional quantitative analyst. Analyze the provided market data and derive trading signals based ONLY on what the data shows - not predetermined formulas.
 
 LIVE MARKET DATA:
 Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
@@ -404,7 +404,7 @@ Current Price: $${livePrice}
 Latest Data: ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)
 Candles: ${candles.length} bars
 
-ANALYZE THE FOLLOWING DATA:
+ANALYZE THE FOLLOWING RAW DATA:
 
 1. TECHNICAL INDICATORS (from Polygon API):
 ${JSON.stringify(features.technical, null, 2)}
@@ -415,37 +415,66 @@ ${JSON.stringify(features.levels, null, 2)}
 3. NEWS SENTIMENT:
 ${JSON.stringify(news, null, 2)}
 
-${quantMetrics ? `4. QUANTITATIVE METRICS:
-${JSON.stringify(quantMetrics, null, 2)}` : ''}
+${quantMetrics ? `4. QUANTITATIVE METRICS (raw indicators only):
+RSI: ${quantMetrics.rsi14}
+EMA20: ${quantMetrics.ema?.['20']}
+EMA50: ${quantMetrics.ema?.['50']}
+MACD: ${JSON.stringify(quantMetrics.macd)}
+BB: ${JSON.stringify(quantMetrics.bb20)}
+ATR: ${quantMetrics.atr14}
+Donchian: ${JSON.stringify(quantMetrics.donchian20)}
+Vol (annual): ${quantMetrics.vol20_annual}%
+Z-Score: ${quantMetrics.zscore20}
+Sharpe: ${quantMetrics.quant_metrics?.sharpe_ratio}
+Sortino: ${quantMetrics.quant_metrics?.sortino_ratio}
+Max Drawdown: ${quantMetrics.quant_metrics?.max_drawdown}%` : ''}
 
-YOUR TASK:
-Analyze ALL the data above and derive trading signals. Look for:
-- Trend patterns in EMAs, MACD, and price action
-- Support/resistance levels where price reacts
-- RSI and momentum divergences
-- Volume patterns and liquidity zones
-- News impact on price direction
-- Quant metrics showing statistical edges
-- Confluence of multiple factors
+YOUR ANALYSIS TASK:
+Read the data above and identify what the market is actually doing:
 
-Based on your analysis:
-1. Determine the directional bias (long or short) from the data
-2. Identify entry opportunities at technical levels shown in the data
-3. Set stop losses at invalidation points from price structure
-4. Target resistance (long) or support (short) levels from the data
-5. Provide signals for 3 timeframes (scalp, intraday, swing)
+1. TREND IDENTIFICATION:
+   - Where is price relative to EMAs? (Above/below/crossing)
+   - Are EMAs aligned (20>50 = uptrend, 20<50 = downtrend)?
+   - What does MACD histogram show? (Positive/negative momentum)
+   - RSI position? (>50 = bullish bias, <50 = bearish bias)
+
+2. SUPPORT/RESISTANCE:
+   - Where did price reject recently? (from price structure data)
+   - Where are Bollinger Bands? (upper/mid/lower as levels)
+   - Donchian channels showing range? (high/low boundaries)
+
+3. CONFLUENCE ANALYSIS:
+   - Do multiple indicators agree on direction?
+   - Are there 4+ signals pointing same way? (Strong confluence)
+   - Any conflicting signals? (Reduces confidence)
+
+4. NEWS IMPACT:
+   - Is news sentiment aligned with technical bias?
+   - Recent news events driving momentum?
+
+5. SIGNAL DERIVATION (not formulas, but logic):
+   - IF strong uptrend (EMA20>EMA50, MACD+, RSI>50, price>EMAs, news bullish): LONG bias
+   - IF strong downtrend (EMA20<EMA50, MACD-, RSI<50, price<EMAs, news bearish): SHORT bias
+   - Entry: At support (long) or resistance (short) from price structure
+   - Stop: Below support (long) or above resistance (short) - use ATR for distance
+   - Targets: Next resistance (long) or support (short) from levels data
+   - Confidence: Based on how many indicators agree (4+ = high, 2-3 = medium, <2 = low)
+
+6. TIMEFRAME SIGNALS:
+   - Scalp: Entry near current price (0.1-0.3% away), tight stops (0.5 ATR), quick targets (1-2 ATR)
+   - Intraday: Entry at EMA20/BB mid pullback (0.5-1% away), medium stops (1.5 ATR), targets (2.5-5 ATR)
+   - Swing: Entry at EMA50 retest (1-2% away), wide stops (2.5 ATR), large targets (5-10 ATR)
 
 CRITICAL REQUIREMENTS:
-- Use ONLY the data provided - no assumptions
-- Direction must be "long" or "short" based on data confluence
-- Entry prices must align with levels in the data
-- Stops must be at structure invalidation points
-- Targets must be at support/resistance from the data
-- All signals must follow the same direction
-- Provide exact prices with 2 decimal precision
-- Explain your reasoning based on the data
+- Derive signals from DATA CONFLUENCE, not predetermined calculations
+- Direction must match what indicators are showing (long/short only)
+- Entry/stop/target prices must use actual levels from the data
+- All 3 timeframe signals must follow the SAME direction
+- Explain your reasoning: "Price above EMA20/50, MACD positive, RSI 62 → Long bias"
+- Provide exact prices with 2-5 decimal precision
+- If data is conflicting/choppy, still pick dominant bias but lower confidence
 
-Analyze the data objectively and provide signals that follow what the market is actually showing.`;
+Analyze the data objectively and let the confluence of indicators guide your signals, not formulas.`;
 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     

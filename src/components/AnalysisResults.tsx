@@ -1314,6 +1314,139 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </Card>
       )}
 
+      {/* Quantitative Trading Signals */}
+      {includeQuantSignals && quantSignals && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2 mb-2">
+                  <Activity className="h-4 w-4" />
+                  ALGORITHMIC TRADING SIGNALS
+                </CardTitle>
+                <p className="text-xs font-mono-tabular text-terminal-secondary">
+                  Reference signals from technical confluence • Compare with AI Analysis above
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-6">
+              {/* Scalp Signal */}
+              {quantSignals.scalp && (
+                <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-xs font-mono-tabular text-terminal-accent font-bold">SCALP (1-15m)</div>
+                    <Badge className="bg-terminal-accent/20 text-terminal-accent font-mono-tabular">
+                      {quantSignals.scalp.probability}% PROBABILITY
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
+                      <div className="text-sm font-mono-tabular text-terminal-accent font-bold">
+                        {safeFormatNumber(quantSignals.scalp.entry, 2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP</div>
+                      <div className="text-sm font-mono-tabular text-terminal-red font-bold">
+                        {safeFormatNumber(quantSignals.scalp.stop, 2)}
+                      </div>
+                    </div>
+                    {quantSignals.scalp.targets?.slice(0, 2).map((target: number, idx: number) => (
+                      <div key={idx}>
+                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">T{idx + 1}</div>
+                        <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                          {safeFormatNumber(target, 2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs font-mono text-terminal-secondary">
+                    {quantSignals.scalp.strategy}
+                  </div>
+                </div>
+              )}
+
+              {/* Intraday Signal */}
+              {quantSignals.intraday && (
+                <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-xs font-mono-tabular text-terminal-accent font-bold">INTRADAY (30m-4h)</div>
+                    <Badge className="bg-terminal-accent/20 text-terminal-accent font-mono-tabular">
+                      {quantSignals.intraday.probability}% PROBABILITY
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
+                      <div className="text-sm font-mono-tabular text-terminal-accent font-bold">
+                        {safeFormatNumber(quantSignals.intraday.entry, 2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP</div>
+                      <div className="text-sm font-mono-tabular text-terminal-red font-bold">
+                        {safeFormatNumber(quantSignals.intraday.stop, 2)}
+                      </div>
+                    </div>
+                    {quantSignals.intraday.targets?.slice(0, 2).map((target: number, idx: number) => (
+                      <div key={idx}>
+                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">T{idx + 1}</div>
+                        <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                          {safeFormatNumber(target, 2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs font-mono text-terminal-secondary">
+                    {quantSignals.intraday.strategy}
+                  </div>
+                </div>
+              )}
+
+              {/* Swing Signal */}
+              {quantSignals.swing && (
+                <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-xs font-mono-tabular text-terminal-accent font-bold">SWING (1D-1W)</div>
+                    <Badge className="bg-terminal-accent/20 text-terminal-accent font-mono-tabular">
+                      {quantSignals.swing.probability}% PROBABILITY
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
+                      <div className="text-sm font-mono-tabular text-terminal-accent font-bold">
+                        {safeFormatNumber(quantSignals.swing.entry, 2)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP</div>
+                      <div className="text-sm font-mono-tabular text-terminal-red font-bold">
+                        {safeFormatNumber(quantSignals.swing.stop, 2)}
+                      </div>
+                    </div>
+                    {quantSignals.swing.targets?.slice(0, 2).map((target: number, idx: number) => (
+                      <div key={idx}>
+                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">T{idx + 1}</div>
+                        <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                          {safeFormatNumber(target, 2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-xs font-mono text-terminal-secondary">
+                    {quantSignals.swing.strategy}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Risk Assessment */}
       {data.riskAssessment && (
         <Card className="bg-terminal border-terminal-border">
