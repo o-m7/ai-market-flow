@@ -494,7 +494,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     // Add timeout wrapper for OpenAI call
     const openaiTimeout = 60000; // 60 second timeout for OpenAI
     const openaiPromise = client.chat.completions.create({
-      model: "gpt-5-2025-08-07", // Latest flagship model with superior reasoning
+      model: "gpt-5",
       messages: [
         { 
           role: "system", 

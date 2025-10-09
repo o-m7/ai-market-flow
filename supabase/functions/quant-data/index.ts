@@ -715,7 +715,7 @@ Focus on momentum, trend, and volatility signals. Be specific and actionable.`;
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07', // Use latest model for better analysis
+        model: 'gpt-5',
         messages: [{ role: 'user', content: prompt }],
         max_completion_tokens: 200,
         // Note: temperature not supported in GPT-5
