@@ -87,7 +87,10 @@ Provide analysis in JSON format:
     
     let analysis;
     try {
-      analysis = JSON.parse(aiData.choices[0].message.content);
+      let content = aiData.choices[0].message.content;
+      // Remove markdown code blocks if present
+      content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      analysis = JSON.parse(content);
     } catch (e) {
       console.error('Failed to parse AI response:', aiData.choices[0].message.content);
       // Fallback analysis

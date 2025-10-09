@@ -92,7 +92,7 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     console.error('[analyze] Failed to fetch fresh candles:', err);
   }
 
-  // Fetch real news sentiment analysis
+  // Fetch real news sentiment analysis (non-blocking)
   let newsData = {
     event_risk: false,
     headline_hits_30m: 0,
@@ -101,29 +101,37 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
   };
 
   try {
-    const newsResponse = await fetch(`${ENV.SUPABASE_URL}/functions/v1/news-signal-analysis`, {
+    const newsController = new AbortController();
+    const newsTimeout = setTimeout(() => newsController.abort(), 8000); // 8s timeout
+    
+    const newsResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/news-signal-analysis`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         symbol: payload.symbol,
         timeframe: payload.timeframe
-      })
+      }),
+      signal: newsController.signal
     });
+
+    clearTimeout(newsTimeout);
 
     if (newsResponse.ok) {
       const newsResult = await newsResponse.json();
       if (newsResult.analysis) {
         newsData = {
           event_risk: newsResult.analysis.news_impact === 'high',
-          headline_hits_30m: newsResult.news?.length || 0,
+          headline_hits_30m: newsResult.news_articles?.length || 0,
           sentiment: newsResult.analysis.sentiment,
           confidence: newsResult.analysis.confidence
         };
         console.log('[analyze] News sentiment fetched:', newsData);
       }
+    } else {
+      console.warn('[analyze] News API returned error:', newsResponse.status);
     }
   } catch (err) {
-    console.warn('[analyze] Failed to fetch news sentiment, using neutral:', err);
+    console.warn('[analyze] Failed to fetch news sentiment, continuing without it:', err instanceof Error ? err.message : 'Unknown error');
   }
 
   // Send candles to ai-analyze - it will fetch technicals from Polygon
