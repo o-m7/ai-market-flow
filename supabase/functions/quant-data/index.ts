@@ -562,7 +562,7 @@ serve(async (req) => {
       throw new Error('POLYGON_API_KEY not configured');
     }
 
-    console.log(`Fetching quant data for ${symbol}, timeframe: ${tf}, withSummary: ${withSummary}`);
+    console.log(`[QUANT-DATA v2024.10.09] Fetching quant data for ${symbol}, timeframe: ${tf}, withSummary: ${withSummary}`);
 
     // Fetch market data
     const candles = await fetchPolygonData(symbol, tf, polygonApiKey);
@@ -681,7 +681,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in quant-data function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message || 'Unknown error',
+        timestamp: new Date().toISOString()
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
