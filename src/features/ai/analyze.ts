@@ -180,11 +180,16 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
   };
 
   console.log('[analyze] Calling ai-analyze with', freshCandles.length, 'candles, currentPrice:', currentPrice);
+  console.log('[analyze] Target URL:', url);
 
   const analysisController = new AbortController();
-  const analysisTimeout = setTimeout(() => analysisController.abort(), 90000); // 90s timeout for AI analysis
+  const analysisTimeout = setTimeout(() => {
+    console.error('[analyze] Analysis timeout after 90s');
+    analysisController.abort();
+  }, 90000); // 90s timeout for AI analysis
 
   try {
+    console.log('[analyze] Sending request to:', url);
     const r = await fetch(url, { 
       method: 'POST', 
       headers, 
@@ -194,8 +199,11 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     
     clearTimeout(analysisTimeout);
     
+    console.log('[analyze] Response status:', r.status);
+    
     if (!r.ok) {
       const text = await r.text().catch(()=> '');
+      console.error('[analyze] Error response:', text);
       throw new Error(`AI analyze failed: ${r.status} - ${text || r.statusText}`);
     }
     
@@ -204,8 +212,12 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     return result; // { summary, outlook, levels, trade_idea, confidence, risks, json_version }
   } catch (err) {
     clearTimeout(analysisTimeout);
+    console.error('[analyze] Fetch error:', err);
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('AI analysis is taking longer than expected. The analysis is still processing. Please wait a moment and check your analysis history.');
+      throw new Error('AI analysis timeout: The analysis is taking longer than 90 seconds. Please try again with a shorter timeframe or fewer candles.');
+    }
+    if (err instanceof Error && err.message.includes('Failed to fetch')) {
+      throw new Error(`Network error calling AI analysis function. Please check your connection and try again. URL: ${url}`);
     }
     throw err;
   }
