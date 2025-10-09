@@ -388,9 +388,9 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
     // Add timeout wrapper for OpenAI call
-    const openaiTimeout = 90000; // 90 second timeout for simplified schema
+    const openaiTimeout = 60000; // 60 second timeout for gpt-4o
     const openaiPromise = client.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o",
       messages: [
         { 
           role: "system", 
@@ -403,11 +403,12 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_completion_tokens: 6000,
+      max_tokens: 6000,
+      temperature: 0.7,
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('OpenAI API timeout after 90 seconds')), openaiTimeout);
+      setTimeout(() => reject(new Error('OpenAI API timeout after 60 seconds')), openaiTimeout);
     });
 
     const response = await Promise.race([openaiPromise, timeoutPromise]);
