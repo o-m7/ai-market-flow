@@ -457,7 +457,7 @@ function calculateInformationRatio(prices: number[], benchmarkPrices: number[], 
   return annualizedExcessReturn / annualizedTrackingError;
 }
 
-// Generate trading signals based on technical indicators
+// Generate REALISTIC, ACTIONABLE trading signals that traders can actually enter
 function generateTradingSignals(
   price: number,
   atr: number,
@@ -468,56 +468,89 @@ function generateTradingSignals(
   ema50: number,
   donchian: { high: number; low: number }
 ) {
-  // Determine trend direction
-  const isBullish = price > ema20 && ema20 > ema50 && macd.hist > 0 && rsi > 50;
-  const isBearish = price < ema20 && ema20 < ema50 && macd.hist < 0 && rsi < 50;
+  // Determine direction from technical confluence (majority vote)
+  const emaTrend = price > ema20 && ema20 > ema50;
+  const rsiMomentum = rsi > 50;
+  const macdMomentum = macd.hist > 0;
+  
+  // Count bullish signals - need at least 2/3 confluence
+  const bullishSignals = [emaTrend, rsiMomentum, macdMomentum].filter(Boolean).length;
+  const isLong = bullishSignals >= 2;
   
   // Calculate confidence based on indicator alignment
-  let baseConfidence = 50;
-  if (isBullish) baseConfidence += 10;
-  if (isBearish) baseConfidence += 10;
-  if (Math.abs(rsi - 50) > 20) baseConfidence += 10;
-  if (Math.abs(macd.hist) > Math.abs(macd.line) * 0.1) baseConfidence += 10;
+  let baseConfidence = 60;
+  if (bullishSignals === 3 || bullishSignals === 0) baseConfidence += 15; // Full alignment
+  if (Math.abs(rsi - 50) > 20) baseConfidence += 5; // Strong momentum
   
-  // Scalp signal (quick trades, tight stops)
-  const scalpStop = isBullish ? price - (atr * 0.5) : price + (atr * 0.5);
-  const scalpTargets = isBullish 
-    ? [price + (atr * 0.5), price + (atr * 1.0), price + (atr * 1.5)]
-    : [price - (atr * 0.5), price - (atr * 1.0), price - (atr * 1.5)];
+  // SCALP: Tight entry very close to current price (0.2-0.5% away)
+  // Entry at micro-level pullback/bounce - traders can actually enter these
+  const scalpEntry = isLong 
+    ? price * 0.998  // Enter 0.2% below on tiny dip
+    : price * 1.002; // Enter 0.2% above on tiny rally
   
-  // Intraday signal (session trades, moderate risk)
-  const intradayStop = isBullish ? bb.lower : bb.upper;
-  const intradayTargets = isBullish
-    ? [ema20, bb.upper, donchian.high]
-    : [ema20, bb.lower, donchian.low];
+  const scalpStop = isLong
+    ? scalpEntry - (atr * 0.4) // Tight 0.4 ATR stop
+    : scalpEntry + (atr * 0.4);
   
-  // Swing signal (multi-day, wider stops)
-  const swingStop = isBullish ? price - (atr * 2) : price + (atr * 2);
-  const swingTargets = isBullish
-    ? [ema50, donchian.high, donchian.high * 1.02]
-    : [ema50, donchian.low, donchian.low * 0.98];
+  const scalpTargets = isLong
+    ? [scalpEntry + (atr * 0.6), scalpEntry + (atr * 1.0), scalpEntry + (atr * 1.5)] // 0.6, 1.0, 1.5 ATR
+    : [scalpEntry - (atr * 0.6), scalpEntry - (atr * 1.0), scalpEntry - (atr * 1.5)];
+  
+  // INTRADAY: Entry at nearby technical level within 1-2%
+  // Use BB levels or EMA as entry - realistic pullback levels traders wait for
+  const intradayEntry = isLong
+    ? Math.max(bb.mid, price * 0.985)  // Entry at BB mid or 1.5% below (pullback)
+    : Math.min(bb.mid, price * 1.015); // Entry at BB mid or 1.5% above (rally)
+  
+  const intradayStop = isLong
+    ? intradayEntry - (atr * 1.2) // 1.2 ATR stop
+    : intradayEntry + (atr * 1.2);
+  
+  const intradayTargets = isLong
+    ? [intradayEntry + (atr * 2), intradayEntry + (atr * 3.5), intradayEntry + (atr * 5)]
+    : [intradayEntry - (atr * 2), intradayEntry - (atr * 3.5), intradayEntry - (atr * 5)];
+  
+  // SWING: Entry at major level 2-4% away
+  // Use Donchian or major EMA as entry - real swing levels traders target
+  const swingEntry = isLong
+    ? Math.min(ema50, price * 0.97) // Entry at EMA50 or 3% below (retest)
+    : Math.max(ema50, price * 1.03); // Entry at EMA50 or 3% above (retest)
+  
+  const swingStop = isLong
+    ? swingEntry - (atr * 2) // 2 ATR stop
+    : swingEntry + (atr * 2);
+  
+  const swingTargets = isLong
+    ? [swingEntry + (atr * 4), swingEntry + (atr * 6.5), swingEntry + (atr * 9)]
+    : [swingEntry - (atr * 4), swingEntry - (atr * 6.5), swingEntry - (atr * 9)];
   
   return {
     scalp: {
-      entry: price,
-      stop: scalpStop,
-      targets: scalpTargets,
-      strategy: `${isBullish ? 'Long' : 'Short'} scalp with ${atr.toFixed(2)} ATR risk. Target quick momentum moves.`,
-      probability: Math.min(baseConfidence + 5, 85)
+      entry: Number(scalpEntry.toFixed(2)),
+      stop: Number(scalpStop.toFixed(2)),
+      targets: scalpTargets.map(t => Number(t.toFixed(2))),
+      strategy: isLong 
+        ? `Quick long on 0.2% pullback, targeting ${(atr * 1.5).toFixed(2)} move. Tight ${(atr * 0.4).toFixed(2)} stop.`
+        : `Quick short on 0.2% bounce, targeting ${(atr * 1.5).toFixed(2)} move. Tight ${(atr * 0.4).toFixed(2)} stop.`,
+      probability: Math.min(baseConfidence + 10, 85)
     },
     intraday: {
-      entry: price,
-      stop: intradayStop,
-      targets: intradayTargets,
-      strategy: `${isBullish ? 'Long' : 'Short'} intraday using BB and EMA levels. Hold for session move.`,
+      entry: Number(intradayEntry.toFixed(2)),
+      stop: Number(intradayStop.toFixed(2)),
+      targets: intradayTargets.map(t => Number(t.toFixed(2))),
+      strategy: isLong
+        ? `Enter at BB mid ${bb.mid.toFixed(2)} or 1.5% pullback. Target ${(atr * 5).toFixed(2)} move.`
+        : `Enter at BB mid ${bb.mid.toFixed(2)} or 1.5% rally. Target ${(atr * 5).toFixed(2)} move.`,
       probability: baseConfidence
     },
     swing: {
-      entry: price,
-      stop: swingStop,
-      targets: swingTargets,
-      strategy: `${isBullish ? 'Long' : 'Short'} swing targeting major S/R levels. Multi-day position.`,
-      probability: Math.max(baseConfidence - 10, 45)
+      entry: Number(swingEntry.toFixed(2)),
+      stop: Number(swingStop.toFixed(2)),
+      targets: swingTargets.map(t => Number(t.toFixed(2))),
+      strategy: isLong
+        ? `Enter at EMA50 ${ema50.toFixed(2)} retest or 3% dip. Multi-day hold for ${(atr * 9).toFixed(2)} target.`
+        : `Enter at EMA50 ${ema50.toFixed(2)} retest or 3% rally. Multi-day hold for ${(atr * 9).toFixed(2)} target.`,
+      probability: Math.max(baseConfidence - 5, 60)
     }
   };
 }

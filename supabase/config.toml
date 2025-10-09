@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.stock-analysis]
 verify_jwt = false
+
+[functions.trigger-trade-checks]
+verify_jwt = false

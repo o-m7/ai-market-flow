@@ -328,17 +328,17 @@ export default function QuantCard({ symbol: initialSymbol = "BTCUSD" }: { symbol
           )}
         </div>
 
-        {/* Trading Signals */}
+        {/* Trading Signals - Comprehensive View Only */}
         {data?.timeframe_profile && (
           <div className="space-y-3">
-            <div className="text-sm font-medium text-muted-foreground">Trading Signals</div>
+            <div className="text-sm font-medium text-muted-foreground">Trading Signals - All Timeframes</div>
             
             {/* Scalp Signal */}
             {data.timeframe_profile.scalp && (
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border p-4 bg-gradient-to-br from-blue-500/5 to-transparent">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold">⚡ SCALP</div>
+                    <div className="text-sm font-semibold">⚡ SCALP (1-15 min)</div>
                     <Badge variant="outline" className="text-xs">{data.timeframe_profile.scalp.probability}% confidence</Badge>
                   </div>
                 </div>
@@ -365,7 +365,7 @@ export default function QuantCard({ symbol: initialSymbol = "BTCUSD" }: { symbol
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-xl border p-4 bg-gradient-to-br from-purple-500/5 to-transparent">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold">📊 INTRADAY</div>
+                    <div className="text-sm font-semibold">📊 INTRADAY (15min-4hr)</div>
                     <Badge variant="outline" className="text-xs">{data.timeframe_profile.intraday.probability}% confidence</Badge>
                   </div>
                 </div>
@@ -392,7 +392,7 @@ export default function QuantCard({ symbol: initialSymbol = "BTCUSD" }: { symbol
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-xl border p-4 bg-gradient-to-br from-green-500/5 to-transparent">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold">📈 SWING</div>
+                    <div className="text-sm font-semibold">📈 SWING (4hr-Daily)</div>
                     <Badge variant="outline" className="text-xs">{data.timeframe_profile.swing.probability}% confidence</Badge>
                   </div>
                 </div>
