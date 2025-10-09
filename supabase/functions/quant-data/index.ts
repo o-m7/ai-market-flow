@@ -444,10 +444,21 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   
   // Format symbol for Polygon API
   // Crypto pairs like BTCUSD, ETHUSD need X: prefix
+  // Forex pairs like EURUSD, GBPUSD need C: prefix
   // Stock tickers like SPY, AAPL don't need prefix
   const cryptoPairs = ['BTC', 'ETH', 'XRP', 'ADA', 'SOL', 'DOT', 'MATIC', 'AVAX', 'LINK', 'UNI', 'ATOM', 'ALGO', 'VET', 'ICP', 'FIL', 'THETA', 'TRX', 'ETC', 'XMR', 'BCH', 'LTC', 'DOGE', 'SHIB', 'NEAR', 'FTM', 'SAND', 'MANA', 'CRV', 'AAVE', 'BNB'];
+  const forexCurrencies = ['EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK', 'NOK', 'DKK'];
+  
   const isCrypto = cryptoPairs.some(pair => symbol.startsWith(pair)) && symbol.endsWith('USD');
-  const polygonSymbol = isCrypto ? `X:${symbol}` : symbol;
+  const isForex = forexCurrencies.some(curr => symbol.startsWith(curr)) && 
+                  (symbol.includes('USD') || forexCurrencies.some(curr => symbol.includes(curr)));
+  
+  let polygonSymbol = symbol;
+  if (isCrypto) {
+    polygonSymbol = `X:${symbol}`;
+  } else if (isForex) {
+    polygonSymbol = `C:${symbol}`;
+  }
   
   const timeframe = timeframes[tf] || '1/hour';
   const now = new Date();
