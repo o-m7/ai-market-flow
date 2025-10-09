@@ -193,6 +193,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_cron_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          active: boolean
+          command: string
+          database: string
+          jobid: number
+          jobname: string
+          nodename: string
+          nodeport: number
+          schedule: string
+          username: string
+        }[]
+      }
       get_historical_accuracy: {
         Args: { p_days?: number; p_symbol: string }
         Returns: {
