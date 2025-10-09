@@ -502,25 +502,13 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                 </div>
               )}
 
-              {data.timeframe_profile?.trend && (
-                <div className="flex items-start gap-3">
-                  <span className="text-xs font-mono-tabular text-terminal-secondary min-w-24">TREND:</span>
-                  <span className={`text-sm font-mono-tabular uppercase ${
-                    data.timeframe_profile.trend === 'bullish' ? 'text-terminal-green' :
-                    data.timeframe_profile.trend === 'bearish' ? 'text-terminal-red' :
-                    'text-terminal-accent'
-                  }`}>
-                    {data.timeframe_profile.trend}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Trading Signals - All Timeframes (from both AI and Quant) */}
-      {(data.timeframe_profile || quantSignals) && (
+      {/* Trading Signals - All Timeframes (Quantitative Analysis) */}
+      {quantSignals && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
@@ -528,16 +516,15 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
               TRADING SIGNALS - ALL TIMEFRAMES
             </CardTitle>
             <p className="text-xs font-mono-tabular text-terminal-secondary mt-2">
-              {data.timeframe_profile && quantSignals ? 'Combined AI & Quantitative Analysis' : 
-               data.timeframe_profile ? 'AI Analysis Signals' : 'Quantitative Analysis Signals'}
+              Quantitative Analysis Signals
             </p>
           </CardHeader>
           <CardContent className="pt-4">
             <div className="space-y-4">
               {/* Helper function to determine if signal is long or short */}
               {(() => {
-                // Prioritize AI signals, fallback to quant signals
-                const signalsToUse = data.timeframe_profile || quantSignals;
+                // Use quant signals
+                const signalsToUse = quantSignals;
                 if (!signalsToUse) return null;
                 
                 // Use trade_idea.direction for accurate signal direction (always long or short now)
@@ -626,7 +613,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                                   {safeFormatNumber(target)}
                                 </div>
                                 <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                                  {calculatePercent(data.timeframe_profile.scalp.entry, target)}% • R:{calculateRR(data.timeframe_profile.scalp.entry, data.timeframe_profile.scalp.stop, target)}
+                                  {calculatePercent(signalsToUse.scalp.entry, target)}% • R:{calculateRR(signalsToUse.scalp.entry, signalsToUse.scalp.stop, target)}
                                 </div>
                               </div>
                             );
