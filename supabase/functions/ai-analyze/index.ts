@@ -273,65 +273,86 @@ Bollinger Bands: mid=${quantMetrics.indicators?.bb20?.mid}, upper=${quantMetrics
 ATR(14): ${quantMetrics.indicators?.atr14}
 VWAP: ${quantMetrics.indicators?.vwap}` : ''}
 
+CRITICAL DIRECTION DEFINITIONS:
+🟢 LONG = BUY signal = Expecting price to GO UP = Bullish = Enter below current price, target above
+🔴 SHORT = SELL signal = Expecting price to GO DOWN = Bearish = Enter above current price, target below
+⚪ HOLD = Uncertain/Conflicting = Wait for clearer setup
+
 AI DECISION-MAKING INSTRUCTIONS:
 
-1. INTEGRATE NEWS INTO SIGNAL:
-   - If news sentiment is STRONGLY bullish + technicals bullish → Increase confidence, tighter stops
-   - If news sentiment is STRONGLY bearish + technicals bearish → Increase confidence, tighter stops
-   - If news CONFLICTS with technicals → Reduce confidence, wider stops, or signal HOLD
-   - If high event risk → Consider reducing position size or waiting
+1. ANALYZE MARKET STRUCTURE:
+   - Trend: Is price making higher highs/lows (bullish) or lower highs/lows (bearish)?
+   - Price vs EMAs: Above all EMAs = bullish structure, Below all EMAs = bearish structure
+   - MACD Histogram: Positive = bullish momentum, Negative = bearish momentum
+   - RSI: Above 50 = bullish bias, Below 50 = bearish bias
+   - Volume: Increasing on moves = confirming trend
 
-2. ANALYZE TECHNICALS:
-   - Price vs EMAs: Is price above/below key moving averages?
-   - MACD: Is histogram positive (bullish) or negative (bearish)?
-   - RSI: Overbought (>70), oversold (<30), or neutral?
-   - Bollinger Bands: Is price at upper/lower band? Squeeze or expansion?
-   - Support/Resistance: Where are the nearest key levels?
+2. CHECK INDICATOR CONFLUENCE:
+   Count how many indicators agree on direction:
+   ✅ At least 4 out of 6 indicators must agree → Proceed with signal
+   ❌ Less than 4 indicators agree → Return "hold"
    
-   ⭐ CONFLUENCE CHECK:
-   - Do at least 4 out of 6 major indicators agree on direction?
-   - If indicators conflict significantly, strongly consider returning "hold"
+   6 Key Indicators to check:
+   1. Price vs EMA20
+   2. Price vs EMA50/200  
+   3. MACD histogram sign
+   4. RSI above/below 50
+   5. Price vs recent swing high/low
+   6. News sentiment alignment
 
-3. DETERMINE TRADE SIGNAL:
-   - Direction: LONG, SHORT, or HOLD
-     * Return "hold" if:
-       - Fewer than 4 indicators agree on direction
-       - News sentiment strongly conflicts with technicals
-       - Price is in consolidation/chop (ATR declining, inside bars)
-       - High event risk but unclear directional bias
-   
-   - Entry: Current price OR nearest key level (support for long, resistance for short)
-   
-   - Stop: Place BEYOND recent swing structure
-     * LONG: Below recent swing low + 1.5 ATR buffer
-     * SHORT: Above recent swing high + 1.5 ATR buffer
-     * Minimum 1.5 ATR distance from entry to account for normal volatility
-   
-   - Targets: Use REAL support/resistance levels from data
-     * Target 1: Nearest resistance (long) / support (short)
-     * Target 2: Next major level
-     * Target 3: Extended objective (optional)
-     * Ensure Target 1 is at least 2x the stop distance (R:R ≥ 2.0)
-   
-   - Time Horizon: scalp (<1h), intraday (1-8h), swing (1-5 days), position (>5 days)
+3. INTEGRATE NEWS SENTIMENT:
+   - Bullish news + Bullish technicals → LONG signal with higher confidence
+   - Bearish news + Bearish technicals → SHORT signal with higher confidence
+   - News conflicts with technicals → Reduce confidence OR return "hold"
+   - High event risk + unclear direction → Return "hold"
 
-4. NEWS IMPACT SECTION:
-   - Explain how news influenced your decision
-   - List key factors from news that support or contradict the trade
-   - Assess whether news creates opportunity or risk
+4. DETERMINE TRADE DIRECTION:
+   
+   Return "long" when:
+   ✅ Price is making higher lows and higher highs
+   ✅ Price above EMA20 and EMA50
+   ✅ MACD histogram positive (or turning positive)
+   ✅ RSI above 50 (bullish momentum)
+   ✅ At least 4/6 indicators bullish
+   ✅ Entry near support, targets at resistance above
+   
+   Return "short" when:
+   ✅ Price is making lower highs and lower lows
+   ✅ Price below EMA20 and EMA50
+   ✅ MACD histogram negative (or turning negative)
+   ✅ RSI below 50 (bearish momentum)
+   ✅ At least 4/6 indicators bearish
+   ✅ Entry near resistance, targets at support below
+   
+   Return "hold" when:
+   ⚪ Less than 4 indicators agree on direction
+   ⚪ News strongly conflicts with technicals
+   ⚪ Price is choppy/ranging with no clear trend
+   ⚪ High volatility with no directional bias
+   ⚪ Major event risk with unclear impact
 
-CRITICAL RULES:
-✅ Generate "hold" signal if conditions are unclear or conflicting
-✅ Ensure Risk:Reward ratio ≥ 2.0 (Target 1 distance must be 2x stop distance)
-✅ Stops must be at least 1.5 ATR from entry
-✅ Let NEWS influence your confidence and risk management
-✅ Use REAL levels from data for entry/stop/targets
-✅ Require at least 4 out of 6 indicators to agree before generating long/short signal
-✅ Explain how news + technicals combine to create the signal
-❌ Do NOT generate long/short in choppy/unclear markets
-❌ Do NOT use formula-based stops - use structure + ATR buffer
-❌ Do NOT generate signals with R:R < 2.0
-❌ Do NOT ignore news sentiment - it MUST factor into your decision`;
+5. SET ENTRY/STOP/TARGETS:
+   For LONG trades:
+   - Entry: At or slightly above current price (buy breakout) or at support below
+   - Stop: Below recent swing low minus 1.5 ATR
+   - Targets: At resistance levels above entry (R:R ≥ 2.0)
+   
+   For SHORT trades:
+   - Entry: At or slightly below current price (sell breakdown) or at resistance above
+   - Stop: Above recent swing high plus 1.5 ATR
+   - Targets: At support levels below entry (R:R ≥ 2.0)
+
+CRITICAL VALIDATION RULES:
+✅ LONG means BUYING (expecting UP) - entry ≤ current price, targets > entry
+✅ SHORT means SELLING (expecting DOWN) - entry ≥ current price, targets < entry
+✅ Minimum Risk:Reward ratio of 2.0 for Target 1
+✅ Stop must be at least 1.5 ATR from entry
+✅ Default to "hold" when in doubt - quality over quantity
+✅ News sentiment MUST be factored into final decision
+❌ Never generate LONG with targets below entry
+❌ Never generate SHORT with targets above entry
+❌ Never generate signal with conflicting indicators
+❌ Never ignore low indicator confluence (<4/6)`;
 
     console.log('[ai-analyze] Calling OpenAI with news-integrated analysis...');
     
@@ -872,33 +893,104 @@ CRITICAL RULES:
     
     // ==================== SIGNAL QUALITY FILTERS ====================
     
-    // Check if direction is "hold" - if so, return early without saving to database
-    if (parsed.trade_idea.direction === 'hold') {
-      console.log(`[VALIDATION] ⚠️  AI returned "hold" - no trade signal generated`);
-      return new Response(JSON.stringify({
-        signal: "hold",
-        message: "Conditions unclear - waiting for better setup",
-        rationale: parsed.trade_idea.rationale,
-        confidence_agreement: signal_confidence_agreement,
-        overall_accuracy: overall_accuracy
-      }), {
+    // Check if direction is "hold" OR if action is "hold" - return early without saving to database
+    if (parsed.trade_idea.direction === 'hold' || parsed.action === 'hold') {
+      console.log(`[VALIDATION] ⚪ AI returned "hold" signal - no trade recommended`);
+      
+      // Build a proper response with the hold recommendation
+      const holdResponse = {
+        symbol,
+        timestamp: new Date().toISOString(),
+        recommendation: 'hold',
+        confidence: 0, // Hold signals have 0 confidence for trading
+        holdReason: parsed.trade_idea.rationale || parsed.action_text || 'Market conditions are unclear or conflicting. Waiting for better setup.',
+        analysis: parsed.summary || 'Technical indicators do not show strong directional bias. Recommend waiting for clearer signals.',
+        outlook: parsed.outlook || 'neutral',
+        action: 'hold',
+        action_text: parsed.action_text || 'No trade recommended at this time',
+        news_impact: parsed.news_impact,
+        market_structure: parsed.market_structure,
+        keyLevels: {
+          support: parsed.levels?.support || [],
+          resistance: parsed.levels?.resistance || []
+        },
+        technicalIndicators: {
+          rsi: parsed.technical?.rsi14 || 50,
+          trend: 'neutral',
+          momentum: 'neutral'
+        },
+        chartPatterns: [],
+        priceTargets: {
+          bullish: 0,
+          bearish: 0
+        },
+        riskAssessment: {
+          level: 'medium',
+          factors: ['Conditions unclear - waiting for better setup']
+        },
+        rejectionDetails: {
+          confidence_agreement: signal_confidence_agreement,
+          reason: 'Insufficient indicator confluence or conflicting signals',
+          indicator_agreement: {
+            checks: indicatorChecks,
+            agreement_count: agreementCount,
+            total_checks: totalChecks
+          }
+        }
+      };
+      
+      return new Response(JSON.stringify(holdResponse), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
     
-    // Reject signals with low confidence agreement
-    if (signal_confidence_agreement < 75) {
-      console.warn(`[VALIDATION] ⚠️  Signal rejected: confidence agreement ${signal_confidence_agreement}% below threshold`);
-      return new Response(JSON.stringify({
-        error: "Signal quality too low",
-        details: {
-          confidence_agreement: signal_confidence_agreement,
-          threshold: 75,
-          message: "Indicators do not strongly support the proposed trade direction. Wait for clearer setup.",
-          rationale: parsed.trade_idea.rationale
+    // Reject signals with low confidence agreement - return as HOLD
+    if (signal_confidence_agreement < 67) {
+      console.warn(`[VALIDATION] ⚠️  Signal rejected: confidence agreement ${signal_confidence_agreement}% below threshold (need ≥67% = 4/6 indicators)`);
+      
+      const holdResponse = {
+        symbol,
+        timestamp: new Date().toISOString(),
+        recommendation: 'hold',
+        confidence: 0,
+        holdReason: `Only ${agreementCount}/${totalChecks} indicators agree on ${tradeDirection.toUpperCase()} direction. Need at least 4 out of 6 indicators to confirm before generating trade signal.`,
+        analysis: parsed.summary || `Insufficient indicator confluence for ${tradeDirection} trade. ${conflictingSignals.length} conflicting signal(s) detected.`,
+        outlook: 'neutral',
+        action: 'hold',
+        action_text: `Indicators show mixed signals (${signal_confidence_agreement}% agreement). Wait for stronger confluence before entering.`,
+        news_impact: parsed.news_impact,
+        keyLevels: {
+          support: parsed.levels?.support || [],
+          resistance: parsed.levels?.resistance || []
+        },
+        technicalIndicators: {
+          rsi: parsed.technical?.rsi14 || 50,
+          trend: 'neutral',
+          momentum: 'neutral'
+        },
+        chartPatterns: [],
+        priceTargets: { bullish: 0, bearish: 0 },
+        riskAssessment: {
+          level: 'medium',
+          factors: [`Low indicator agreement: ${signal_confidence_agreement}%`, 'Conflicting technical signals']
+        },
+        rejectionDetails: {
+          _type: 'confidence_agreement',
+          value: signal_confidence_agreement,
+          threshold: 67,
+          agreement_count: agreementCount,
+          total_checks: totalChecks,
+          conflicting_signals: conflictingSignals,
+          indicator_agreement: {
+            checks: indicatorChecks,
+            agreement_count: agreementCount,
+            total_checks: totalChecks
+          }
         }
-      }), {
+      };
+      
+      return new Response(JSON.stringify(holdResponse), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -915,17 +1007,45 @@ CRITICAL RULES:
       
       if (rrRatio < 2.0) {
         console.warn(`[VALIDATION] ⚠️  Signal rejected: R:R ratio ${rrRatio.toFixed(2)} below minimum 2.0`);
-        return new Response(JSON.stringify({
-          error: "Risk-reward ratio too low",
-          details: {
-            rr_ratio: rrRatio.toFixed(2),
+        
+        const holdResponse = {
+          symbol,
+          timestamp: new Date().toISOString(),
+          recommendation: 'hold',
+          confidence: 0,
+          holdReason: `Risk:Reward ratio of ${rrRatio.toFixed(2)} is too low (minimum 2.0 required). Trade setup does not offer sufficient reward for the risk taken.`,
+          analysis: parsed.summary || `${tradeDirection.toUpperCase()} setup identified but rejected due to poor risk:reward profile.`,
+          outlook: parsed.outlook || 'neutral',
+          action: 'hold',
+          action_text: `Wait for better entry point with improved R:R ratio`,
+          keyLevels: {
+            support: parsed.levels?.support || [],
+            resistance: parsed.levels?.resistance || []
+          },
+          technicalIndicators: {
+            rsi: parsed.technical?.rsi14 || 50,
+            trend: parsed.outlook === 'bullish' ? 'bullish' : parsed.outlook === 'bearish' ? 'bearish' : 'neutral',
+            momentum: 'neutral'
+          },
+          chartPatterns: [],
+          priceTargets: { bullish: 0, bearish: 0 },
+          riskAssessment: {
+            level: 'high',
+            factors: [`Poor R:R ratio: ${rrRatio.toFixed(2)}`, 'Insufficient reward for risk taken']
+          },
+          rejectionDetails: {
+            _type: 'risk_reward',
+            value: rrRatio.toFixed(2),
             threshold: 2.0,
-            message: "Trade setup does not offer sufficient reward for the risk. Wait for better entry.",
             entry: entryPrice,
             stop: stopPrice,
-            target: target1Price
+            target: target1Price,
+            risk: risk,
+            reward: reward
           }
-        }), {
+        };
+        
+        return new Response(JSON.stringify(holdResponse), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
