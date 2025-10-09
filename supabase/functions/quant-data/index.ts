@@ -798,22 +798,47 @@ serve(async (req) => {
     console.log(`💰 Price source: ${usingLivePrice ? `LIVE SNAPSHOT @ ${snapshotTime}` : 'LAST CANDLE'}`);
     console.log(`💰 Current price: ${currentPrice}, Last candle: ${lastCandleClose}, Prev close: ${prevClose}`);
 
-    // Calculate technical indicators (use Polygon indicators if available)
-    const ema20 = calculateEMA(prices, 20);
-    const ema50 = calculateEMA(prices, 50);
-    const ema200 = calculateEMA(prices, 200);
-    const rsi14 = polygonIndicators.rsi || calculateRSI(prices, 14);
+    // === CRITICAL FIX: Append live price to make indicators current ===
+    // If we have a live snapshot price that's different from the last candle, append it
+    // This ensures all indicators reflect the CURRENT market state, not hour-old data
+    let pricesForIndicators = [...prices];
+    let candlesForIndicators = [...candles];
+    
+    if (usingLivePrice && Math.abs(currentPrice - lastCandleClose) > 0.01) {
+      console.log(`🔧 APPENDING live price ${currentPrice} to indicator calculation (was ${lastCandleClose})`);
+      pricesForIndicators.push(currentPrice);
+      
+      // Create a synthetic current candle for the live price
+      const lastCandle = candles[candles.length - 1];
+      const nowMs = Date.now();
+      candlesForIndicators.push({
+        t: nowMs,
+        o: lastCandleClose,
+        h: Math.max(currentPrice, lastCandleClose),
+        l: Math.min(currentPrice, lastCandleClose),
+        c: currentPrice,
+        v: 0 // We don't have volume for the synthetic candle
+      });
+    }
+
+    // Calculate technical indicators on LIVE data (includes current price)
+    const ema20 = calculateEMA(pricesForIndicators, 20);
+    const ema50 = calculateEMA(pricesForIndicators, 50);
+    const ema200 = calculateEMA(pricesForIndicators, 200);
+    const rsi14 = polygonIndicators.rsi || calculateRSI(pricesForIndicators, 14);
     
     if (polygonIndicators.usePolygonIndicators) {
       console.log('✅ Using Polygon API indicators for enhanced accuracy');
     }
-    const macd = calculateMACD(prices);
-    const bb20 = calculateBollingerBands(prices, 20);
-    const atr14 = calculateATR(candles, 14);
-    const donchian20 = calculateDonchian(candles, 20);
-    const vol20_annual = calculateRealizedVolatility(prices, 20);
-    const zscore20 = calculateZScore(prices, 20);
-    const vwap = calculateVWAP(candles);
+    const macd = calculateMACD(pricesForIndicators);
+    const bb20 = calculateBollingerBands(pricesForIndicators, 20);
+    const atr14 = calculateATR(candlesForIndicators, 14);
+    const donchian20 = calculateDonchian(candlesForIndicators, 20);
+    const vol20_annual = calculateRealizedVolatility(pricesForIndicators, 20);
+    const zscore20 = calculateZScore(pricesForIndicators, 20);
+    const vwap = calculateVWAP(candlesForIndicators);
+    
+    console.log(`📈 LIVE INDICATORS: RSI=${rsi14.toFixed(1)}, EMA20=${ema20.toFixed(2)}, EMA50=${ema50.toFixed(2)}, Current=${currentPrice}`);
 
     // Fetch benchmark data (S&P 500 proxy) for alpha/beta calculations
     let benchmarkPrices: number[] = [];
@@ -824,20 +849,20 @@ serve(async (req) => {
       console.log('Benchmark data unavailable, alpha/beta will be null');
     }
 
-    // Calculate advanced quantitative metrics
-    const sharpe_ratio = calculateSharpeRatio(prices, Math.min(252, prices.length));
-    const sortino_ratio = calculateSortinoRatio(prices, Math.min(252, prices.length));
-    const alpha = benchmarkPrices.length > 0 ? calculateAlpha(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
-    const beta = benchmarkPrices.length > 0 ? calculateBeta(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
-    const std_dev = calculateSampleStdDev(prices, 20);
+    // Calculate advanced quantitative metrics on live data
+    const sharpe_ratio = calculateSharpeRatio(pricesForIndicators, Math.min(252, pricesForIndicators.length));
+    const sortino_ratio = calculateSortinoRatio(pricesForIndicators, Math.min(252, pricesForIndicators.length));
+    const alpha = benchmarkPrices.length > 0 ? calculateAlpha(pricesForIndicators, benchmarkPrices, Math.min(252, pricesForIndicators.length)) : null;
+    const beta = benchmarkPrices.length > 0 ? calculateBeta(pricesForIndicators, benchmarkPrices, Math.min(252, pricesForIndicators.length)) : null;
+    const std_dev = calculateSampleStdDev(pricesForIndicators, 20);
     const variance = std_dev * std_dev; // Variance is std dev squared
-    const population_std_dev = calculatePopulationStdDev(prices, 20);
-    const sample_std_dev = calculateSampleStdDev(prices, 20);
-    const skewness = calculateSkewness(prices, 20);
-    const kurtosis = calculateKurtosis(prices, 20);
-    const max_drawdown = calculateMaxDrawdown(prices);
-    const calmar_ratio = calculateCalmarRatio(prices, Math.min(252, prices.length));
-    const information_ratio = benchmarkPrices.length > 0 ? calculateInformationRatio(prices, benchmarkPrices, Math.min(252, prices.length)) : null;
+    const population_std_dev = calculatePopulationStdDev(pricesForIndicators, 20);
+    const sample_std_dev = calculateSampleStdDev(pricesForIndicators, 20);
+    const skewness = calculateSkewness(pricesForIndicators, 20);
+    const kurtosis = calculateKurtosis(pricesForIndicators, 20);
+    const max_drawdown = calculateMaxDrawdown(pricesForIndicators);
+    const calmar_ratio = calculateCalmarRatio(pricesForIndicators, Math.min(252, pricesForIndicators.length));
+    const information_ratio = benchmarkPrices.length > 0 ? calculateInformationRatio(pricesForIndicators, benchmarkPrices, Math.min(252, pricesForIndicators.length)) : null;
 
     // Create tail data (last 50 points for sparkline)
     const tail = candles.slice(-50).map(c => ({ t: c.t, c: c.c }));
@@ -858,7 +883,7 @@ serve(async (req) => {
       }
     }
 
-    // Generate trading signals based on technical indicators and actual price structure
+    // Generate trading signals based on LIVE technical indicators and actual price structure
     const timeframe_profile = generateTradingSignals(
       currentPrice,
       atr14,
@@ -868,7 +893,7 @@ serve(async (req) => {
       ema20,
       ema50,
       donchian20,
-      candles // Pass candles for price structure analysis
+      candlesForIndicators // Use candles with live price appended
     );
 
     const response: QuantResponse = {
