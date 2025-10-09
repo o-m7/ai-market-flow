@@ -86,12 +86,18 @@ serve(async (req) => {
         let symbol = analysis.symbol;
         const marketType = (analysis.market || '').toUpperCase();
         
+        console.log(`[check-trade-outcomes] DEBUG: analysis.market="${analysis.market}", marketType="${marketType}", original symbol="${symbol}"`);
+        
         if (marketType === 'CRYPTO') {
           symbol = `X:${analysis.symbol.replace('/', '')}`;
+          console.log(`[check-trade-outcomes] DEBUG: Converted to CRYPTO symbol: ${symbol}`);
         } else if (marketType === 'FOREX') {
           symbol = `C:${analysis.symbol}`;
+          console.log(`[check-trade-outcomes] DEBUG: Converted to FOREX symbol: ${symbol}`);
+        } else {
+          console.log(`[check-trade-outcomes] DEBUG: Using stock symbol as-is: ${symbol}`);
         }
-        // For stocks, use symbol as-is
+        
         const timeframe = analysis.timeframe || '60m';
         
         // Map timeframe to Polygon format
