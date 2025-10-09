@@ -451,11 +451,22 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   
   const timeframe = timeframes[tf] || '1/hour';
   const now = new Date();
-  const from = new Date(now.getTime() - (100 * 24 * 60 * 60 * 1000)); // 100 days ago
   
-  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${timeframe}/${from.toISOString().split('T')[0]}/${now.toISOString().split('T')[0]}?adjusted=true&sort=asc&limit=5000&apikey=${polygonApiKey}`;
+  // Use shorter lookback periods to ensure we get recent data
+  const lookbackDays: Record<string, number> = {
+    '1m': 2,    // 2 days for 1min = 2880 bars
+    '5m': 5,    // 5 days for 5min = 1440 bars
+    '15m': 10,  // 10 days for 15min = 960 bars
+    '1h': 30,   // 30 days for 1h = 720 bars
+    '1d': 365   // 1 year for daily = 365 bars
+  };
   
-  console.log(`Fetching quant data: symbol=${symbol}, polygonSymbol=${polygonSymbol}, timeframe=${tf}`);
+  const daysToFetch = lookbackDays[tf] || 30;
+  const from = new Date(now.getTime() - (daysToFetch * 24 * 60 * 60 * 1000));
+  
+  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${timeframe}/${from.toISOString().split('T')[0]}/${now.toISOString().split('T')[0]}?adjusted=true&sort=desc&limit=5000&apikey=${polygonApiKey}`;
+  
+  console.log(`Fetching quant data: symbol=${symbol}, polygonSymbol=${polygonSymbol}, timeframe=${tf}, days=${daysToFetch}`);
   
   const response = await fetch(url);
   if (!response.ok) {
@@ -465,16 +476,17 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   }
   
   const data = await response.json();
-  console.log(`Polygon response: status=${data.status}, count=${data.resultsCount || 0}`);
+  console.log(`Polygon response: status=${data.status}, count=${data.resultsCount || 0}, ticker=${data.ticker}`);
   
   if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
     console.error('No data available - symbol:', symbol, 'polygonSymbol:', polygonSymbol, 'response:', JSON.stringify(data).substring(0, 200));
     throw new Error(`No data available for ${symbol}`);
   }
   
-  console.log(`Successfully fetched ${data.results.length} candles for ${polygonSymbol}`);
+  console.log(`Successfully fetched ${data.results.length} candles for ${polygonSymbol}, latest timestamp: ${new Date(data.results[0].t).toISOString()}`);
   
-  return data.results.map((bar: any) => ({
+  // Reverse to chronological order (oldest first) since we fetched desc
+  const candles = data.results.reverse().map((bar: any) => ({
     t: bar.t,
     o: bar.o,
     h: bar.h,
@@ -482,6 +494,8 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
     c: bar.c,
     v: bar.v
   }));
+  
+  return candles;
 }
 
 async function generateSummary(symbol: string, indicators: any, openaiKey: string): Promise<string> {
