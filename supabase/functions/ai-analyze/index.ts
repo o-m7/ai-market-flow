@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.6.2"; // Using gpt-4o model
+const FUNCTION_VERSION = "3.0.0"; // Using gpt-5 with full data integration
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -411,8 +411,18 @@ ${JSON.stringify(features.technical, null, 2)}
 PRICE STRUCTURE & LEVELS:
 ${JSON.stringify(features.levels, null, 2)}
 
-NEWS SENTIMENT:
-${JSON.stringify(news, null, 2)}
+NEWS SENTIMENT (GPT-5 Analysis):
+${news ? `
+Sentiment: ${news.sentiment} (Confidence: ${(news.confidence * 100).toFixed(0)}%)
+Trading Signal from News: ${news.trading_signal}
+News Impact Level: ${news.event_risk ? 'HIGH' : 'MEDIUM/LOW'}
+Articles Analyzed: ${news.headline_hits_30m}
+Key Drivers: ${news.key_drivers?.join(', ') || 'None'}
+Risk Factors: ${news.risk_factors?.join(', ') || 'None'}
+News Summary: ${news.news_summary || 'No significant news'}
+Expected Time Horizon: ${news.time_horizon}
+Expected Volatility: ${news.volatility_expected}
+` : 'No news data available'}
 
 ${quantMetrics ? `QUANT INDICATORS (for reference only):
 RSI: ${quantMetrics.rsi14}
@@ -484,7 +494,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     // Add timeout wrapper for OpenAI call
     const openaiTimeout = 60000; // 60 second timeout for OpenAI
     const openaiPromise = client.chat.completions.create({
-      model: "gpt-4o", // Reliable model with good access
+      model: "gpt-5-2025-08-07", // Latest flagship model with superior reasoning
       messages: [
         { 
           role: "system", 
@@ -497,7 +507,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_tokens: 4096,
+      max_completion_tokens: 4096, // Use max_completion_tokens for GPT-5
       temperature: 0.7,
     });
 
