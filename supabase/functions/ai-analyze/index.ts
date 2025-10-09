@@ -608,88 +608,202 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       });
     }
 
+    // ==================== VALIDATION PIPELINE START ====================
+    const validationStartTime = Date.now();
+    console.log(`[VALIDATION] ⏱️  Starting validation pipeline at ${new Date().toISOString()}`);
+    
     // Validate and calculate accuracy metrics
     const latestCandleTime = candles[candles.length - 1]?.t || Date.now();
     const dataAgeSeconds = Math.round((Date.now() - latestCandleTime) / 1000);
+    const dataAgeMinutes = (dataAgeSeconds / 60).toFixed(2);
+    
+    console.log(`[VALIDATION] 📊 Data Freshness Check:`);
+    console.log(`  - Latest candle: ${new Date(latestCandleTime).toISOString()}`);
+    console.log(`  - Data age: ${dataAgeSeconds}s (${dataAgeMinutes} minutes)`);
+    
     const freshness_score = Math.max(0, 100 - (dataAgeSeconds / 60) * 10); // Lose 10 points per minute of age
+    console.log(`  - Freshness score: ${freshness_score.toFixed(2)}/100`);
+    
+    if (freshness_score < 70) {
+      console.warn(`[VALIDATION] ⚠️  DATA STALENESS WARNING: Score ${freshness_score.toFixed(2)} < 70 (data is ${dataAgeMinutes} minutes old)`);
+    }
     
     const livePrice = currentPrice || features.technical.current;
+    console.log(`[VALIDATION] 💰 Live Price: ${livePrice.toFixed(2)}`);
     
     // Validate entry logic relative to direction and current price
     const validationNotes: string[] = [];
     let entry_validity = 100;
+    console.log(`[VALIDATION] 🎯 Entry Validity Check (starting at 100)...`);
     
     const tradeDirection = parsed.trade_idea?.direction;
     const entryPrice = parsed.trade_idea?.entry;
     const stopPrice = parsed.trade_idea?.stop;
+    const targetPrice = parsed.trade_idea?.target1;
+    
+    console.log(`[VALIDATION] 📈 Trade Setup:`);
+    console.log(`  - Direction: ${tradeDirection?.toUpperCase()}`);
+    console.log(`  - Entry: ${entryPrice?.toFixed(2)}`);
+    console.log(`  - Stop: ${stopPrice?.toFixed(2)}`);
+    console.log(`  - Target: ${targetPrice?.toFixed(2)}`);
     
     if (tradeDirection === 'long') {
+      console.log(`[VALIDATION] 🔵 LONG Trade Validation:`);
       // LONG: Entry should be AT OR BELOW current price (buy dip or at market)
+      const entryDistancePercent = ((entryPrice/livePrice - 1) * 100).toFixed(2);
+      console.log(`  - Entry vs Current: ${entryPrice.toFixed(2)} vs ${livePrice.toFixed(2)} (${entryDistancePercent}% difference)`);
+      
       if (entryPrice > livePrice * 1.02) {
-        entry_validity -= 40;
-        validationNotes.push(`⚠️ LONG entry ${entryPrice.toFixed(2)} is ${((entryPrice/livePrice - 1) * 100).toFixed(1)}% above current price ${livePrice.toFixed(2)} - should be at or below for long trades`);
+        const penalty = 40;
+        entry_validity -= penalty;
+        const warning = `⚠️ LONG entry ${entryPrice.toFixed(2)} is ${entryDistancePercent}% above current price ${livePrice.toFixed(2)} - should be at or below for long trades`;
+        validationNotes.push(warning);
+        console.warn(`[VALIDATION] ❌ Entry Invalid (-${penalty} points): ${warning}`);
+      } else {
+        console.log(`[VALIDATION] ✅ Entry Valid: LONG entry is at or below current price`);
       }
+      
       // Stop should be BELOW entry
+      console.log(`  - Stop vs Entry: ${stopPrice.toFixed(2)} vs ${entryPrice.toFixed(2)}`);
       if (stopPrice >= entryPrice) {
-        entry_validity -= 30;
-        validationNotes.push(`⚠️ LONG stop ${stopPrice.toFixed(2)} is above/equal to entry ${entryPrice.toFixed(2)} - invalid risk management`);
+        const penalty = 30;
+        entry_validity -= penalty;
+        const warning = `⚠️ LONG stop ${stopPrice.toFixed(2)} is above/equal to entry ${entryPrice.toFixed(2)} - invalid risk management`;
+        validationNotes.push(warning);
+        console.warn(`[VALIDATION] ❌ Stop Invalid (-${penalty} points): ${warning}`);
+      } else {
+        console.log(`[VALIDATION] ✅ Stop Valid: Stop is below entry`);
       }
     } else if (tradeDirection === 'short') {
+      console.log(`[VALIDATION] 🔴 SHORT Trade Validation:`);
       // SHORT: Entry should be AT OR ABOVE current price (sell rally or at market)
+      const entryDistancePercent = ((1 - entryPrice/livePrice) * 100).toFixed(2);
+      console.log(`  - Entry vs Current: ${entryPrice.toFixed(2)} vs ${livePrice.toFixed(2)} (${entryDistancePercent}% difference)`);
+      
       if (entryPrice < livePrice * 0.98) {
-        entry_validity -= 40;
-        validationNotes.push(`⚠️ SHORT entry ${entryPrice.toFixed(2)} is ${((1 - entryPrice/livePrice) * 100).toFixed(1)}% below current price ${livePrice.toFixed(2)} - should be at or above for short trades`);
+        const penalty = 40;
+        entry_validity -= penalty;
+        const warning = `⚠️ SHORT entry ${entryPrice.toFixed(2)} is ${entryDistancePercent}% below current price ${livePrice.toFixed(2)} - should be at or above for short trades`;
+        validationNotes.push(warning);
+        console.warn(`[VALIDATION] ❌ Entry Invalid (-${penalty} points): ${warning}`);
+      } else {
+        console.log(`[VALIDATION] ✅ Entry Valid: SHORT entry is at or above current price`);
       }
+      
       // Stop should be ABOVE entry
+      console.log(`  - Stop vs Entry: ${stopPrice.toFixed(2)} vs ${entryPrice.toFixed(2)}`);
       if (stopPrice <= entryPrice) {
-        entry_validity -= 30;
-        validationNotes.push(`⚠️ SHORT stop ${stopPrice.toFixed(2)} is below/equal to entry ${entryPrice.toFixed(2)} - invalid risk management`);
+        const penalty = 30;
+        entry_validity -= penalty;
+        const warning = `⚠️ SHORT stop ${stopPrice.toFixed(2)} is below/equal to entry ${entryPrice.toFixed(2)} - invalid risk management`;
+        validationNotes.push(warning);
+        console.warn(`[VALIDATION] ❌ Stop Invalid (-${penalty} points): ${warning}`);
+      } else {
+        console.log(`[VALIDATION] ✅ Stop Valid: Stop is above entry`);
       }
     }
     
+    console.log(`[VALIDATION] 📊 Entry Validity Score: ${entry_validity}/100`);
+    
     // Validate support levels are below current price
+    console.log(`[VALIDATION] 🔽 Support Level Validation:`);
     const support = parsed.levels?.support || [];
+    console.log(`  - Total support levels: ${support.length}`);
+    console.log(`  - Support prices: [${support.map(s => s.toFixed(2)).join(', ')}]`);
+    
     const invalidSupport = support.filter((s: number) => s > livePrice * 1.01);
     if (invalidSupport.length > 0) {
-      entry_validity -= 20;
-      validationNotes.push(`⚠️ ${invalidSupport.length} support level(s) above current price - support should be below price`);
+      const penalty = 20;
+      entry_validity -= penalty;
+      const warning = `⚠️ ${invalidSupport.length} support level(s) above current price - support should be below price`;
+      validationNotes.push(warning);
+      console.warn(`[VALIDATION] ❌ Invalid Support (-${penalty} points): ${warning}`);
+      console.warn(`  - Invalid levels: [${invalidSupport.map(s => s.toFixed(2)).join(', ')}]`);
+    } else {
+      console.log(`[VALIDATION] ✅ All support levels valid (below price)`);
     }
     
     // Validate resistance levels are above current price
+    console.log(`[VALIDATION] 🔼 Resistance Level Validation:`);
     const resistance = parsed.levels?.resistance || [];
+    console.log(`  - Total resistance levels: ${resistance.length}`);
+    console.log(`  - Resistance prices: [${resistance.map(r => r.toFixed(2)).join(', ')}]`);
+    
     const invalidResistance = resistance.filter((r: number) => r < livePrice * 0.99);
     if (invalidResistance.length > 0) {
-      entry_validity -= 20;
-      validationNotes.push(`⚠️ ${invalidResistance.length} resistance level(s) below current price - resistance should be above price`);
+      const penalty = 20;
+      entry_validity -= penalty;
+      const warning = `⚠️ ${invalidResistance.length} resistance level(s) below current price - resistance should be above price`;
+      validationNotes.push(warning);
+      console.warn(`[VALIDATION] ❌ Invalid Resistance (-${penalty} points): ${warning}`);
+      console.warn(`  - Invalid levels: [${invalidResistance.map(r => r.toFixed(2)).join(', ')}]`);
+    } else {
+      console.log(`[VALIDATION] ✅ All resistance levels valid (above price)`);
     }
     
+    console.log(`[VALIDATION] 📊 Updated Entry Validity Score: ${entry_validity}/100`);
+    
     // Calculate signal clarity score
+    console.log(`[VALIDATION] 🎯 Signal Clarity Calculation (starting at 50):`);
     const ema20 = features.technical.ema20;
     const ema50 = features.technical.ema50;
     const macd_hist = features.technical.macd.hist;
     const rsi = features.technical.rsi14;
     
+    console.log(`  - Technical Indicators:`);
+    console.log(`    • EMA20: ${ema20.toFixed(2)}`);
+    console.log(`    • EMA50: ${ema50.toFixed(2)}`);
+    console.log(`    • MACD Hist: ${macd_hist.toFixed(4)}`);
+    console.log(`    • RSI: ${rsi.toFixed(2)}`);
+    
     let signal_clarity = 50;
     
     // EMA alignment adds clarity
-    if ((livePrice > ema20 && livePrice > ema50) || (livePrice < ema20 && livePrice < ema50)) {
+    const priceAboveEmas = livePrice > ema20 && livePrice > ema50;
+    const priceBelowEmas = livePrice < ema20 && livePrice < ema50;
+    if (priceAboveEmas || priceBelowEmas) {
       signal_clarity += 20;
+      console.log(`[VALIDATION] ✅ EMA Alignment (+20): Price ${priceAboveEmas ? 'above' : 'below'} both EMAs`);
+    } else {
+      console.log(`[VALIDATION] ⚠️  EMA Mixed: Price between EMAs (+0)`);
     }
     
     // MACD agreement adds clarity
-    if ((macd_hist > 0 && tradeDirection === 'long') || (macd_hist < 0 && tradeDirection === 'short')) {
+    const macdAgreesLong = macd_hist > 0 && tradeDirection === 'long';
+    const macdAgreesShort = macd_hist < 0 && tradeDirection === 'short';
+    if (macdAgreesLong || macdAgreesShort) {
       signal_clarity += 15;
+      console.log(`[VALIDATION] ✅ MACD Agreement (+15): MACD ${macd_hist > 0 ? 'positive' : 'negative'} matches ${tradeDirection}`);
+    } else {
+      console.log(`[VALIDATION] ⚠️  MACD Conflict: MACD ${macd_hist > 0 ? 'positive' : 'negative'} conflicts with ${tradeDirection} (+0)`);
     }
     
     // RSI extreme adds clarity
-    if ((rsi < 35 && tradeDirection === 'long') || (rsi > 65 && tradeDirection === 'short')) {
+    const rsiSupportsLong = rsi < 35 && tradeDirection === 'long';
+    const rsiSupportsShort = rsi > 65 && tradeDirection === 'short';
+    if (rsiSupportsLong || rsiSupportsShort) {
       signal_clarity += 15;
+      console.log(`[VALIDATION] ✅ RSI Extreme (+15): RSI ${rsi.toFixed(2)} supports ${tradeDirection}`);
+    } else {
+      console.log(`[VALIDATION] ⚠️  RSI Neutral: RSI ${rsi.toFixed(2)} not at extreme (+0)`);
     }
     
+    console.log(`[VALIDATION] 📊 Signal Clarity Score: ${signal_clarity}/100`);
+    
     // Level precision score
-    const level_precision = Math.min(100, 50 + (support.length + resistance.length) * 10);
+    const totalLevels = support.length + resistance.length;
+    const level_precision = Math.min(100, 50 + totalLevels * 10);
+    console.log(`[VALIDATION] 📏 Level Precision: ${totalLevels} total levels → ${level_precision}/100`);
     
     // Overall accuracy
+    console.log(`[VALIDATION] 🧮 Overall Accuracy Calculation:`);
+    console.log(`  - Formula: (freshness×0.3) + (clarity×0.3) + (precision×0.2) + (entry×0.2)`);
+    console.log(`  - Weighted scores:`);
+    console.log(`    • Freshness: ${freshness_score.toFixed(2)} × 0.3 = ${(freshness_score * 0.3).toFixed(2)}`);
+    console.log(`    • Clarity:   ${signal_clarity.toFixed(2)} × 0.3 = ${(signal_clarity * 0.3).toFixed(2)}`);
+    console.log(`    • Precision: ${level_precision.toFixed(2)} × 0.2 = ${(level_precision * 0.2).toFixed(2)}`);
+    console.log(`    • Entry:     ${entry_validity.toFixed(2)} × 0.2 = ${(entry_validity * 0.2).toFixed(2)}`);
+    
     const overall_accuracy = Math.round(
       (freshness_score * 0.3) + 
       (signal_clarity * 0.3) + 
@@ -697,18 +811,33 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       (entry_validity * 0.2)
     );
     
+    console.log(`[VALIDATION] 🎯 OVERALL ACCURACY: ${overall_accuracy}/100`);
+    
     if (validationNotes.length === 0) {
       validationNotes.push(`✓ All validation checks passed`);
       validationNotes.push(`✓ Data age: ${dataAgeSeconds}s`);
       validationNotes.push(`✓ Entry ${entryPrice.toFixed(2)} vs Current ${livePrice.toFixed(2)}: Valid for ${tradeDirection}`);
+      console.log(`[VALIDATION] ✅ Perfect validation - no warnings`);
+    } else {
+      console.log(`[VALIDATION] ⚠️  ${validationNotes.length} validation warning(s):`);
+      validationNotes.forEach((note, i) => {
+        console.log(`  ${i + 1}. ${note}`);
+      });
     }
     
-    console.log('[ai-analyze] Accuracy metrics:', {
+    const validationEndTime = Date.now();
+    const validationDuration = validationEndTime - validationStartTime;
+    console.log(`[VALIDATION] ⏱️  Validation completed in ${validationDuration}ms at ${new Date().toISOString()}`);
+    console.log(`[VALIDATION] ==================== PIPELINE END ====================`);
+    
+    console.log('[ai-analyze] 📊 ACCURACY METRICS SUMMARY:', {
       freshness_score: Math.round(freshness_score),
       signal_clarity: Math.round(signal_clarity),
       level_precision: Math.round(level_precision),
       entry_validity: Math.round(entry_validity),
-      overall_accuracy
+      overall_accuracy,
+      validation_duration_ms: validationDuration,
+      warnings_count: validationNotes.length
     });
 
     // Validate and ensure all required fields
