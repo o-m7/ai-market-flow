@@ -42,74 +42,43 @@ function round5(n: number): number {
   return Number(n.toFixed(5));
 }
 
-// Enhanced OpenAI Function Schema for comprehensive institutional analysis
+// Simplified AI Analysis Schema - AI-Driven Decisions with News Integration
 const InstitutionalTaResultSchema = {
   name: "InstitutionalTaResult",
-  description: "Comprehensive institutional-grade technical analysis with multiple strategies and quantitative metrics",
+  description: "Live AI-driven technical analysis integrated with real-time news sentiment",
   parameters: {
     type: "object",
     properties: {
-      summary: { type: "string", description: "Comprehensive market structure and technical analysis summary" },
-      action: { type: "string", enum: ["buy", "sell", "hold"], description: "Primary trading action" },
-      action_text: { type: "string", description: "Detailed action description with rationale" },
-      outlook: { type: "string", enum: ["bullish", "bearish", "neutral"], description: "Market outlook" },
+      summary: { type: "string", description: "Comprehensive market analysis including news impact" },
+      action: { type: "string", enum: ["buy", "sell", "hold"], description: "AI-determined trading action based on technicals AND news" },
+      action_text: { type: "string", description: "Detailed rationale incorporating news sentiment" },
+      outlook: { type: "string", enum: ["bullish", "bearish", "neutral"], description: "Overall market outlook" },
+      news_impact: {
+        type: "object",
+        properties: {
+          sentiment: { type: "string", enum: ["bullish", "bearish", "neutral"], description: "News sentiment" },
+          impact_level: { type: "string", enum: ["high", "medium", "low"], description: "How much news influenced the signal" },
+          key_factors: { type: "array", items: { type: "string" }, description: "Key news factors affecting the trade" },
+          headline_count: { type: "number", description: "Number of relevant news articles" }
+        },
+        required: ["sentiment", "impact_level", "key_factors", "headline_count"]
+      },
       market_structure: {
         type: "object",
         properties: {
           trend_direction: { type: "string", enum: ["strong_bullish", "bullish", "neutral", "bearish", "strong_bearish"] },
           market_phase: { type: "string", enum: ["trending", "range_bound", "consolidation", "breakout"] },
           volatility_regime: { type: "string", enum: ["low", "normal", "high", "extreme"] },
-          session_context: { type: "string", description: "Session analysis and liquidity context" }
+          session_context: { type: "string", description: "Current market session analysis" }
         },
         required: ["trend_direction", "market_phase", "volatility_regime", "session_context"]
       },
       levels: {
         type: "object",
         properties: {
-          support: { type: "array", items: { type: "number" }, description: "Key support levels from price action" },
-          resistance: { type: "array", items: { type: "number" }, description: "Key resistance levels from price action" },
-          vwap: { type: ["number", "null"], description: "VWAP level" },
-          pivot_points: { type: "array", items: { type: "number" }, description: "Daily pivot points" },
-          liquidity_zones: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                price: { type: "number" },
-                type: { type: "string", enum: ["buy", "sell"] },
-                strength: { type: "string", enum: ["weak", "moderate", "strong"] },
-                description: { type: "string" }
-              }
-            },
-            description: "Institutional liquidity zones where orders cluster"
-          },
-          breakout_zones: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                price: { type: "number" },
-                type: { type: "string", enum: ["bullish", "bearish"] },
-                strength: { type: "string", enum: ["weak", "moderate", "strong"] },
-                description: { type: "string" }
-              }
-            },
-            description: "Key psychological breakout levels"
-          },
-          order_blocks: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                high: { type: "number" },
-                low: { type: "number" },
-                type: { type: "string", enum: ["bullish", "bearish"] },
-                strength: { type: "string" },
-                description: { type: "string" }
-              }
-            },
-            description: "Institutional order block zones"
-          }
+          support: { type: "array", items: { type: "number" }, description: "Key support levels" },
+          resistance: { type: "array", items: { type: "number" }, description: "Key resistance levels" },
+          vwap: { type: ["number", "null"], description: "VWAP level" }
         },
         required: ["support", "resistance"]
       },
@@ -124,94 +93,26 @@ const InstitutionalTaResultSchema = {
               "23.6": { type: "number" },
               "38.2": { type: "number" },
               "50.0": { type: "number" },
-              "61.8": { type: "number" },
-              "78.6": { type: "number" }
+              "61.8": { type: "number" }
             },
-            required: ["23.6", "38.2", "50.0", "61.8", "78.6"]
+            required: ["23.6", "38.2", "50.0", "61.8"]
           },
-          extensions: {
-            type: "object",
-            properties: {
-              "127.2": { type: "number" },
-              "161.8": { type: "number" },
-              "261.8": { type: "number" }
-            },
-            required: ["127.2", "161.8", "261.8"]
-          },
-          direction: { type: "string", enum: ["up", "down"] },
-          confluence_zones: { type: "array", items: { type: "string" }, description: "Key Fibonacci confluence areas" }
+          direction: { type: "string", enum: ["up", "down"] }
         },
-        required: ["pivot_high", "pivot_low", "retracements", "extensions", "direction", "confluence_zones"]
-      },
-      trading_strategies: {
-        type: "object",
-        properties: {
-          trend_following: {
-            type: "object",
-            properties: {
-              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              probability: { type: "number", minimum: 0, maximum: 100 },
-              rationale: { type: "string" }
-            },
-            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
-          },
-          mean_reversion: {
-            type: "object",
-            properties: {
-              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              probability: { type: "number", minimum: 0, maximum: 100 },
-              rationale: { type: "string" }
-            },
-            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
-          },
-          momentum: {
-            type: "object",
-            properties: {
-              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              probability: { type: "number", minimum: 0, maximum: 100 },
-              rationale: { type: "string" }
-            },
-            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
-          },
-          range_trading: {
-            type: "object",
-            properties: {
-              setup_quality: { type: "string", enum: ["excellent", "good", "fair", "poor", "invalid"] },
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              probability: { type: "number", minimum: 0, maximum: 100 },
-              rationale: { type: "string" }
-            },
-            required: ["setup_quality", "entry", "stop", "targets", "probability", "rationale"]
-          }
-        },
-        required: ["trend_following", "mean_reversion", "momentum", "range_trading"]
+        required: ["pivot_high", "pivot_low", "retracements", "direction"]
       },
       trade_idea: {
         type: "object",
         properties: {
-          direction: { type: "string", enum: ["long", "short"], description: "REQUIRED: Must choose long or short based on technical bias. Never return none." },
-          entry: { type: "number", description: "Optimal entry at key technical level - can be at support/resistance/EMA levels, not forced at current price" },
-          stop: { type: "number", description: "Stop loss at structure invalidation point (recent swing + ATR buffer)" },
-          targets: { type: "array", items: { type: "number" }, description: "Multiple targets at key resistance/support levels with minimum 2:1 R:R" },
-          target_probabilities: { type: "array", items: { type: "number" }, description: "Probability of reaching each target" },
-          rationale: { type: "string" },
+          direction: { type: "string", enum: ["long", "short"], description: "Trade direction - AI decides based on ALL factors including news" },
+          entry: { type: "number", description: "Entry price at current market level or key technical level" },
+          stop: { type: "number", description: "Stop loss level" },
+          targets: { type: "array", items: { type: "number" }, description: "Profit targets" },
+          rationale: { type: "string", description: "Complete rationale including technical + news factors" },
           time_horizon: { type: "string", enum: ["scalp", "intraday", "swing", "position"] },
-          setup_type: { type: "string", enum: ["breakout", "pullback", "mean_reversion", "range", "momentum", "trend_continuation"] },
-          rr_estimate: { type: "number" },
-          expected_value: { type: "number", description: "Expected value of the trade" }
+          rr_estimate: { type: "number", description: "Risk-reward ratio" }
         },
-        required: ["direction", "entry", "stop", "targets", "target_probabilities", "rationale", "time_horizon", "setup_type", "rr_estimate", "expected_value"]
+        required: ["direction", "entry", "stop", "targets", "rationale", "time_horizon", "rr_estimate"]
       },
       technical: {
         type: "object",
@@ -220,16 +121,14 @@ const InstitutionalTaResultSchema = {
           ema50: { type: "number" },
           ema200: { type: "number" },
           rsi14: { type: "number" },
-          rsi_divergence: { type: "string", description: "RSI divergence analysis" },
           macd: {
             type: "object",
             properties: {
               line: { type: "number" },
               signal: { type: "number" },
-              hist: { type: "number" },
-              analysis: { type: "string", description: "MACD signal quality and context" }
+              hist: { type: "number" }
             },
-            required: ["line", "signal", "hist", "analysis"]
+            required: ["line", "signal", "hist"]
           },
           atr14: { type: "number" },
           bb: {
@@ -237,89 +136,23 @@ const InstitutionalTaResultSchema = {
             properties: {
               mid: { type: "number" },
               upper: { type: "number" },
-              lower: { type: "number" },
-              width: { type: "number" },
-              position: { type: "string", description: "Price position relative to bands" }
+              lower: { type: "number" }
             },
-            required: ["mid", "upper", "lower", "width", "position"]
-          },
-          volume_analysis: { type: "string", description: "Volume and order flow analysis" }
+            required: ["mid", "upper", "lower"]
+          }
         },
-        required: ["ema20", "ema50", "ema200", "rsi14", "rsi_divergence", "macd", "atr14", "bb", "volume_analysis"]
-      },
-      quantitative_metrics: {
-        type: "object",
-        properties: {
-          volatility_percentile: { type: "number" },
-          trend_strength: { type: "number", minimum: 0, maximum: 100 },
-          momentum_score: { type: "number", minimum: -100, maximum: 100 },
-          mean_reversion_probability: { type: "number", minimum: 0, maximum: 100 },
-          breakout_probability: { type: "number", minimum: 0, maximum: 100 }
-        },
-        required: ["volatility_percentile", "trend_strength", "momentum_score", "mean_reversion_probability", "breakout_probability"]
+        required: ["ema20", "ema50", "ema200", "rsi14", "macd", "atr14", "bb"]
       },
       confidence_model: { type: "number", minimum: 0, maximum: 100 },
       confidence_calibrated: { type: "number", minimum: 0, maximum: 100 },
-      evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence for analysis" },
-      risks: { type: "string", description: "Risk assessment and mitigation strategies" },
-      timeframe_profile: {
-        type: "object",
-        properties: {
-          scalp: {
-            type: "object",
-            properties: {
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              strategy: { type: "string" },
-              probability: { type: "number" }
-            },
-            required: ["entry", "stop", "targets", "strategy", "probability"]
-          },
-          intraday: {
-            type: "object",
-            properties: {
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              strategy: { type: "string" },
-              probability: { type: "number" }
-            },
-            required: ["entry", "stop", "targets", "strategy", "probability"]
-          },
-          swing: {
-            type: "object",
-            properties: {
-              entry: { type: "number" },
-              stop: { type: "number" },
-              targets: { type: "array", items: { type: "number" } },
-              strategy: { type: "string" },
-              probability: { type: "number" }
-            },
-            required: ["entry", "stop", "targets", "strategy", "probability"]
-          }
-        },
-        required: ["scalp", "intraday", "swing"]
-      },
-      accuracy_metrics: {
-        type: "object",
-        properties: {
-          data_freshness_score: { type: "number", minimum: 0, maximum: 100, description: "How recent/fresh the candle data is" },
-          signal_clarity_score: { type: "number", minimum: 0, maximum: 100, description: "How clear the directional signal is" },
-          level_precision_score: { type: "number", minimum: 0, maximum: 100, description: "How precise support/resistance levels are" },
-          entry_validity_score: { type: "number", minimum: 0, maximum: 100, description: "How valid the entry price is relative to current price" },
-          overall_accuracy: { type: "number", minimum: 0, maximum: 100, description: "Overall accuracy score of the analysis" },
-          validation_notes: { type: "array", items: { type: "string" }, description: "Notes about analysis validation" }
-        },
-        required: ["data_freshness_score", "signal_clarity_score", "level_precision_score", "entry_validity_score", "overall_accuracy", "validation_notes"]
-      },
+      evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence" },
+      risks: { type: "string", description: "Risk factors and mitigation" },
       json_version: { type: "string" }
     },
     required: [
-      "summary", "action", "action_text", "outlook", "market_structure", "levels", "fibonacci", 
-      "trading_strategies", "trade_idea", "technical", "quantitative_metrics", 
-      "confidence_model", "confidence_calibrated", "evidence", "risks", "timeframe_profile", 
-      "accuracy_metrics", "json_version"
+      "summary", "action", "action_text", "outlook", "news_impact", "market_structure", 
+      "levels", "fibonacci", "trade_idea", "technical", "confidence_model", 
+      "confidence_calibrated", "evidence", "risks", "json_version"
     ]
   }
 };
@@ -395,91 +228,73 @@ serve(async (req) => {
     
     console.log(`[ai-analyze] Using ${candles.length} candles, latest from ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)`);
     
-    // CRITICAL: Data-driven prompt - NO FORMULAS, derive from actual price structure
-    const comprehensivePrompt = `You are an elite institutional trader analyzing real market data. Your job is to READ the data and derive signals from what you see - NOT apply formulas.
+    // AI-Driven prompt integrating news sentiment into signals
+    const comprehensivePrompt = `You are an elite AI trading analyst. Analyze real market data AND news sentiment to generate ONE optimized trading signal.
 
-MARKET CONTEXT:
+LIVE MARKET DATA:
 Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
-Current Price: $${livePrice}
-Data: ${candles.length} candles ending ${new Date(latestCandleTime).toISOString()}
+Current Live Price: $${livePrice}
+Data: ${candles.length} candles ending ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)
 
-RAW MARKET DATA PROVIDED:
-
-TECHNICAL INDICATORS:
+REAL-TIME TECHNICAL INDICATORS:
 ${JSON.stringify(features.technical, null, 2)}
 
 PRICE STRUCTURE & LEVELS:
 ${JSON.stringify(features.levels, null, 2)}
 
-NEWS SENTIMENT:
-${JSON.stringify(news, null, 2)}
+NEWS SENTIMENT ANALYSIS:
+${news ? `
+- Sentiment: ${news.sentiment}
+- Event Risk: ${news.event_risk ? 'HIGH' : 'LOW'}
+- Recent Headlines: ${news.headline_hits_30m} articles in last 30 minutes
+- Confidence: ${news.confidence}/10
+` : 'No news data available'}
 
-${quantMetrics ? `QUANT INDICATORS (for reference only):
-RSI: ${quantMetrics.rsi14}
-EMA20: ${quantMetrics.ema?.['20']} | EMA50: ${quantMetrics.ema?.['50']}
-MACD: line=${quantMetrics.macd?.line}, signal=${quantMetrics.macd?.signal}, hist=${quantMetrics.macd?.hist}
-BB: mid=${quantMetrics.bb20?.mid}, upper=${quantMetrics.bb20?.upper}, lower=${quantMetrics.bb20?.lower}
-ATR: ${quantMetrics.atr14}
-Donchian: high=${quantMetrics.donchian20?.high}, low=${quantMetrics.donchian20?.low}` : ''}
+${quantMetrics ? `LIVE QUANTITATIVE INDICATORS:
+RSI: ${quantMetrics.indicators?.rsi14}
+EMAs: 20=${quantMetrics.indicators?.ema?.['20']} | 50=${quantMetrics.indicators?.ema?.['50']} | 200=${quantMetrics.indicators?.ema?.['200']}
+MACD: line=${quantMetrics.indicators?.macd?.line}, signal=${quantMetrics.indicators?.macd?.signal}, hist=${quantMetrics.indicators?.macd?.hist}
+Bollinger Bands: mid=${quantMetrics.indicators?.bb20?.mid}, upper=${quantMetrics.indicators?.bb20?.upper}, lower=${quantMetrics.indicators?.bb20?.lower}
+ATR(14): ${quantMetrics.indicators?.atr14}
+VWAP: ${quantMetrics.indicators?.vwap}` : ''}
 
-YOUR ANALYSIS METHODOLOGY:
+AI DECISION-MAKING INSTRUCTIONS:
 
-STEP 1: IDENTIFY TREND FROM DATA
-Look at the actual indicator values:
-- Is price above or below EMA20 and EMA50? What does this mean?
-- Is EMA20 > EMA50 (uptrend) or EMA20 < EMA50 (downtrend)?
-- Is MACD histogram positive (bullish) or negative (bearish)?
-- Is RSI > 50 (bullish) or < 50 (bearish)?
-- Count: How many indicators point to long vs short?
-→ If 4+ indicators agree: STRONG TREND (high confidence)
-→ If 2-3 agree: MODERATE (medium confidence)
-→ If mixed: CHOPPY (low confidence, but still pick dominant bias)
+1. INTEGRATE NEWS INTO SIGNAL:
+   - If news sentiment is STRONGLY bullish + technicals bullish → Increase confidence, tighter stops
+   - If news sentiment is STRONGLY bearish + technicals bearish → Increase confidence, tighter stops
+   - If news CONFLICTS with technicals → Reduce confidence, wider stops, or signal HOLD
+   - If high event risk → Consider reducing position size or waiting
 
-STEP 2: FIND KEY LEVELS FROM PRICE STRUCTURE
-Look at support/resistance in the levels data:
-- Where did price bounce/reject recently? (these are real levels)
-- Where are BB upper/mid/lower? (dynamic S/R)
-- Where are Donchian high/low? (range boundaries)
-→ These are YOUR entry, stop, and target levels (NOT ATR formulas)
+2. ANALYZE TECHNICALS:
+   - Price vs EMAs: Is price above/below key moving averages?
+   - MACD: Is histogram positive (bullish) or negative (bearish)?
+   - RSI: Overbought (>70), oversold (<30), or neutral?
+   - Bollinger Bands: Is price at upper/lower band? Squeeze or expansion?
+   - Support/Resistance: Where are the nearest key levels?
 
-STEP 3: DERIVE DIFFERENT STOP LOSSES PER TIMEFRAME
-CRITICAL: Each timeframe needs DIFFERENT stop logic based on price structure:
+3. DETERMINE SINGLE TRADE SIGNAL:
+   - Direction: LONG or SHORT based on combined analysis of news + technicals
+   - Entry: Use current price or nearest key level (support for long, resistance for short)
+   - Stop: Place at structure invalidation point (recent swing + buffer)
+   - Targets: Use actual resistance/support levels from data (NOT formulas)
+   - Time Horizon: Choose ONE that best fits the setup (scalp/intraday/swing/position)
 
-SCALP (1-15m): 
-- Entry: Very close to current price (within 0.2%)
-- Stop: Just below nearest micro support/swing low for long (or above for short)
-  Example: If recent low is 3 points below entry → stop there (NOT "0.5 ATR")
-- Targets: Nearest resistance levels from data (NOT "1 ATR, 2 ATR")
-
-INTRADAY (30m-4h):
-- Entry: At pullback to EMA20 or BB mid (look at actual values)
-- Stop: Below recent swing low + small buffer for long (or above swing high for short)
-  Example: If swing low is 8 points below → stop there (NOT "1.5 ATR")
-- Targets: Next major resistance from levels data (NOT "2.5 ATR, 4 ATR")
-
-SWING (1D+):
-- Entry: At major support like EMA50 or previous consolidation (look at data)
-- Stop: Below major structure/swing point for long (or above for short)
-  Example: If key support is 20 points below → stop there (NOT "2.5 ATR")
-- Targets: Major resistance zones from levels data (NOT "5 ATR, 10 ATR")
-
-STEP 4: EXPLAIN YOUR LOGIC
-For each signal, write WHY:
-"Scalp stop at X because recent swing low is there (not formula)"
-"Intraday entry at Y because EMA20 is at Y and price bounced there twice"
-"Swing target at Z because major resistance level from levels data is at Z"
+4. NEWS IMPACT SECTION:
+   - Explain how news influenced your decision
+   - List key factors from news that support or contradict the trade
+   - Assess whether news creates opportunity or risk
 
 CRITICAL RULES:
-❌ DO NOT use ATR multipliers (0.5 ATR, 1.5 ATR, 2.5 ATR) - these are formulas
-❌ DO NOT make stops the same distance on all timeframes
-✅ DO look at actual support/resistance from levels data
-✅ DO make each timeframe's stop DIFFERENT based on actual price structure
-✅ DO use the same directional bias (all long or all short) but DIFFERENT prices
-✅ DO explain reasoning: "Stop here because recent swing low at X"
+✅ Generate ONE trade signal optimized for current conditions
+✅ Let NEWS influence your confidence and risk management
+✅ Use REAL levels from data for entry/stop/targets
+✅ Explain how news + technicals combine to create the signal
+❌ Do NOT ignore news sentiment - it MUST factor into your decision
+❌ Do NOT use formula-based stops (like "1.5 ATR") - use actual price levels
+❌ Do NOT generate multiple signals - just ONE optimized setup`;
 
-Return signals where scalp/intraday/swing have DIFFERENT stop distances because they're based on DIFFERENT actual price levels in the data, not formulas.`;
-
-    console.log('[ai-analyze] Calling OpenAI with function calling...');
+    console.log('[ai-analyze] Calling OpenAI with news-integrated analysis...');
     
     // Add timeout wrapper for OpenAI call
     const openaiTimeout = 60000; // 60 second timeout for OpenAI
@@ -548,17 +363,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
     try {
       parsed = JSON.parse(toolCall.function.arguments);
       console.log('[ai-analyze] Function call parsed successfully');
-      
-      // Log timeframe_profile to debug missing signals
-      console.log('[ai-analyze] timeframe_profile received:', JSON.stringify(parsed.timeframe_profile, null, 2));
-      if (!parsed.timeframe_profile || !parsed.timeframe_profile.scalp || !parsed.timeframe_profile.intraday || !parsed.timeframe_profile.swing) {
-        console.warn('[ai-analyze] ⚠️  Missing timeframe_profile signals!', {
-          has_timeframe_profile: !!parsed.timeframe_profile,
-          has_scalp: !!parsed.timeframe_profile?.scalp,
-          has_intraday: !!parsed.timeframe_profile?.intraday,
-          has_swing: !!parsed.timeframe_profile?.swing
-        });
-      }
+      console.log('[ai-analyze] Analysis includes news_impact:', !!parsed.news_impact);
     } catch (e) {
       console.error('[ai-analyze] Function arguments parse failed:', e);
       return new Response(JSON.stringify({ 
@@ -1141,15 +946,8 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
       // Don't fail the request if storage fails
     }
 
-    console.log(`[ai-analyze] Deterministic analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);
-    
-    // Verify timeframe_profile is in final response
-    console.log('[ai-analyze] Final response includes timeframe_profile:', {
-      has_timeframe_profile: !!result.timeframe_profile,
-      has_scalp: !!result.timeframe_profile?.scalp,
-      has_intraday: !!result.timeframe_profile?.intraday,
-      has_swing: !!result.timeframe_profile?.swing
-    });
+    console.log(`[ai-analyze] AI analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);
+    console.log('[ai-analyze] News impact:', result.news_impact);
     
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

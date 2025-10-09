@@ -11,6 +11,12 @@ interface InstitutionalAnalysis {
   action: 'buy' | 'sell' | 'hold';
   action_text: string;
   outlook: 'bullish' | 'bearish' | 'neutral';
+  news_impact?: {
+    sentiment: 'bullish' | 'bearish' | 'neutral';
+    impact_level: 'high' | 'medium' | 'low';
+    key_factors: string[];
+    headline_count: number;
+  };
   market_structure?: {
     trend_direction: 'strong_bullish' | 'bullish' | 'neutral' | 'bearish' | 'strong_bearish';
     market_phase: 'trending' | 'range_bound' | 'consolidation' | 'breakout';
@@ -21,86 +27,37 @@ interface InstitutionalAnalysis {
     support: number[]; 
     resistance: number[]; 
     vwap?: number | null;
-    pivot_points?: number[];
   };
   fibonacci: {
     pivot_high: number; pivot_low: number;
-    retracements: { "23.6": number; "38.2": number; "50.0": number; "61.8": number; "78.6": number; };
-    extensions: { "127.2": number; "161.8": number; "261.8"?: number; };
+    retracements: { "23.6": number; "38.2": number; "50.0": number; "61.8": number; };
     direction: 'up' | 'down';
-    confluence_zones?: string[];
-  };
-  trading_strategies?: {
-    trend_following: StrategySetup;
-    mean_reversion: StrategySetup;
-    momentum: StrategySetup;
-    range_trading: StrategySetup;
   };
   trade_idea: {
     direction: 'long' | 'short' | 'none';
     entry: number; stop: number; targets: number[];
-    target_probabilities?: number[];
     rationale: string;
     time_horizon: 'scalp' | 'intraday' | 'swing' | 'position';
-    setup_type: 'breakout' | 'pullback' | 'mean_reversion' | 'range' | 'momentum' | 'trend_continuation' | 'other';
     rr_estimate: number;
-    expected_value?: number;
   };
   technical: {
     ema20: number; ema50: number; ema200: number;
     rsi14: number;
-    rsi_divergence?: string;
     macd: { 
       line: number; signal: number; hist: number;
-      analysis?: string;
     };
     atr14: number;
     bb: { 
       mid: number; upper: number; lower: number;
-      width?: number;
-      position?: string;
     };
-    volume_analysis?: {
-      obv: number;
-      volume_zscore_20: number;
-    };
-  };
-  quantitative_metrics?: {
-    volatility_percentile: number;
-    trend_strength: number;
-    momentum_score: number;
-    mean_reversion_probability: number;
-    breakout_probability: number;
   };
   confidence_model: number;
   confidence_calibrated: number;
   evidence: string[];
   risks: string;
-  timeframe_profile: {
-    scalp: TimeframeSetup;
-    intraday: TimeframeSetup;
-    swing: TimeframeSetup;
-  };
   analyzed_at?: string;
   json_version?: string;
   _inputs?: { technical_used?: { lastClose?: number } };
-}
-
-interface StrategySetup {
-  setup_quality: 'excellent' | 'good' | 'fair' | 'poor' | 'invalid';
-  entry: number;
-  stop: number;
-  targets: number[];
-  probability: number;
-  rationale: string;
-}
-
-interface TimeframeSetup {
-  entry: number;
-  stop: number;
-  targets: number[];
-  strategy?: string;
-  probability?: number;
 }
 
 /* ---------- Safe helpers ---------- */
@@ -164,20 +121,8 @@ export function AiResult({ data, symbol }: AiResultProps) {
 
   const supports = Array.isArray(analysis?.levels?.support) ? analysis.levels.support : [];
   const resistances = Array.isArray(analysis?.levels?.resistance) ? analysis.levels.resistance : [];
-  const pivots = Array.isArray(analysis?.levels?.pivot_points) ? analysis.levels.pivot_points : [];
   const vwap = analysis?.levels?.vwap ?? null;
   const currentPrice = (data?._inputs?.technical_used?.lastClose as number) ?? undefined;
-
-  const getQualityColor = (quality?: string) => {
-    switch (quality) {
-      case "excellent": return "bg-green-600 text-white";
-      case "good": return "bg-green-500 text-white";
-      case "fair": return "bg-yellow-500 text-white";
-      case "poor": return "bg-orange-500 text-white";
-      case "invalid": return "bg-red-500 text-white";
-      default: return "bg-gray-500 text-white";
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -211,6 +156,55 @@ export function AiResult({ data, symbol }: AiResultProps) {
           <p className="text-sm text-muted-foreground mt-2">{safeText(analysis?.summary)}</p>
         </CardContent>
       </Card>
+
+      {/* News Impact Section */}
+      {analysis?.news_impact && (
+        <Card className={`border-2 ${
+          analysis.news_impact.impact_level === 'high' ? 'bg-primary/5 border-primary' :
+          analysis.news_impact.impact_level === 'medium' ? 'bg-accent/5 border-accent' :
+          'bg-muted/5 border-border'
+        }`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              News Impact Analysis
+              <Badge variant="outline" className="ml-auto">
+                {safeUpper(analysis.news_impact.impact_level)} Impact
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">SENTIMENT</p>
+                <Badge variant={
+                  analysis.news_impact.sentiment === 'bullish' ? 'default' :
+                  analysis.news_impact.sentiment === 'bearish' ? 'destructive' : 'secondary'
+                }>
+                  {safeUpper(analysis.news_impact.sentiment)}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">HEADLINES</p>
+                <p className="font-mono text-sm">{analysis.news_impact.headline_count} articles</p>
+              </div>
+            </div>
+            {analysis.news_impact.key_factors.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">KEY FACTORS</p>
+                <ul className="space-y-1">
+                  {analysis.news_impact.key_factors.map((factor, idx) => (
+                    <li key={idx} className="text-xs flex items-start gap-2">
+                      <span className="text-primary">•</span>
+                      <span>{factor}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Market Structure Analysis */}
       {analysis?.market_structure && (
@@ -250,190 +244,14 @@ export function AiResult({ data, symbol }: AiResultProps) {
         </Card>
       )}
 
-      {/* Enhanced Quantitative Analysis */}
-      {analysis?.quantitative_metrics && (
-        <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calculator className="h-5 w-5 text-primary" />
-              Advanced Quantitative Analysis
-              <Badge variant="outline" className="ml-auto bg-primary/10 text-primary border-primary/30">
-                Statistical Edge
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="text-center p-3 bg-card rounded-lg border">
-                <p className="text-xs font-medium text-muted-foreground mb-1">VOLATILITY PERCENTILE</p>
-                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.volatility_percentile, 1)}%</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {Number(analysis.quantitative_metrics.volatility_percentile) > 75 ? "High Vol Regime" :
-                   Number(analysis.quantitative_metrics.volatility_percentile) < 25 ? "Low Vol Regime" : "Normal Vol"}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-card rounded-lg border">
-                <p className="text-xs font-medium text-muted-foreground mb-1">TREND STRENGTH</p>
-                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.trend_strength, 0)}/100</p>
-                <div className="w-full bg-muted rounded-full h-2 mt-2">
-                  <div 
-                    className="bg-primary h-2 rounded-full transition-all"
-                    style={{ width: `${Math.min(100, Math.max(0, Number(analysis.quantitative_metrics.trend_strength) || 0))}%` }}
-                  />
-                </div>
-              </div>
-              <div className="text-center p-3 bg-card rounded-lg border">
-                <p className="text-xs font-medium text-muted-foreground mb-1">MOMENTUM SCORE</p>
-                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.momentum_score, 0)}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {Number(analysis.quantitative_metrics.momentum_score) > 0 ? "Bullish Momentum" : 
-                   Number(analysis.quantitative_metrics.momentum_score) < 0 ? "Bearish Momentum" : "Neutral"}
-                </p>
-              </div>
-              <div className="text-center p-3 bg-card rounded-lg border">
-                <p className="text-xs font-medium text-muted-foreground mb-1">MEAN REVERSION %</p>
-                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.mean_reversion_probability, 0)}%</p>
-                <div className="w-full bg-muted rounded-full h-2 mt-2">
-                  <div 
-                    className="bg-orange-500 h-2 rounded-full transition-all"
-                    style={{ width: `${Number(analysis.quantitative_metrics.mean_reversion_probability) || 0}%` }}
-                  />
-                </div>
-              </div>
-              <div className="text-center p-3 bg-card rounded-lg border">
-                <p className="text-xs font-medium text-muted-foreground mb-1">BREAKOUT PROBABILITY</p>
-                <p className="font-mono text-lg font-semibold">{safeNum(analysis.quantitative_metrics.breakout_probability, 0)}%</p>
-                <div className="w-full bg-muted rounded-full h-2 mt-2">
-                  <div 
-                    className="bg-green-500 h-2 rounded-full transition-all"
-                    style={{ width: `${Number(analysis.quantitative_metrics.breakout_probability) || 0}%` }}
-                  />
-                </div>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Statistical Profile
-                </h4>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span>Market Regime:</span>
-                    <span className="font-mono">
-                      {Number(analysis.quantitative_metrics.volatility_percentile) > 75 ? "High Volatility" :
-                       Number(analysis.quantitative_metrics.volatility_percentile) < 25 ? "Low Volatility" : "Normal"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Trend Quality:</span>
-                    <span className="font-mono">
-                      {Number(analysis.quantitative_metrics.trend_strength) > 70 ? "Strong" :
-                       Number(analysis.quantitative_metrics.trend_strength) > 40 ? "Moderate" : "Weak"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Price Action:</span>
-                    <span className="font-mono">
-                      {Number(analysis.quantitative_metrics.momentum_score) > 50 ? "Momentum Driven" : 
-                       Number(analysis.quantitative_metrics.mean_reversion_probability) > 60 ? "Mean Reverting" : "Mixed"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  Trading Edge Metrics
-                </h4>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span>Breakout Edge:</span>
-                    <span className={`font-mono ${Number(analysis.quantitative_metrics.breakout_probability) > 60 ? 'text-green-600' : 'text-muted-foreground'}`}>
-                      {Number(analysis.quantitative_metrics.breakout_probability) > 60 ? 'Favorable' : 'Neutral'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Reversion Edge:</span>
-                    <span className={`font-mono ${Number(analysis.quantitative_metrics.mean_reversion_probability) > 60 ? 'text-orange-600' : 'text-muted-foreground'}`}>
-                      {Number(analysis.quantitative_metrics.mean_reversion_probability) > 60 ? 'Favorable' : 'Neutral'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Trend Edge:</span>
-                    <span className={`font-mono ${Number(analysis.quantitative_metrics.trend_strength) > 60 ? 'text-blue-600' : 'text-muted-foreground'}`}>
-                      {Number(analysis.quantitative_metrics.trend_strength) > 60 ? 'Favorable' : 'Neutral'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Trading Strategies */}
-      {analysis?.trading_strategies && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Multiple Strategy Analysis
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {Object.entries(analysis.trading_strategies).map(([strategyName, strategy]: [string, any]) => (
-              <div key={strategyName} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-medium capitalize">{strategyName.replace('_', ' ')} Strategy</h4>
-                  <div className="flex items-center gap-2">
-                    <Badge className={getQualityColor(strategy?.setup_quality)}>
-                      {safeUpper(strategy?.setup_quality)}
-                    </Badge>
-                    <Badge variant="outline">
-                      {safeNum(strategy?.probability, 0)}% Prob
-                    </Badge>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">ENTRY</p>
-                    <p className="font-mono text-xs">{formatPrice(strategy?.entry)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">STOP</p>
-                    <p className="font-mono text-xs text-red-600">{formatPrice(strategy?.stop)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">TARGETS</p>
-                    <p className="font-mono text-xs text-green-600">
-                      {Array.isArray(strategy?.targets) && strategy.targets.length
-                        ? strategy.targets.map((t: any) => formatPrice(t)).join(", ")
-                        : "N/A"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">R:R</p>
-                    <p className="font-mono text-xs">{strategy?.targets?.[0] && strategy?.stop && strategy?.entry ? 
-                      safeNum(Math.abs(strategy.targets[0] - strategy.entry) / Math.abs(strategy.entry - strategy.stop), 1) : "—"}:1</p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">{safeText(strategy?.rationale)}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Enhanced Trade Setup */}
+      {/* Trade Setup */}
       {analysis?.trade_idea?.direction !== "none" && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Target className="h-4 w-4" />
-              Primary Trade Setup — {safeUpper(analysis?.trade_idea?.setup_type?.replace?.("_", " "))}
+              AI Trade Setup
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
