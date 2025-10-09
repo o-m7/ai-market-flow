@@ -878,14 +878,11 @@ CRITICAL RULES:
       });
     }
     
-    // Validate risk-reward ratio
-    const tradeIdea = parsed.trade_idea;
-    const entryPrice = tradeIdea.entry;
-    const stopPrice = tradeIdea.stop;
-    const target1Price = tradeIdea.targets?.[0];
+    // Validate risk-reward ratio (reusing variables from earlier validation)
+    const target1Price = parsed.trade_idea.targets?.[0];
     
     if (entryPrice && stopPrice && target1Price) {
-      const isLong = tradeIdea.direction === 'long';
+      const isLong = tradeDirection === 'long';
       const risk = Math.abs(entryPrice - stopPrice);
       const reward = isLong ? (target1Price - entryPrice) : (entryPrice - target1Price);
       const rrRatio = reward / risk;
