@@ -566,49 +566,7 @@ function generateTradingSignals(
   };
 }
 
-// Fetch historical data from S3 for better signal accuracy
-async function fetchS3HistoricalData(symbol: string, tf: string): Promise<CandleData[]> {
-  try {
-    const polygonS3AccessKey = Deno.env.get('POLYGON_S3_ACCESS_KEY');
-    const polygonS3SecretKey = Deno.env.get('POLYGON_S3_SECRET_KEY');
-    
-    if (!polygonS3AccessKey || !polygonS3SecretKey) {
-      console.log('S3 credentials not available, skipping historical data fetch');
-      return [];
-    }
-
-    // Construct S3 URL for historical data
-    // Format: s3://polygon-data/{symbol}/{timeframe}/history.json
-    const bucketUrl = `https://polygon-data.s3.amazonaws.com/${symbol}/${tf}/history.json`;
-    
-    const response = await fetch(bucketUrl, {
-      headers: {
-        'x-amz-access-key-id': polygonS3AccessKey,
-        'x-amz-secret-access-key': polygonS3SecretKey
-      }
-    });
-
-    if (!response.ok) {
-      console.log(`S3 historical data not available for ${symbol}/${tf}`);
-      return [];
-    }
-
-    const historicalData = await response.json();
-    console.log(`✅ Loaded ${historicalData.length} historical candles from S3 for ${symbol}`);
-    
-    return historicalData.map((bar: any) => ({
-      t: bar.t,
-      o: bar.o,
-      h: bar.h,
-      l: bar.l,
-      c: bar.c,
-      v: bar.v
-    }));
-  } catch (e) {
-    console.error('Error fetching S3 historical data:', e);
-    return [];
-  }
-}
+// S3 historical data removed - using polygon-chart-data instead
 
 // Fetch Polygon indicators instead of calculating manually
 async function fetchPolygonIndicators(symbol: string, tf: string, polygonApiKey: string) {
