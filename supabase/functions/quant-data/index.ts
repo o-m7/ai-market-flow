@@ -73,6 +73,26 @@ interface QuantResponse {
     calmar_ratio: number | null;
     information_ratio: number | null;
   };
+  // Advanced market structure features
+  liquidity_zones?: Array<{
+    price: number;
+    type: "buy" | "sell";
+    strength: "strong" | "moderate" | "weak";
+    description: string;
+  }>;
+  breakout_zones?: Array<{
+    price: number;
+    type: "bullish" | "bearish";
+    strength: "strong" | "moderate" | "weak";
+    description: string;
+  }>;
+  order_blocks?: Array<{
+    high: number;
+    low: number;
+    type: "bullish" | "bearish";
+    strength: "strong" | "moderate";
+    description: string;
+  }>;
 }
 
 // Technical indicator calculations
@@ -457,6 +477,250 @@ function calculateInformationRatio(prices: number[], benchmarkPrices: number[], 
   const annualizedTrackingError = trackingError * Math.sqrt(252);
   
   return annualizedExcessReturn / annualizedTrackingError;
+}
+
+// Find liquidity zones where institutional orders cluster
+function findLiquidityZones(candles: CandleData[], currentPrice: number, vwap: number) {
+  const zones: any[] = [];
+  
+  // Round number liquidity (psychological levels)
+  const roundBase = currentPrice >= 1000 ? 1000 : currentPrice >= 100 ? 100 : currentPrice >= 10 ? 10 : 1;
+  const nearestRound = Math.round(currentPrice / roundBase) * roundBase;
+  
+  if (Math.abs(nearestRound - currentPrice) / currentPrice > 0.002) {
+    zones.push({
+      price: nearestRound,
+      type: nearestRound > currentPrice ? "sell" : "buy",
+      strength: "strong",
+      description: `Round number liquidity at ${nearestRound.toFixed(2)}`
+    });
+  }
+  
+  // VWAP liquidity zone
+  if (Math.abs(vwap - currentPrice) / currentPrice > 0.003) {
+    zones.push({
+      price: vwap,
+      type: vwap > currentPrice ? "sell" : "buy",
+      strength: "moderate",
+      description: `VWAP liquidity zone at ${vwap.toFixed(2)}`
+    });
+  }
+  
+  // Previous day high/low liquidity
+  const last24h = candles.slice(-24);
+  if (last24h.length > 0) {
+    const dayHigh = Math.max(...last24h.map(c => c.h));
+    const dayLow = Math.min(...last24h.map(c => c.l));
+    
+    if (dayHigh > currentPrice * 1.002 && dayHigh < currentPrice * 1.05) {
+      zones.push({
+        price: dayHigh,
+        type: "sell",
+        strength: "strong",
+        description: `Previous day high - sell-side liquidity at ${dayHigh.toFixed(2)}`
+      });
+    }
+    
+    if (dayLow < currentPrice * 0.998 && dayLow > currentPrice * 0.95) {
+      zones.push({
+        price: dayLow,
+        type: "buy",
+        strength: "strong",
+        description: `Previous day low - buy-side liquidity at ${dayLow.toFixed(2)}`
+      });
+    }
+  }
+  
+  // High volume nodes (price levels with repeated testing)
+  const priceFrequency = new Map<number, number>();
+  const priceStep = currentPrice * 0.001; // 0.1% buckets
+  
+  candles.slice(-100).forEach(c => {
+    const bucket = Math.round((c.h + c.l) / 2 / priceStep) * priceStep;
+    priceFrequency.set(bucket, (priceFrequency.get(bucket) || 0) + (c.v || 1));
+  });
+  
+  const sortedPrices = Array.from(priceFrequency.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  
+  sortedPrices.forEach(([price, volume]) => {
+    if (Math.abs(price - currentPrice) / currentPrice > 0.005 && 
+        Math.abs(price - currentPrice) / currentPrice < 0.03) {
+      zones.push({
+        price,
+        type: price > currentPrice ? "sell" : "buy",
+        strength: "moderate",
+        description: `High volume node - ${volume > 0 ? 'strong' : 'weak'} liquidity at ${price.toFixed(2)}`
+      });
+    }
+  });
+  
+  return zones.slice(0, 5);
+}
+
+// Find breakout zones (key psychological and structural levels)
+function findBreakoutZones(candles: CandleData[], currentPrice: number, support: number[], resistance: number[]) {
+  const zones: any[] = [];
+  
+  // Resistance breakout zones
+  resistance.forEach(level => {
+    const distance = (level - currentPrice) / currentPrice;
+    if (distance > 0.001 && distance < 0.05) {
+      const recentTests = candles.slice(-20).filter(c => 
+        Math.abs(c.h - level) / level < 0.003
+      ).length;
+      
+      zones.push({
+        price: level,
+        type: "bullish",
+        strength: recentTests > 2 ? "strong" : recentTests > 0 ? "moderate" : "weak",
+        description: `Resistance breakout zone at ${level.toFixed(2)} (tested ${recentTests}x recently)`
+      });
+    }
+  });
+  
+  // Support breakdown zones
+  support.forEach(level => {
+    const distance = (currentPrice - level) / currentPrice;
+    if (distance > 0.001 && distance < 0.05) {
+      const recentTests = candles.slice(-20).filter(c => 
+        Math.abs(c.l - level) / level < 0.003
+      ).length;
+      
+      zones.push({
+        price: level,
+        type: "bearish",
+        strength: recentTests > 2 ? "strong" : recentTests > 0 ? "moderate" : "weak",
+        description: `Support breakdown zone at ${level.toFixed(2)} (tested ${recentTests}x recently)`
+      });
+    }
+  });
+  
+  return zones.slice(0, 4);
+}
+
+// Find order blocks (institutional accumulation/distribution zones)
+function findOrderBlocks(candles: CandleData[], currentPrice: number) {
+  const blocks: any[] = [];
+  const recentCandles = candles.slice(-30);
+  
+  for (let i = 1; i < recentCandles.length - 1; i++) {
+    const candle = recentCandles[i];
+    const prevCandle = recentCandles[i - 1];
+    const nextCandle = recentCandles[i + 1];
+    
+    const avgVolume = recentCandles.slice(Math.max(0, i - 5), i + 1).reduce((sum, c) => sum + (c.v || 1), 0) / 6;
+    const candleVolume = candle.v || 1;
+    
+    // Bullish order block: Strong buying pressure followed by upward move
+    if (candleVolume > avgVolume * 1.5 && 
+        candle.c > candle.o && 
+        nextCandle.c > candle.h &&
+        candle.h < currentPrice * 0.99) {
+      
+      blocks.push({
+        high: candle.h,
+        low: candle.l,
+        type: "bullish",
+        strength: candleVolume > avgVolume * 2 ? "strong" : "moderate",
+        description: `Bullish order block ${candle.l.toFixed(2)}-${candle.h.toFixed(2)} (institutional buying)`
+      });
+    }
+    
+    // Bearish order block: Strong selling pressure followed by downward move
+    if (candleVolume > avgVolume * 1.5 && 
+        candle.c < candle.o && 
+        nextCandle.c < candle.l &&
+        candle.l > currentPrice * 1.01) {
+      
+      blocks.push({
+        high: candle.h,
+        low: candle.l,
+        type: "bearish",
+        strength: candleVolume > avgVolume * 2 ? "strong" : "moderate",
+        description: `Bearish order block ${candle.l.toFixed(2)}-${candle.h.toFixed(2)} (institutional selling)`
+      });
+    }
+  }
+  
+  return blocks.slice(0, 3);
+}
+
+// Find support levels (swing lows with strong bounces)
+function findSupportLevels(candles: CandleData[], currentPrice: number): number[] {
+  // Use last 50 candles for better accuracy
+  const recentCandles = candles.slice(-50);
+  const lows = recentCandles.map(c => c.l);
+  
+  // Find swing lows where price bounced with volume confirmation
+  const pivots: Array<{price: number, strength: number}> = [];
+  for (let i = 3; i < recentCandles.length - 3; i++) {
+    const candle = recentCandles[i];
+    const prevCandles = recentCandles.slice(i-3, i);
+    const nextCandles = recentCandles.slice(i+1, i+4);
+    
+    // Check if it's a swing low
+    if (candle.l < Math.min(...prevCandles.map(c => c.l)) && 
+        candle.l < Math.min(...nextCandles.map(c => c.l)) &&
+        candle.l < currentPrice * 0.995) {
+      
+      // Calculate strength based on volume and bounce
+      const avgVolume = recentCandles.slice(i-5, i+5).reduce((sum, c) => sum + (c.v || 1), 0) / 10;
+      const volumeStrength = (candle.v || 1) / avgVolume;
+      const bounceSize = (nextCandles[0].c - candle.l) / candle.l;
+      const strength = volumeStrength * (1 + bounceSize * 100);
+      
+      pivots.push({ price: candle.l, strength });
+    }
+  }
+  
+  // Sort by strength and proximity to current price
+  pivots.sort((a, b) => {
+    const aProximity = Math.abs(currentPrice - a.price) / currentPrice;
+    const bProximity = Math.abs(currentPrice - b.price) / currentPrice;
+    return (b.strength / (1 + bProximity * 10)) - (a.strength / (1 + aProximity * 10));
+  });
+  
+  return pivots.slice(0, 3).map(p => p.price).sort((a, b) => a - b);
+}
+
+// Find resistance levels (swing highs with strong rejections)
+function findResistanceLevels(candles: CandleData[], currentPrice: number): number[] {
+  // Use last 50 candles for better accuracy
+  const recentCandles = candles.slice(-50);
+  const highs = recentCandles.map(c => c.h);
+  
+  // Find swing highs where price rejected with volume confirmation
+  const pivots: Array<{price: number, strength: number}> = [];
+  for (let i = 3; i < recentCandles.length - 3; i++) {
+    const candle = recentCandles[i];
+    const prevCandles = recentCandles.slice(i-3, i);
+    const nextCandles = recentCandles.slice(i+1, i+4);
+    
+    // Check if it's a swing high
+    if (candle.h > Math.max(...prevCandles.map(c => c.h)) && 
+        candle.h > Math.max(...nextCandles.map(c => c.h)) &&
+        candle.h > currentPrice * 1.005) {
+      
+      // Calculate strength based on volume and rejection
+      const avgVolume = recentCandles.slice(i-5, i+5).reduce((sum, c) => sum + (c.v || 1), 0) / 10;
+      const volumeStrength = (candle.v || 1) / avgVolume;
+      const rejectionSize = (candle.h - nextCandles[0].c) / candle.h;
+      const strength = volumeStrength * (1 + rejectionSize * 100);
+      
+      pivots.push({ price: candle.h, strength });
+    }
+  }
+  
+  // Sort by strength and proximity to current price
+  pivots.sort((a, b) => {
+    const aProximity = Math.abs(currentPrice - a.price) / currentPrice;
+    const bProximity = Math.abs(currentPrice - b.price) / currentPrice;
+    return (b.strength / (1 + bProximity * 10)) - (a.strength / (1 + aProximity * 10));
+  });
+  
+  return pivots.slice(0, 3).map(p => p.price).sort((a, b) => a - b);
 }
 
 // Generate DATA-DRIVEN trading signals (NOT formulas)
@@ -901,6 +1165,17 @@ serve(async (req) => {
       candlesForIndicators // Use candles with live price appended
     );
 
+    // === CALCULATE SUPPORT/RESISTANCE FOR MARKET STRUCTURE ===
+    const highs = candlesForIndicators.map(c => c.h);
+    const lows = candlesForIndicators.map(c => c.l);
+    const support = findSupportLevels(candlesForIndicators, currentPrice);
+    const resistance = findResistanceLevels(candlesForIndicators, currentPrice);
+
+    // === ADVANCED MARKET STRUCTURE FEATURES ===
+    const liquidity_zones = findLiquidityZones(candlesForIndicators, currentPrice, vwap || currentPrice);
+    const breakout_zones = findBreakoutZones(candlesForIndicators, currentPrice, support, resistance);
+    const order_blocks = findOrderBlocks(candlesForIndicators, currentPrice);
+
     const response: QuantResponse = {
       symbol,
       tf,
@@ -924,6 +1199,9 @@ serve(async (req) => {
       tail,
       summary,
       timeframe_profile,
+      liquidity_zones,
+      breakout_zones,
+      order_blocks,
       quant_metrics: {
         sharpe_ratio,
         sortino_ratio,
