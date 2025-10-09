@@ -2,7 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Target, AlertTriangle, Clock, TrendingUp, TrendingDown, Activity, Award } from "lucide-react";
+import { Brain, Target, AlertTriangle, Clock, TrendingUp, TrendingDown, Activity, Award, BarChart3 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useHistoricalAccuracy } from "@/hooks/useHistoricalAccuracy";
 
@@ -20,8 +20,9 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
   // Fetch historical accuracy for this symbol
   const { data: historicalData } = useHistoricalAccuracy(symbol, 30);
   
-  // Fetch quant signals for this symbol and timeframe
+  // Fetch quant signals and metrics for this symbol and timeframe
   const [quantSignals, setQuantSignals] = React.useState<any>(null);
+  const [quantMetrics, setQuantMetrics] = React.useState<any>(null);
   
   React.useEffect(() => {
     if (includeQuantSignals) {
@@ -35,8 +36,23 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
           const { data: response, error } = await supabase.functions.invoke('quant-data', {
             body: { symbol, tf: timeframeMap[timeframe] || '1h', withSummary: false }
           });
-          if (!error && response?.timeframe_profile) {
+          if (!error && response) {
             setQuantSignals(response.timeframe_profile);
+            // Store all the raw quant data
+            setQuantMetrics({
+              rsi14: response.rsi14,
+              ema20: response.ema?.['20'],
+              ema50: response.ema?.['50'],
+              ema200: response.ema?.['200'],
+              atr14: response.atr14,
+              zscore20: response.zscore20,
+              vol20_annual: response.vol20_annual,
+              vwap: response.vwap,
+              macd: response.macd,
+              bb20: response.bb20,
+              donchian20: response.donchian20,
+              ...response.quant_metrics // sharpe, sortino, alpha, beta, etc.
+            });
           }
         } catch (e) {
           console.error('Failed to fetch quant signals:', e);
@@ -1309,6 +1325,203 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                   </div>
                 </div>
               )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Raw Quantitative Metrics - Z-score, Alpha, Sharpe, etc. */}
+      {includeQuantSignals && quantMetrics && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
+            <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              QUANTITATIVE METRICS • RAW DATA
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="space-y-6">
+              {/* Technical Indicators */}
+              <div>
+                <div className="text-xs font-mono-tabular text-terminal-accent mb-3 font-bold">TECHNICAL INDICATORS</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {quantMetrics.rsi14 !== undefined && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">RSI (14)</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.rsi14, 2)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.ema20 !== undefined && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">EMA 20</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.ema20, 2)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.ema50 !== undefined && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">EMA 50</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.ema50, 2)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.atr14 !== undefined && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ATR (14)</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.atr14, 2)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Statistical Measures */}
+              <div>
+                <div className="text-xs font-mono-tabular text-terminal-accent mb-3 font-bold">STATISTICAL MEASURES</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {quantMetrics.zscore20 !== undefined && quantMetrics.zscore20 !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">Z-SCORE (20)</div>
+                      <div className={`text-lg font-mono-tabular font-bold ${
+                        Math.abs(quantMetrics.zscore20) > 2 ? 'text-terminal-red' :
+                        Math.abs(quantMetrics.zscore20) > 1 ? 'text-terminal-accent' :
+                        'text-terminal-green'
+                      }`}>
+                        {safeFormatNumber(quantMetrics.zscore20, 3)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.vol20_annual !== undefined && quantMetrics.vol20_annual !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">VOLATILITY (20D)</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.vol20_annual, 2)}%
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.std_dev !== undefined && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STD DEV</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.std_dev, 2)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.skewness !== undefined && quantMetrics.skewness !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SKEWNESS</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.skewness, 3)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.kurtosis !== undefined && quantMetrics.kurtosis !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">KURTOSIS</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.kurtosis, 3)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Risk-Adjusted Returns */}
+              <div>
+                <div className="text-xs font-mono-tabular text-terminal-accent mb-3 font-bold">RISK-ADJUSTED RETURNS</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {quantMetrics.sharpe_ratio !== undefined && quantMetrics.sharpe_ratio !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SHARPE RATIO</div>
+                      <div className={`text-lg font-mono-tabular font-bold ${
+                        quantMetrics.sharpe_ratio > 1 ? 'text-terminal-green' :
+                        quantMetrics.sharpe_ratio > 0 ? 'text-terminal-accent' :
+                        'text-terminal-red'
+                      }`}>
+                        {safeFormatNumber(quantMetrics.sharpe_ratio, 3)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.sortino_ratio !== undefined && quantMetrics.sortino_ratio !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SORTINO RATIO</div>
+                      <div className={`text-lg font-mono-tabular font-bold ${
+                        quantMetrics.sortino_ratio > 1 ? 'text-terminal-green' :
+                        quantMetrics.sortino_ratio > 0 ? 'text-terminal-accent' :
+                        'text-terminal-red'
+                      }`}>
+                        {safeFormatNumber(quantMetrics.sortino_ratio, 3)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.calmar_ratio !== undefined && quantMetrics.calmar_ratio !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">CALMAR RATIO</div>
+                      <div className={`text-lg font-mono-tabular font-bold ${
+                        quantMetrics.calmar_ratio > 1 ? 'text-terminal-green' :
+                        quantMetrics.calmar_ratio > 0 ? 'text-terminal-accent' :
+                        'text-terminal-red'
+                      }`}>
+                        {safeFormatNumber(quantMetrics.calmar_ratio, 3)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.information_ratio !== undefined && quantMetrics.information_ratio !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">INFO RATIO</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.information_ratio, 3)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Market Exposure */}
+              <div>
+                <div className="text-xs font-mono-tabular text-terminal-accent mb-3 font-bold">MARKET EXPOSURE</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {quantMetrics.alpha !== undefined && quantMetrics.alpha !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ALPHA</div>
+                      <div className={`text-lg font-mono-tabular font-bold ${
+                        quantMetrics.alpha > 0 ? 'text-terminal-green' : 'text-terminal-red'
+                      }`}>
+                        {safeFormatNumber(quantMetrics.alpha, 4)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.beta !== undefined && quantMetrics.beta !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">BETA</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.beta, 3)}
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.max_drawdown !== undefined && quantMetrics.max_drawdown !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">MAX DRAWDOWN</div>
+                      <div className="text-lg font-mono-tabular text-terminal-red font-bold">
+                        {safeFormatNumber(quantMetrics.max_drawdown, 2)}%
+                      </div>
+                    </div>
+                  )}
+                  {quantMetrics.vwap !== undefined && quantMetrics.vwap !== null && (
+                    <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">VWAP</div>
+                      <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                        {safeFormatNumber(quantMetrics.vwap, 2)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
