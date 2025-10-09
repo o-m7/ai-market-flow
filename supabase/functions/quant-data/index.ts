@@ -442,19 +442,30 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
     '1d': '1/day'
   };
   
+  // Format symbol for Polygon API (crypto needs X: prefix)
+  const isCrypto = symbol.includes('USD') && !symbol.includes('/');
+  const polygonSymbol = isCrypto ? `X:${symbol}` : symbol;
+  
   const timeframe = timeframes[tf] || '1/hour';
   const now = new Date();
   const from = new Date(now.getTime() - (100 * 24 * 60 * 60 * 1000)); // 100 days ago
   
-  const url = `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/${timeframe}/${from.toISOString().split('T')[0]}/${now.toISOString().split('T')[0]}?adjusted=true&sort=asc&limit=5000&apikey=${polygonApiKey}`;
+  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${timeframe}/${from.toISOString().split('T')[0]}/${now.toISOString().split('T')[0]}?adjusted=true&sort=asc&limit=5000&apikey=${polygonApiKey}`;
+  
+  console.log(`Fetching quant data from Polygon: ${url.replace(polygonApiKey, 'REDACTED')}`);
   
   const response = await fetch(url);
   if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Polygon API error: ${response.status} - ${errorText}`);
     throw new Error(`Polygon API error: ${response.statusText}`);
   }
   
   const data = await response.json();
-  if (!data.results || !Array.isArray(data.results)) {
+  console.log(`Polygon response status: ${data.status}, count: ${data.resultsCount || 0}`);
+  
+  if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
+    console.error('No data available for symbol:', symbol, 'Polygon symbol:', polygonSymbol);
     throw new Error('No data available for symbol');
   }
   
