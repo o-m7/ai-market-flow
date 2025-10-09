@@ -782,7 +782,6 @@ serve(async (req) => {
 
     // === CRITICAL: Validate data freshness to prevent outdated signals ===
     const latestCandleTime = candles[candles.length - 1].t;
-    const nowMs = Date.now();
     const dataAgeMinutes = (nowMs - latestCandleTime) / (1000 * 60);
     
     // Data freshness thresholds by timeframe
@@ -830,9 +829,8 @@ serve(async (req) => {
       
       // Create a synthetic current candle for the live price
       const lastCandle = candles[candles.length - 1];
-      const nowMs = Date.now();
       candlesForIndicators.push({
-        t: nowMs,
+        t: Date.now(),
         o: lastCandleClose,
         h: Math.max(currentPrice, lastCandleClose),
         l: Math.min(currentPrice, lastCandleClose),
