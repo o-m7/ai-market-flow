@@ -663,109 +663,63 @@ async function fetchPolygonIndicators(symbol: string, tf: string, polygonApiKey:
 }
 
 async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: string): Promise<CandleData[]> {
-  const timeframes: Record<string, string> = {
-    '1m': '1/minute',
-    '5m': '5/minute', 
-    '15m': '15/minute',
-    '1h': '1/hour',
-    '1d': '1/day'
+  // Use the unified polygon-chart-data function for consistent, fresh data
+  const tfMap: Record<string, string> = {
+    '1m': '1m',
+    '5m': '5m',
+    '15m': '15m',
+    '1h': '60m',
+    '1d': '1d'
   };
   
-  // Format symbol for Polygon API
+  const timeframe = tfMap[tf] || '60m';
+  
+  // Determine asset type
   const cryptoPairs = ['BTC', 'ETH', 'XRP', 'ADA', 'SOL', 'DOT', 'MATIC', 'AVAX', 'LINK', 'UNI', 'ATOM', 'ALGO', 'VET', 'ICP', 'FIL', 'THETA', 'TRX', 'ETC', 'XMR', 'BCH', 'LTC', 'DOGE', 'SHIB', 'NEAR', 'FTM', 'SAND', 'MANA', 'CRV', 'AAVE', 'BNB'];
-  const forexCurrencies = ['EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK', 'NOK', 'DKK'];
-  
   const isCrypto = cryptoPairs.some(pair => symbol.startsWith(pair)) && symbol.endsWith('USD');
-  const isForex = forexCurrencies.some(curr => symbol.startsWith(curr)) && 
-                  (symbol.includes('USD') || forexCurrencies.some(curr => symbol.includes(curr)));
+  const asset = isCrypto ? 'crypto' : 'stock';
   
-  let polygonSymbol = symbol;
-  if (isCrypto) {
-    polygonSymbol = `X:${symbol}`;
-  } else if (isForex) {
-    polygonSymbol = `C:${symbol}`;
-  }
+  console.log(`📊 Fetching data via polygon-chart-data: ${symbol} (${asset}), timeframe=${timeframe}`);
   
-  const timeframe = timeframes[tf] || '1/hour';
-  const now = Date.now(); // Use milliseconds for fresh data
+  // Call the polygon-chart-data edge function
+  const response = await fetch('https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      symbol,
+      timeframe,
+      asset,
+      limit: 500
+    })
+  });
   
-  // Fetch historical data from S3 first
-  const historicalData = await fetchS3HistoricalData(symbol, tf);
-  
-  // Use shorter lookback periods to ensure we get recent data
-  const lookbackDays: Record<string, number> = {
-    '1m': 2,    // 2 days for 1min = 2880 bars
-    '5m': 5,    // 5 days for 5min = 1440 bars
-    '15m': 10,  // 10 days for 15min = 960 bars
-    '1h': 30,   // 30 days for 1h = 720 bars
-    '1d': 365   // 1 year for daily = 365 bars
-  };
-  
-  const daysToFetch = lookbackDays[tf] || 30;
-  const fromMs = now - (daysToFetch * 24 * 60 * 60 * 1000);
-  
-  // CRITICAL: Convert to Unix seconds for Polygon API (not milliseconds!)
-  const fromUnix = Math.floor(fromMs / 1000);
-  const toUnix = Math.floor(now / 1000);
-  
-  const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${timeframe}/${fromUnix}/${toUnix}?adjusted=true&sort=asc&limit=5000&apiKey=${polygonApiKey}`;
-  
-  console.log(`Fetching FRESH data: symbol=${symbol}, polygonSymbol=${polygonSymbol}, timeframe=${tf}, from=${new Date(fromMs).toISOString()}, to=${new Date(now).toISOString()}`);
-  
-  const response = await fetch(url);
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Polygon API error: ${response.status} - ${errorText}`);
-    throw new Error(`Polygon API error: ${response.statusText}`);
+    console.error(`polygon-chart-data error: ${response.status} - ${errorText}`);
+    throw new Error(`Failed to fetch chart data: ${response.statusText}`);
   }
   
   const data = await response.json();
-  console.log(`Polygon response: status=${data.status}, count=${data.resultsCount || 0}, ticker=${data.ticker}`);
   
-  if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
-    console.error('No data available - symbol:', symbol, 'polygonSymbol:', polygonSymbol, 'response:', JSON.stringify(data).substring(0, 200));
+  if (!data.candles || !Array.isArray(data.candles) || data.candles.length === 0) {
+    console.error('No candles returned from polygon-chart-data:', symbol);
     throw new Error(`No data available for ${symbol}`);
   }
   
-  const latestTimestamp = data.results[data.results.length - 1].t;
-  const dataAge = (now - latestTimestamp) / (1000 * 60); // Age in minutes
+  console.log(`✅ Received ${data.candles.length} fresh candles from polygon-chart-data`);
+  console.log(`📊 Latest: ${data.lastTimeUTC} (${data.candles[data.candles.length - 1].c})`);
   
-  // Define max acceptable data age by timeframe (in minutes)
-  const maxDataAge: Record<string, number> = {
-    '1m': 10,   // 1min data should be < 10 min old
-    '5m': 30,   // 5min data should be < 30 min old  
-    '15m': 60,  // 15min data should be < 1 hour old
-    '1h': 180,  // 1h data should be < 3 hours old
-    '1d': 1440  // Daily data should be < 1 day old
-  };
-  
-  const maxAge = maxDataAge[tf] || 180;
-  
-  console.log(`✅ Fetched ${data.results.length} FRESH candles for ${polygonSymbol}`);
-  console.log(`📊 Latest candle: ${new Date(latestTimestamp).toISOString()} (${dataAge.toFixed(1)} minutes old)`);
-  
-  if (dataAge > maxAge) {
-    console.error(`❌ DATA TOO STALE: Latest candle is ${dataAge.toFixed(0)} minutes old (max ${maxAge} min for ${tf} timeframe)`);
-    throw new Error(`Data is too stale for ${symbol}. Latest: ${new Date(latestTimestamp).toISOString()}, Age: ${dataAge.toFixed(0)} min`);
-  }
-  
-  const candles = data.results.map((bar: any) => ({
-    t: bar.t,
-    o: bar.o,
-    h: bar.h,
-    l: bar.l,
-    c: bar.c,
-    v: bar.v
+  // Transform to expected format
+  return data.candles.map((c: any) => ({
+    t: c.t,
+    o: c.o,
+    h: c.h,
+    l: c.l,
+    c: c.c,
+    v: c.v
   }));
-  
-  // Merge with historical data if available (older data first)
-  if (historicalData.length > 0) {
-    const historicalUpToRecent = historicalData.filter(h => h.t < candles[0].t);
-    console.log(`📚 Merged ${historicalUpToRecent.length} historical candles with ${candles.length} fresh candles`);
-    return [...historicalUpToRecent, ...candles];
-  }
-  
-  return candles;
 }
 
 async function generateSummary(symbol: string, indicators: any, openaiKey: string): Promise<string> {
