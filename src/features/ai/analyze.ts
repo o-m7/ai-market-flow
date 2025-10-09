@@ -93,17 +93,11 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
   }
 
   // Fetch real news sentiment analysis (non-blocking)
-  let newsData: any = {
+  let newsData = {
     event_risk: false,
     headline_hits_30m: 0,
     sentiment: 'neutral' as 'bullish' | 'bearish' | 'neutral',
-    confidence: 0,
-    key_drivers: [],
-    risk_factors: [],
-    news_summary: null,
-    trading_signal: 'hold',
-    time_horizon: 'medium',
-    volatility_expected: 'medium'
+    confidence: 0
   };
 
   try {
@@ -125,20 +119,13 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     if (newsResponse.ok) {
       const newsResult = await newsResponse.json();
       if (newsResult.analysis) {
-        // Pass FULL news analysis to AI (not just basic flags)
         newsData = {
           event_risk: newsResult.analysis.news_impact === 'high',
           headline_hits_30m: newsResult.news_articles?.length || 0,
           sentiment: newsResult.analysis.sentiment,
-          confidence: newsResult.analysis.confidence,
-          key_drivers: newsResult.analysis.key_drivers || [],
-          risk_factors: newsResult.analysis.risk_factors || [],
-          news_summary: newsResult.analysis.news_summary || null,
-          trading_signal: newsResult.analysis.trading_signal || 'hold',
-          time_horizon: newsResult.analysis.time_horizon || 'medium',
-          volatility_expected: newsResult.analysis.volatility_expected || 'medium'
+          confidence: newsResult.analysis.confidence
         };
-        console.log('[analyze] FULL news sentiment fetched:', newsData);
+        console.log('[analyze] News sentiment fetched:', newsData);
       }
     } else {
       console.warn('[analyze] News API returned error:', newsResponse.status);
@@ -147,13 +134,12 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     console.warn('[analyze] Failed to fetch news sentiment, continuing without it:', err instanceof Error ? err.message : 'Unknown error');
   }
 
-  // Fetch quant metrics from quant-data function (MANDATORY for full analysis)
-  let quantMetrics: any = null;
+  // Fetch quant metrics from quant-data function
+  let quantMetrics = null;
   try {
     const quantController = new AbortController();
     const quantTimeout = setTimeout(() => quantController.abort(), 10000); // 10s timeout
     
-    console.log('[analyze] Fetching MANDATORY quant metrics for comprehensive analysis...');
     const quantResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/quant-data`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -168,21 +154,18 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     clearTimeout(quantTimeout);
 
     if (quantResponse.ok) {
-      quantMetrics = await quantResponse.json();
-      console.log('[analyze] ✅ Quant metrics successfully fetched:', {
-        hasEMA: !!quantMetrics.ema,
-        hasRSI: !!quantMetrics.rsi14,
-        hasMACD: !!quantMetrics.macd,
-        hasTimeframeProfile: !!quantMetrics.timeframe_profile,
-        hasQuantMetrics: !!quantMetrics.quant_metrics
-      });
+      const quantResult = await quantResponse.json();
+      quantMetrics = {
+        indicators: quantResult.indicators,
+        signals: quantResult.signals,
+        metrics: quantResult.metrics
+      };
+      console.log('[analyze] Quant metrics fetched:', Object.keys(quantMetrics));
     } else {
-      console.error('[analyze] ❌ Quant API returned error:', quantResponse.status);
-      console.warn('[analyze] Analysis will proceed with limited data - accuracy may be reduced');
+      console.warn('[analyze] Quant API returned error:', quantResponse.status);
     }
   } catch (err) {
-    console.error('[analyze] ❌ CRITICAL: Failed to fetch quant metrics:', err instanceof Error ? err.message : 'Unknown error');
-    console.warn('[analyze] Analysis will proceed without quantitative metrics - this may significantly reduce signal quality');
+    console.warn('[analyze] Failed to fetch quant metrics, continuing without them:', err instanceof Error ? err.message : 'Unknown error');
   }
 
   // Send ALL data to ai-analyze - let AI derive signals from the data

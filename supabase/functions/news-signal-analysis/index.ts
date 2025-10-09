@@ -67,7 +67,7 @@ Provide analysis in JSON format:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07', // Use latest model for better sentiment analysis
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
@@ -78,8 +78,8 @@ Provide analysis in JSON format:
             content: prompt
           }
         ],
-        max_completion_tokens: 1000, // Use max_completion_tokens for GPT-5
-        // Note: temperature not supported in GPT-5, defaults to 1.0
+        max_tokens: 1000,
+        temperature: 0.3,
       }),
     });
 
