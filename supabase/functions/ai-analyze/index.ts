@@ -247,17 +247,6 @@ const InstitutionalTaResultSchema = {
         },
         required: ["ema20", "ema50", "ema200", "rsi14", "rsi_divergence", "macd", "atr14", "bb", "volume_analysis"]
       },
-      quantitative_metrics: {
-        type: "object",
-        properties: {
-          volatility_percentile: { type: "number" },
-          trend_strength: { type: "number", minimum: 0, maximum: 100 },
-          momentum_score: { type: "number", minimum: -100, maximum: 100 },
-          mean_reversion_probability: { type: "number", minimum: 0, maximum: 100 },
-          breakout_probability: { type: "number", minimum: 0, maximum: 100 }
-        },
-        required: ["volatility_percentile", "trend_strength", "momentum_score", "mean_reversion_probability", "breakout_probability"]
-      },
       confidence_model: { type: "number", minimum: 0, maximum: 100 },
       confidence_calibrated: { type: "number", minimum: 0, maximum: 100 },
       evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence for analysis" },
@@ -317,7 +306,7 @@ const InstitutionalTaResultSchema = {
     },
     required: [
       "summary", "action", "action_text", "outlook", "market_structure", "levels", "fibonacci", 
-      "trading_strategies", "trade_idea", "technical", "quantitative_metrics", 
+      "trading_strategies", "trade_idea", "technical", 
       "confidence_model", "confidence_calibrated", "evidence", "risks", "timeframe_profile", 
       "accuracy_metrics", "json_version"
     ]
@@ -507,7 +496,7 @@ Return signals where scalp/intraday/swing have DIFFERENT stop distances because 
       ],
       tools: [{ type: "function", function: InstitutionalTaResultSchema }],
       tool_choice: { type: "function", function: { name: "InstitutionalTaResult" } },
-      max_completion_tokens: 16000,
+      max_completion_tokens: 12000,
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
