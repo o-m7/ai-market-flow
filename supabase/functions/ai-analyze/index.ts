@@ -301,12 +301,25 @@ const InstitutionalTaResultSchema = {
         },
         required: ["scalp", "intraday", "swing"]
       },
+      accuracy_metrics: {
+        type: "object",
+        properties: {
+          data_freshness_score: { type: "number", minimum: 0, maximum: 100, description: "How recent/fresh the candle data is" },
+          signal_clarity_score: { type: "number", minimum: 0, maximum: 100, description: "How clear the directional signal is" },
+          level_precision_score: { type: "number", minimum: 0, maximum: 100, description: "How precise support/resistance levels are" },
+          entry_validity_score: { type: "number", minimum: 0, maximum: 100, description: "How valid the entry price is relative to current price" },
+          overall_accuracy: { type: "number", minimum: 0, maximum: 100, description: "Overall accuracy score of the analysis" },
+          validation_notes: { type: "array", items: { type: "string" }, description: "Notes about analysis validation" }
+        },
+        required: ["data_freshness_score", "signal_clarity_score", "level_precision_score", "entry_validity_score", "overall_accuracy", "validation_notes"]
+      },
       json_version: { type: "string" }
     },
     required: [
       "summary", "action", "action_text", "outlook", "market_structure", "levels", "fibonacci", 
       "trading_strategies", "trade_idea", "technical", "quantitative_metrics", 
-      "confidence_model", "confidence_calibrated", "evidence", "risks", "timeframe_profile", "json_version"
+      "confidence_model", "confidence_calibrated", "evidence", "risks", "timeframe_profile", 
+      "accuracy_metrics", "json_version"
     ]
   }
 };
@@ -384,6 +397,8 @@ serve(async (req) => {
     
     const comprehensivePrompt = `You are an elite institutional trading desk providing multi-strategy quantitative analysis.
 
+🎯 CRITICAL: ACCURACY IS PARAMOUNT - Provide PRECISE, DETAILED numbers for ALL metrics
+
 MARKET DATA:
 Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
 🔴 CURRENT LIVE PRICE: ${livePrice}
@@ -392,6 +407,7 @@ Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
 
 ⚠️ CRITICAL: ALL support/resistance/liquidity zones are calculated from LIVE CANDLES (most recent ${candles.length} bars)
 ⚠️ CRITICAL: ALL entries must reference CURRENT PRICE ${livePrice} not historical data
+⚠️ CRITICAL: Provide EXACT numbers with 2 decimal precision for ALL price levels
 
 🚨 CRITICAL RULES FOR PROFESSIONAL ENTRIES:
 1. You MUST choose either "long" or "short" direction - NEVER "none"
@@ -404,9 +420,10 @@ Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
 2. SUPPORT & RESISTANCE LEVELS:
    - Use the support and resistance arrays provided in technical features
    - These are calculated from LIVE candle data (last ${candles.length} candles)
-   - Support levels are swing lows BELOW current price ${livePrice}
-   - Resistance levels are swing highs ABOVE current price ${livePrice}
+   - Support levels MUST be BELOW current price ${livePrice}
+   - Resistance levels MUST be ABOVE current price ${livePrice}
    - Include these exact levels in your "levels" response
+   - Provide AT LEAST 2-3 support and 2-3 resistance levels
 
 3. LIQUIDITY & ORDER BLOCKS:
    - Use liquidity_zones, breakout_zones, and order_blocks from technical features
@@ -416,6 +433,37 @@ Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
    - Order blocks show where smart money accumulated/distributed
 
 4. ENTRY PRICES - Think like an institutional trader:
+   - LONG entries: MUST be AT OR BELOW current price ${livePrice} (buy dips, pullbacks, or market)
+   - SHORT entries: MUST be AT OR ABOVE current price ${livePrice} (sell rallies, bounces, or market)
+   - DO NOT force market orders - wait for optimal entry at key levels
+   - Entries should be at: Order blocks > Liquidity zones > Support/Resistance > Fibonacci > VWAP > EMAs
+   - Entry can be 1-3% away from current if at a key technical level
+   - Provide EXACT entry price with 2 decimal precision
+
+5. STOP LOSS placement:
+   - LONG: Stop MUST be BELOW entry (at invalidation point: recent swing low - ATR buffer)
+   - SHORT: Stop MUST be ABOVE entry (at invalidation point: recent swing high + ATR buffer)
+   - Use ATR for buffer: Stop = structure ± (1-1.5 × ATR)
+   - Provide EXACT stop price with 2 decimal precision
+
+6. TARGET placement:
+   - Provide AT LEAST 2-3 targets at key levels
+   - LONG targets: Resistance levels, Fibonacci extensions, previous highs (MUST be ABOVE entry)
+   - SHORT targets: Support levels, Fibonacci extensions, previous lows (MUST be BELOW entry)
+   - Minimum 2:1 risk-reward ratio required
+   - Provide EXACT target prices with 2 decimal precision
+   - Provide probability estimates for each target (0-100)
+
+7. ACCURACY METRICS - You MUST provide:
+   - data_freshness_score: Rate how fresh the data is (0-100, consider candle age ${candleAge}s)
+   - signal_clarity_score: Rate how clear the directional signal is (0-100)
+   - level_precision_score: Rate how precise your support/resistance levels are (0-100)
+   - entry_validity_score: Rate how valid your entry is relative to current price (0-100)
+   - overall_accuracy: Overall confidence in analysis accuracy (0-100)
+   - validation_notes: Array of strings noting validation points or warnings
+
+TECHNICAL FEATURES (calculated from LIVE ${candles.length} candles):
+${JSON.stringify(features, null, 2)}
    - LONG entries: Wait for pullbacks to support levels, liquidity zones, order blocks, EMA bounces, or breakout retests
    - SHORT entries: Wait for rallies to resistance levels, liquidity zones, order blocks, EMA rejections, or breakdown retests
    - DO NOT force market orders at current price ${livePrice}
@@ -560,6 +608,109 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       });
     }
 
+    // Validate and calculate accuracy metrics
+    const latestCandleTime = candles[candles.length - 1]?.t || Date.now();
+    const dataAgeSeconds = Math.round((Date.now() - latestCandleTime) / 1000);
+    const freshness_score = Math.max(0, 100 - (dataAgeSeconds / 60) * 10); // Lose 10 points per minute of age
+    
+    const livePrice = currentPrice || features.technical.current;
+    
+    // Validate entry logic relative to direction and current price
+    const validationNotes: string[] = [];
+    let entry_validity = 100;
+    
+    const tradeDirection = parsed.trade_idea?.direction;
+    const entryPrice = parsed.trade_idea?.entry;
+    const stopPrice = parsed.trade_idea?.stop;
+    
+    if (tradeDirection === 'long') {
+      // LONG: Entry should be AT OR BELOW current price (buy dip or at market)
+      if (entryPrice > livePrice * 1.02) {
+        entry_validity -= 40;
+        validationNotes.push(`⚠️ LONG entry ${entryPrice.toFixed(2)} is ${((entryPrice/livePrice - 1) * 100).toFixed(1)}% above current price ${livePrice.toFixed(2)} - should be at or below for long trades`);
+      }
+      // Stop should be BELOW entry
+      if (stopPrice >= entryPrice) {
+        entry_validity -= 30;
+        validationNotes.push(`⚠️ LONG stop ${stopPrice.toFixed(2)} is above/equal to entry ${entryPrice.toFixed(2)} - invalid risk management`);
+      }
+    } else if (tradeDirection === 'short') {
+      // SHORT: Entry should be AT OR ABOVE current price (sell rally or at market)
+      if (entryPrice < livePrice * 0.98) {
+        entry_validity -= 40;
+        validationNotes.push(`⚠️ SHORT entry ${entryPrice.toFixed(2)} is ${((1 - entryPrice/livePrice) * 100).toFixed(1)}% below current price ${livePrice.toFixed(2)} - should be at or above for short trades`);
+      }
+      // Stop should be ABOVE entry
+      if (stopPrice <= entryPrice) {
+        entry_validity -= 30;
+        validationNotes.push(`⚠️ SHORT stop ${stopPrice.toFixed(2)} is below/equal to entry ${entryPrice.toFixed(2)} - invalid risk management`);
+      }
+    }
+    
+    // Validate support levels are below current price
+    const support = parsed.levels?.support || [];
+    const invalidSupport = support.filter((s: number) => s > livePrice * 1.01);
+    if (invalidSupport.length > 0) {
+      entry_validity -= 20;
+      validationNotes.push(`⚠️ ${invalidSupport.length} support level(s) above current price - support should be below price`);
+    }
+    
+    // Validate resistance levels are above current price
+    const resistance = parsed.levels?.resistance || [];
+    const invalidResistance = resistance.filter((r: number) => r < livePrice * 0.99);
+    if (invalidResistance.length > 0) {
+      entry_validity -= 20;
+      validationNotes.push(`⚠️ ${invalidResistance.length} resistance level(s) below current price - resistance should be above price`);
+    }
+    
+    // Calculate signal clarity score
+    const ema20 = features.technical.ema20;
+    const ema50 = features.technical.ema50;
+    const macd_hist = features.technical.macd.hist;
+    const rsi = features.technical.rsi14;
+    
+    let signal_clarity = 50;
+    
+    // EMA alignment adds clarity
+    if ((livePrice > ema20 && livePrice > ema50) || (livePrice < ema20 && livePrice < ema50)) {
+      signal_clarity += 20;
+    }
+    
+    // MACD agreement adds clarity
+    if ((macd_hist > 0 && tradeDirection === 'long') || (macd_hist < 0 && tradeDirection === 'short')) {
+      signal_clarity += 15;
+    }
+    
+    // RSI extreme adds clarity
+    if ((rsi < 35 && tradeDirection === 'long') || (rsi > 65 && tradeDirection === 'short')) {
+      signal_clarity += 15;
+    }
+    
+    // Level precision score
+    const level_precision = Math.min(100, 50 + (support.length + resistance.length) * 10);
+    
+    // Overall accuracy
+    const overall_accuracy = Math.round(
+      (freshness_score * 0.3) + 
+      (signal_clarity * 0.3) + 
+      (level_precision * 0.2) + 
+      (entry_validity * 0.2)
+    );
+    
+    if (validationNotes.length === 0) {
+      validationNotes.push(`✓ All validation checks passed`);
+      validationNotes.push(`✓ Data age: ${dataAgeSeconds}s`);
+      validationNotes.push(`✓ Entry ${entryPrice.toFixed(2)} vs Current ${livePrice.toFixed(2)}: Valid for ${tradeDirection}`);
+    }
+    
+    console.log('[ai-analyze] Accuracy metrics:', {
+      freshness_score: Math.round(freshness_score),
+      signal_clarity: Math.round(signal_clarity),
+      level_precision: Math.round(level_precision),
+      entry_validity: Math.round(entry_validity),
+      overall_accuracy
+    });
+
     // Validate and ensure all required fields
     const result = {
       ...parsed,
@@ -571,7 +722,15 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       json_version: "1.0.0",
       analyzed_at: new Date().toISOString(),
       input_features: features,
-      input_news: news || { event_risk: false, headline_hits_30m: 0 }
+      input_news: news || { event_risk: false, headline_hits_30m: 0 },
+      accuracy_metrics: {
+        data_freshness_score: Math.round(freshness_score),
+        signal_clarity_score: Math.round(signal_clarity),
+        level_precision_score: Math.round(level_precision),
+        entry_validity_score: Math.round(entry_validity),
+        overall_accuracy,
+        validation_notes: validationNotes
+      }
     };
 
     console.log(`[ai-analyze] Deterministic analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);

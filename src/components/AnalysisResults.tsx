@@ -64,6 +64,104 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </CardHeader>
       </Card>
 
+      {/* Accuracy Metrics - Quantitative Validation */}
+      {data.accuracy_metrics && (
+        <Card className="bg-terminal border-terminal-border">
+          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
+            <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              ACCURACY & VALIDATION METRICS
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">DATA FRESHNESS</div>
+                <div className={`text-2xl font-mono-tabular font-bold ${
+                  data.accuracy_metrics.data_freshness_score >= 80 ? 'text-terminal-green' :
+                  data.accuracy_metrics.data_freshness_score >= 60 ? 'text-terminal-accent' :
+                  'text-terminal-red'
+                }`}>
+                  {data.accuracy_metrics.data_freshness_score}%
+                </div>
+              </div>
+              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SIGNAL CLARITY</div>
+                <div className={`text-2xl font-mono-tabular font-bold ${
+                  data.accuracy_metrics.signal_clarity_score >= 80 ? 'text-terminal-green' :
+                  data.accuracy_metrics.signal_clarity_score >= 60 ? 'text-terminal-accent' :
+                  'text-terminal-red'
+                }`}>
+                  {data.accuracy_metrics.signal_clarity_score}%
+                </div>
+              </div>
+              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">LEVEL PRECISION</div>
+                <div className={`text-2xl font-mono-tabular font-bold ${
+                  data.accuracy_metrics.level_precision_score >= 80 ? 'text-terminal-green' :
+                  data.accuracy_metrics.level_precision_score >= 60 ? 'text-terminal-accent' :
+                  'text-terminal-red'
+                }`}>
+                  {data.accuracy_metrics.level_precision_score}%
+                </div>
+              </div>
+              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY VALIDITY</div>
+                <div className={`text-2xl font-mono-tabular font-bold ${
+                  data.accuracy_metrics.entry_validity_score >= 80 ? 'text-terminal-green' :
+                  data.accuracy_metrics.entry_validity_score >= 60 ? 'text-terminal-accent' :
+                  'text-terminal-red'
+                }`}>
+                  {data.accuracy_metrics.entry_validity_score}%
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-terminal-darker p-4 border-2 border-terminal-accent/30 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-mono-tabular text-terminal-secondary">OVERALL ACCURACY SCORE</div>
+                <div className={`text-3xl font-mono-tabular font-bold ${
+                  data.accuracy_metrics.overall_accuracy >= 80 ? 'text-terminal-green' :
+                  data.accuracy_metrics.overall_accuracy >= 60 ? 'text-terminal-accent' :
+                  'text-terminal-red'
+                }`}>
+                  {data.accuracy_metrics.overall_accuracy}%
+                </div>
+              </div>
+              <div className="h-3 bg-terminal-darker rounded-full overflow-hidden border border-terminal-border">
+                <div 
+                  className={`h-full ${
+                    data.accuracy_metrics.overall_accuracy >= 80 ? 'bg-terminal-green' :
+                    data.accuracy_metrics.overall_accuracy >= 60 ? 'bg-terminal-accent' :
+                    'bg-terminal-red'
+                  }`}
+                  style={{ width: `${data.accuracy_metrics.overall_accuracy}%` }}
+                />
+              </div>
+            </div>
+
+            {data.accuracy_metrics.validation_notes && data.accuracy_metrics.validation_notes.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-xs font-mono-tabular text-terminal-secondary mb-2">VALIDATION NOTES:</div>
+                {data.accuracy_metrics.validation_notes.map((note: string, idx: number) => {
+                  const isWarning = note.includes('⚠️');
+                  const isSuccess = note.includes('✓');
+                  return (
+                    <div key={idx} className={`flex items-start gap-2 p-2 border-l-2 text-xs font-mono ${
+                      isWarning ? 'bg-terminal-red/5 border-terminal-red text-terminal-red' :
+                      isSuccess ? 'bg-terminal-green/5 border-terminal-green text-terminal-green' :
+                      'bg-terminal-accent/5 border-terminal-accent text-terminal-accent'
+                    }`}>
+                      {note}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Main Analysis Summary */}
       <Card className="bg-terminal border-terminal-border">
         <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">

@@ -30,11 +30,11 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     throw new Error('No backend configured. Set VITE_PUBLIC_API_URL or VITE_SUPABASE_URL.');
   }
 
-  // Fetch ALL fresh candles for live analysis - ignore stale payload data
+  // Fetch ONLY the most recent candles for live analysis
   let currentPrice: number | null = null;
   let freshCandles = payload.candles;
   
-  console.log('[analyze] Fetching completely fresh candles for', payload.symbol);
+  console.log('[analyze] Fetching real-time candles for', payload.symbol);
   
   try {
     const liveDataResponse = await fetch(`https://ifetofkhyblyijghuwzs.supabase.co/functions/v1/polygon-chart-data`, {
@@ -44,7 +44,7 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
         symbol: payload.symbol,
         timeframe: payload.timeframe,
         asset: payload.market.toLowerCase(),
-        limit: 100, // Get 100 fresh candles for proper support/resistance calculation
+        limit: 50, // Only get 50 most recent candles for current analysis
         lite: false // Get full data including volume
       })
     });
@@ -52,7 +52,7 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     if (liveDataResponse.ok) {
       const liveData = await liveDataResponse.json();
       if (liveData.candles && liveData.candles.length > 0) {
-        // Use completely fresh candles
+        // Use ONLY the freshest candles - discard any stale payload data
         freshCandles = liveData.candles.map((c: any) => ({
           t: c.t,
           o: c.o,
@@ -66,18 +66,27 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
         currentPrice = liveData.snapshotLastTrade || liveData.candles[liveData.candles.length - 1].c;
         
         const latestCandle = liveData.candles[liveData.candles.length - 1];
-        console.log('[analyze] Fresh candles fetched:', { 
+        const ageSeconds = Math.round((Date.now() - latestCandle.t) / 1000);
+        
+        console.log('[analyze] Real-time candles fetched:', { 
           count: freshCandles.length,
           latestClose: latestCandle.c,
           currentPrice,
           latestTime: new Date(latestCandle.t).toISOString(),
-          age: liveData.lastTimeUTC 
+          ageSeconds,
+          isRecent: ageSeconds < 300 // Less than 5 minutes old
         });
+        
+        // Validate data freshness
+        if (ageSeconds > 300) {
+          console.warn('[analyze] WARNING: Data may be stale, age:', ageSeconds, 'seconds');
+        }
       } else {
-        console.warn('[analyze] No fresh candles returned, using provided data');
+        console.warn('[analyze] No fresh candles returned');
       }
     } else {
-      console.warn('[analyze] Live data fetch failed:', liveDataResponse.status, await liveDataResponse.text());
+      const errorText = await liveDataResponse.text();
+      console.error('[analyze] Live data fetch failed:', liveDataResponse.status, errorText);
     }
   } catch (err) {
     console.error('[analyze] Failed to fetch fresh candles:', err);
