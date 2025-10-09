@@ -171,10 +171,14 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
             </div>
             <div className="text-right">
               <Badge className={`${getRecommendationColor(data.recommendation)} font-mono-tabular text-sm mb-2`}>
-                {data.recommendation?.toUpperCase() || 'HOLD'}
+                {data.recommendation === 'buy' ? '↑ LONG (BUY)' : 
+                 data.recommendation === 'sell' ? '↓ SHORT (SELL)' : 
+                 data.recommendation === 'long' ? '↑ LONG (BUY)' : 
+                 data.recommendation === 'short' ? '↓ SHORT (SELL)' : 
+                 '⏸️ HOLD'}
               </Badge>
               <div className="text-xs font-mono-tabular text-terminal-secondary">
-                CONFIDENCE: {Math.round((data.confidence_calibrated || data.confidence || 50) * 100)}%
+                CONFIDENCE: {data.recommendation === 'hold' ? '0' : Math.round((data.confidence_calibrated || data.confidence || 50) * 100)}%
               </div>
             </div>
           </div>
@@ -189,12 +193,12 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
               <Activity className="h-5 w-5 flex-shrink-0 mt-0.5 text-terminal-accent" />
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Badge className="font-mono-tabular bg-terminal-accent/20 text-terminal-accent border-terminal-accent">
-                    ⏸️ HOLD SIGNAL
-                  </Badge>
-                  <span className="text-xs font-mono-tabular text-terminal-secondary">
-                    NO TRADE RECOMMENDED
-                  </span>
+                <Badge className="font-mono-tabular bg-terminal-accent/20 text-terminal-accent border-terminal-accent">
+                  ⏸️ HOLD - NO TRADE
+                </Badge>
+                <span className="text-xs font-mono-tabular text-terminal-secondary">
+                  MARKET CONDITIONS UNCERTAIN OR TOO RISKY
+                </span>
                 </div>
                 <p className="text-sm font-mono-tabular text-terminal-text">
                   {data.holdReason || 'Conditions unclear - waiting for better setup'}
@@ -214,7 +218,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                   </div>
                 )}
                 <p className="text-xs font-mono-tabular text-terminal-accent mt-2">
-                  💡 Wait for clearer technical setup or stronger indicator confluence before entering
+                  💡 Waiting for clearer setup with better risk:reward and stronger indicator confluence. Goal: Maximize profit while minimizing risk.
                 </p>
               </div>
             </div>
@@ -522,7 +526,11 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
               <div className="flex items-start gap-3">
                 <span className="text-xs font-mono-tabular text-terminal-secondary min-w-24">ACTION:</span>
                 <span className="text-sm font-mono-tabular text-terminal-foreground uppercase font-bold">
-                  {data.recommendation || 'HOLD'}
+                  {data.recommendation === 'buy' ? 'LONG (BUY)' : 
+                   data.recommendation === 'sell' ? 'SHORT (SELL)' : 
+                   data.recommendation === 'long' ? 'LONG (BUY)' : 
+                   data.recommendation === 'short' ? 'SHORT (SELL)' : 
+                   'HOLD - NO TRADE'}
                 </span>
               </div>
               
@@ -569,8 +577,22 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                 const signalsToUse = quantSignals;
                 if (!signalsToUse) return null;
                 
-                // Use trade_idea.direction for accurate signal direction (always long or short now)
-                const tradeDirection = data.trade_idea?.direction || 'long';
+                // Check for hold signal first - if recommendation is hold, don't show signals
+                if (data.recommendation === 'hold' || data.action === 'hold') {
+                  return null; // Don't show trading signals section for hold recommendations
+                }
+                
+                // Use trade_idea.direction for accurate signal direction
+                // Map buy -> long, sell -> short for clarity
+                let tradeDirection = data.trade_idea?.direction || data.recommendation || 'hold';
+                if (tradeDirection === 'buy') tradeDirection = 'long';
+                if (tradeDirection === 'sell') tradeDirection = 'short';
+                
+                // If still no clear direction or hold, don't show signals
+                if (tradeDirection === 'hold' || (!tradeDirection)) {
+                  return null;
+                }
+                
                 const isLong = tradeDirection === 'long';
                 const direction = isLong ? 'LONG' : 'SHORT';
                 const directionColor = isLong ? 'text-terminal-green' : 'text-terminal-red';
@@ -1028,22 +1050,22 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </Card>
       )}
 
-      {/* Trade Idea - Always shows since direction is always long or short */}
-      {data.trade_idea && (
+      {/* Trade Idea - Only show if there's an actual trade signal (not hold) */}
+      {data.trade_idea && data.recommendation !== 'hold' && data.action !== 'hold' && data.trade_idea.direction !== 'hold' && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
               <Target className="h-4 w-4" />
-              TRADE IDEA • {data.trade_idea.direction?.toUpperCase()}
+              TRADE IDEA • {data.trade_idea.direction === 'long' || data.trade_idea.direction === 'buy' ? 'LONG (BUY)' : 'SHORT (SELL)'}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
             <div className="flex items-center gap-3 mb-4">
               <Badge className={`${
-                data.trade_idea.direction === 'long' ? 'text-terminal-green bg-terminal-green/10 border-terminal-green/20' :
+                data.trade_idea.direction === 'long' || data.trade_idea.direction === 'buy' ? 'text-terminal-green bg-terminal-green/10 border-terminal-green/20' :
                 'text-terminal-red bg-terminal-red/10 border-terminal-red/20'
               } font-mono-tabular`}>
-                {data.trade_idea.direction === 'long' ? '↑ LONG' : '↓ SHORT'}
+                {data.trade_idea.direction === 'long' || data.trade_idea.direction === 'buy' ? '↑ LONG (BUY)' : '↓ SHORT (SELL)'}
               </Badge>
               {data.trade_idea.setup_type && (
                 <Badge variant="outline" className="font-mono-tabular text-xs">
