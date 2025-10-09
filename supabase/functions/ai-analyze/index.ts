@@ -432,12 +432,31 @@ Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
    - Liquidity zones show where institutional orders cluster
    - Order blocks show where smart money accumulated/distributed
 
-4. ENTRY PRICES - Think like an institutional trader:
-   - LONG entries: MUST be AT OR BELOW current price ${livePrice} (buy dips, pullbacks, or market)
-   - SHORT entries: MUST be AT OR ABOVE current price ${livePrice} (sell rallies, bounces, or market)
-   - DO NOT force market orders - wait for optimal entry at key levels
-   - Entries should be at: Order blocks > Liquidity zones > Support/Resistance > Fibonacci > VWAP > EMAs
-   - Entry can be 1-3% away from current if at a key technical level
+4. ENTRY PRICES - CRITICAL PRICE RANGE VALIDATION:
+   🚨 MANDATORY ENTRY PRICE RULES (AI MUST FOLLOW):
+   
+   FOR LONG TRADES:
+   - Entry MUST be between ${(livePrice * 0.98).toFixed(2)} and ${(livePrice * 1.02).toFixed(2)} (±2% of current price ${livePrice})
+   - OR at nearest support level within 3% of current price (${(livePrice * 0.97).toFixed(2)} - ${(livePrice * 1.03).toFixed(2)})
+   - NEVER place LONG entry above current price + 2% unless at a critical support retest
+   - Entry justification: buying dips, pullbacks to support, order blocks, or at current market price
+   
+   FOR SHORT TRADES:
+   - Entry MUST be between ${(livePrice * 0.98).toFixed(2)} and ${(livePrice * 1.02).toFixed(2)} (±2% of current price ${livePrice})
+   - OR at nearest resistance level within 3% of current price (${(livePrice * 0.97).toFixed(2)} - ${(livePrice * 1.03).toFixed(2)})
+   - NEVER place SHORT entry below current price - 2% unless at a critical resistance retest
+   - Entry justification: selling rallies, bounces to resistance, order blocks, or at current market price
+   
+   VALID ENTRY PLACEMENT (in order of priority):
+   1. At current price ±0.5% (market entry with tight range)
+   2. At order block level within 3% of current price
+   3. At liquidity zone within 3% of current price  
+   4. At support/resistance within 3% of current price
+   5. At Fibonacci retracement level (38.2%, 50%, 61.8%) within 3% of current price
+   6. At VWAP or major EMA (20/50/200) within 3% of current price
+   
+   ⚠️ If NO valid technical level exists within ±3% of current price ${livePrice}:
+   - Place entry at current price ${livePrice} (market entry)
    - Provide EXACT entry price with 2 decimal precision
 
 5. STOP LOSS placement:
@@ -765,6 +784,86 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
     
     console.log(`[VALIDATION] 📊 Updated Entry Validity Score: ${entry_validity}/100`);
     
+    // ==================== ENTRY PRICE CORRECTION ====================
+    // Post-processing: Correct invalid entries that are outside acceptable ranges
+    console.log(`[VALIDATION] 🔧 Entry Price Correction Check:`);
+    const originalEntry = parsed.trade_idea?.entry;
+    let correctedEntry = originalEntry;
+    let entryCorrected = false;
+    const entryCorrections: string[] = [];
+    
+    const minValidEntry = livePrice * 0.97; // 3% below
+    const maxValidEntry = livePrice * 1.03; // 3% above
+    const idealMinEntry = livePrice * 0.98; // 2% below (preferred range)
+    const idealMaxEntry = livePrice * 1.02; // 2% above (preferred range)
+    
+    console.log(`  - Original Entry: ${originalEntry?.toFixed(2)}`);
+    console.log(`  - Valid Range: ${minValidEntry.toFixed(2)} - ${maxValidEntry.toFixed(2)} (±3%)`);
+    console.log(`  - Ideal Range: ${idealMinEntry.toFixed(2)} - ${idealMaxEntry.toFixed(2)} (±2%)`);
+    
+    if (originalEntry && (originalEntry < minValidEntry || originalEntry > maxValidEntry)) {
+      console.warn(`[VALIDATION] ⚠️  Entry ${originalEntry.toFixed(2)} is OUTSIDE valid range!`);
+      
+      // Find nearest valid level
+      const allLevels = [
+        ...support.map((s: number) => ({ price: s, type: 'support' })),
+        ...resistance.map((r: number) => ({ price: r, type: 'resistance' })),
+        { price: livePrice, type: 'current_price' }
+      ];
+      
+      // Filter levels within valid range and matching trade direction
+      const validLevels = allLevels.filter(level => {
+        if (level.price < minValidEntry || level.price > maxValidEntry) return false;
+        
+        if (tradeDirection === 'long') {
+          // For LONG, prefer levels at or below current price
+          return level.price <= livePrice * 1.01; // Allow 1% above for immediate entries
+        } else if (tradeDirection === 'short') {
+          // For SHORT, prefer levels at or above current price
+          return level.price >= livePrice * 0.99; // Allow 1% below for immediate entries
+        }
+        return true;
+      });
+      
+      if (validLevels.length > 0) {
+        // Find closest level to original entry
+        const nearest = validLevels.reduce((prev, curr) => {
+          const prevDiff = Math.abs(prev.price - originalEntry);
+          const currDiff = Math.abs(curr.price - originalEntry);
+          return currDiff < prevDiff ? curr : prev;
+        });
+        
+        correctedEntry = nearest.price;
+        entryCorrected = true;
+        const correction = `Entry corrected from ${originalEntry.toFixed(2)} to ${correctedEntry.toFixed(2)} (nearest valid ${nearest.type})`;
+        entryCorrections.push(correction);
+        console.log(`[VALIDATION] ✅ ${correction}`);
+      } else {
+        // No valid levels found, use current price
+        correctedEntry = livePrice;
+        entryCorrected = true;
+        const correction = `Entry corrected from ${originalEntry.toFixed(2)} to ${correctedEntry.toFixed(2)} (market entry at current price)`;
+        entryCorrections.push(correction);
+        console.log(`[VALIDATION] ✅ ${correction}`);
+      }
+      
+      // Update parsed data
+      if (parsed.trade_idea) {
+        parsed.trade_idea.entry = correctedEntry;
+      }
+      
+      // Add to validation notes
+      validationNotes.push(`🔧 AUTO-CORRECTED: ${entryCorrections[0]}`);
+      
+      // Recalculate entry validity with corrected entry
+      entry_validity = Math.max(entry_validity, 80); // Boost score since we corrected it
+      console.log(`[VALIDATION] 📊 Entry Validity boosted to ${entry_validity}/100 after correction`);
+    } else if (originalEntry) {
+      console.log(`[VALIDATION] ✅ Entry is within valid range - no correction needed`);
+    }
+    
+    console.log(`[VALIDATION] 📊 Updated Entry Validity Score: ${entry_validity}/100`);
+    
     // Calculate signal clarity score
     console.log(`[VALIDATION] 🎯 Signal Clarity Calculation (starting at 50):`);
     const ema20 = features.technical.ema20;
@@ -883,6 +982,13 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       json_version: "1.0.0",
       analyzed_at: new Date().toISOString(),
       data_staleness_warning: stalenessWarning,
+      entry_correction_applied: entryCorrected,
+      entry_correction_details: entryCorrected ? {
+        original_entry: originalEntry,
+        corrected_entry: correctedEntry,
+        corrections: entryCorrections,
+        reason: "Entry outside valid price range (±3% of current price)"
+      } : null,
       input_features: features,
       input_news: news || { event_risk: false, headline_hits_30m: 0 },
       accuracy_metrics: {
@@ -903,6 +1009,10 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
     
     if (stalenessWarning) {
       console.warn(`[VALIDATION] ⚠️  Adding staleness warning to response: ${stalenessWarning.severity} severity`);
+    }
+    
+    if (entryCorrected) {
+      console.log(`[VALIDATION] 🔧 Entry correction applied and logged in response`);
     }
 
     console.log(`[ai-analyze] Deterministic analysis completed: ${result.action} (${result.confidence_calibrated}% confidence)`);

@@ -103,6 +103,43 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
         </Card>
       )}
 
+      {/* Entry Price Correction Notice */}
+      {data.entry_correction_applied && data.entry_correction_details && (
+        <Card className="border-2 bg-terminal-accent/5 border-terminal-accent">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <Target className="h-5 w-5 flex-shrink-0 mt-0.5 text-terminal-accent" />
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="font-mono-tabular bg-terminal-accent/20 text-terminal-accent border-terminal-accent">
+                    AUTO-CORRECTED
+                  </Badge>
+                  <span className="text-xs font-mono-tabular text-terminal-secondary">
+                    ENTRY PRICE VALIDATION
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-mono-tabular text-terminal-text">
+                    Original Entry: <span className="text-terminal-red line-through">{safeFormatNumber(data.entry_correction_details.original_entry)}</span>
+                  </p>
+                  <p className="text-sm font-mono-tabular text-terminal-text">
+                    Corrected Entry: <span className="text-terminal-green font-bold">{safeFormatNumber(data.entry_correction_details.corrected_entry)}</span>
+                  </p>
+                </div>
+                <p className="text-xs font-mono-tabular text-terminal-secondary">
+                  🔧 {data.entry_correction_details.reason}
+                </p>
+                {data.entry_correction_details.corrections.map((correction: string, idx: number) => (
+                  <p key={idx} className="text-xs font-mono-tabular text-terminal-accent">
+                    ✓ {correction}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Accuracy Metrics - Quantitative Validation */}
       {data.accuracy_metrics && (
         <Card className="bg-terminal border-terminal-border">
@@ -185,10 +222,12 @@ export const AnalysisResults = ({ data, symbol }: AnalysisResultsProps) => {
                 {data.accuracy_metrics.validation_notes.map((note: string, idx: number) => {
                   const isWarning = note.includes('⚠️');
                   const isSuccess = note.includes('✓');
+                  const isCorrection = note.includes('🔧');
                   return (
                     <div key={idx} className={`flex items-start gap-2 p-2 border-l-2 text-xs font-mono ${
                       isWarning ? 'bg-terminal-red/5 border-terminal-red text-terminal-red' :
                       isSuccess ? 'bg-terminal-green/5 border-terminal-green text-terminal-green' :
+                      isCorrection ? 'bg-terminal-accent/5 border-terminal-accent text-terminal-accent' :
                       'bg-terminal-accent/5 border-terminal-accent text-terminal-accent'
                     }`}>
                       {note}
