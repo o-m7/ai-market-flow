@@ -442,8 +442,11 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
     '1d': '1/day'
   };
   
-  // Format symbol for Polygon API (crypto needs X: prefix)
-  const isCrypto = symbol.includes('USD') && !symbol.includes('/');
+  // Format symbol for Polygon API
+  // Crypto pairs like BTCUSD, ETHUSD need X: prefix
+  // Stock tickers like SPY, AAPL don't need prefix
+  const cryptoPairs = ['BTC', 'ETH', 'XRP', 'ADA', 'SOL', 'DOT', 'MATIC', 'AVAX', 'LINK', 'UNI', 'ATOM', 'ALGO', 'VET', 'ICP', 'FIL', 'THETA', 'TRX', 'ETC', 'XMR', 'BCH', 'LTC', 'DOGE', 'SHIB', 'NEAR', 'FTM', 'SAND', 'MANA', 'CRV', 'AAVE', 'BNB'];
+  const isCrypto = cryptoPairs.some(pair => symbol.startsWith(pair)) && symbol.endsWith('USD');
   const polygonSymbol = isCrypto ? `X:${symbol}` : symbol;
   
   const timeframe = timeframes[tf] || '1/hour';
@@ -452,7 +455,7 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   
   const url = `https://api.polygon.io/v2/aggs/ticker/${polygonSymbol}/range/${timeframe}/${from.toISOString().split('T')[0]}/${now.toISOString().split('T')[0]}?adjusted=true&sort=asc&limit=5000&apikey=${polygonApiKey}`;
   
-  console.log(`Fetching quant data from Polygon: ${url.replace(polygonApiKey, 'REDACTED')}`);
+  console.log(`Fetching quant data: symbol=${symbol}, polygonSymbol=${polygonSymbol}, timeframe=${tf}`);
   
   const response = await fetch(url);
   if (!response.ok) {
@@ -462,12 +465,14 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   }
   
   const data = await response.json();
-  console.log(`Polygon response status: ${data.status}, count: ${data.resultsCount || 0}`);
+  console.log(`Polygon response: status=${data.status}, count=${data.resultsCount || 0}`);
   
   if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
-    console.error('No data available for symbol:', symbol, 'Polygon symbol:', polygonSymbol);
-    throw new Error('No data available for symbol');
+    console.error('No data available - symbol:', symbol, 'polygonSymbol:', polygonSymbol, 'response:', JSON.stringify(data).substring(0, 200));
+    throw new Error(`No data available for ${symbol}`);
   }
+  
+  console.log(`Successfully fetched ${data.results.length} candles for ${polygonSymbol}`);
   
   return data.results.map((bar: any) => ({
     t: bar.t,
