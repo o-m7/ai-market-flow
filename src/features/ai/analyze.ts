@@ -33,6 +33,7 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
   // Fetch ONLY the most recent candles for live analysis
   let currentPrice: number | null = null;
   let freshCandles = payload.candles;
+  let snapshotTimeUTC: string | null = null; // Declare here before use
   
   console.log('[analyze] Fetching real-time candles for', payload.symbol);
   
@@ -64,6 +65,11 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
         
         // Get current live price from snapshot
         currentPrice = liveData.snapshotLastTrade || liveData.candles[liveData.candles.length - 1].c;
+        
+        // Capture snapshot timestamp for freshness validation
+        if (liveData.snapshotTimeUTC) {
+          snapshotTimeUTC = liveData.snapshotTimeUTC;
+        }
         
         const latestCandle = liveData.candles[liveData.candles.length - 1];
         const ageSeconds = Math.round((Date.now() - latestCandle.t) / 1000);
@@ -175,6 +181,7 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     market: payload.market,
     candles: freshCandles,
     currentPrice, // Pass live price for context
+    snapshotTimeUTC, // Pass snapshot timestamp for freshness validation
     news: newsData,
     quantMetrics // Pass quant data for AI to analyze
   };

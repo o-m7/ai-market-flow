@@ -61,6 +61,8 @@ export default function TVLightweightChart({
   const dataRef = useRef<LWBar[]>([]);
   const overlayLinesRef = useRef<IPriceLine[]>([]);
   const [analysisData, setAnalysisData] = useState<any>(null);
+  const [dataFreshness, setDataFreshness] = useState<'fresh' | 'recent' | 'stale'>('fresh');
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
 
   useEffect(() => {
     if (!ref.current) return;
@@ -130,13 +132,30 @@ export default function TVLightweightChart({
       }
     })();
 
+    // Dynamic polling intervals based on timeframe
+    const getPollingInterval = (timeframe: string) => {
+      const intervals: Record<string, number> = {
+        '1m': 15000,   // 15 seconds
+        '5m': 30000,   // 30 seconds
+        '15m': 60000,  // 1 minute
+        '30m': 120000, // 2 minutes
+        '1h': 180000,  // 3 minutes
+        '4h': 300000,  // 5 minutes
+        '1d': 600000   // 10 minutes
+      };
+      return intervals[timeframe] || 60000;
+    };
+
     // Live updates - tick every second to update current bar
     let tickTimer: NodeJS.Timeout | null = null;
     
-    // Full refresh every 30 seconds to capture completed candles
+    // Dynamic refresh based on timeframe to capture completed candles and technical indicators
     let refreshTimer: NodeJS.Timeout | null = null;
     
     if (live) {
+      const pollingInterval = getPollingInterval(tf);
+      console.log(`[Live Data] Polling every ${pollingInterval/1000}s for ${tf} timeframe`);
+
       // Update current bar every second with live price
       tickTimer = setInterval(async () => {
         try {
@@ -160,6 +179,10 @@ export default function TVLightweightChart({
             onDataChange?.([...dataRef.current]);
           }
 
+          // Update freshness indicator
+          setLastUpdate(Date.now());
+          setDataFreshness('fresh');
+
           if (series === 'candles') {
             seriesRef.current.update(patched);
           } else {
@@ -170,14 +193,16 @@ export default function TVLightweightChart({
         }
       }, 1000);
 
-      // Refresh full dataset every 30 seconds to get completed candles
+      // Refresh full dataset dynamically based on timeframe to get completed candles
       refreshTimer = setInterval(async () => {
         try {
-          console.log(`[Live Refresh] Fetching fresh candles for ${symbol}`);
+          console.log(`[Live Refresh] Fetching fresh candles and indicators for ${symbol}`);
           const freshData = await fetchCandles(symbol, tf);
           lastBar.current = freshData.at(-1);
           dataRef.current = freshData;
           onDataChange?.(freshData);
+          
+          setLastUpdate(Date.now());
           
           if (series === 'candles') {
             seriesRef.current.setData(freshData);
@@ -186,8 +211,9 @@ export default function TVLightweightChart({
           }
         } catch (error) {
           console.error('Live refresh error:', error);
+          setDataFreshness('stale');
         }
-      }, 30000); // 30 seconds
+      }, pollingInterval);
     }
 
     return () => {
@@ -230,6 +256,20 @@ export default function TVLightweightChart({
 
   }, [tradingOverlays]);
 
+  // Dynamic polling intervals based on timeframe
+  const getPollingInterval = (timeframe: string) => {
+    const intervals: Record<string, number> = {
+      '1m': 15000,   // 15 seconds
+      '5m': 30000,   // 30 seconds
+      '15m': 60000,  // 1 minute
+      '30m': 120000, // 2 minutes
+      '1h': 180000,  // 3 minutes
+      '4h': 300000,  // 5 minutes
+      '1d': 600000   // 10 minutes
+    };
+    return intervals[timeframe] || 60000;
+  };
+
   // Fetch AI analysis for risk badges and overlays
   useEffect(() => {
     const fetchAnalysis = async () => {
@@ -250,11 +290,31 @@ export default function TVLightweightChart({
     };
 
     if (live) {
+      const pollingInterval = getPollingInterval(tf);
       fetchAnalysis();
-      const interval = setInterval(fetchAnalysis, 30000); // Update every 30s
+      const interval = setInterval(fetchAnalysis, pollingInterval); // Dynamic polling based on timeframe
       return () => clearInterval(interval);
     }
   }, [symbol, tf, live]);
+
+  // Update freshness indicator every second
+  useEffect(() => {
+    if (!live) return;
+    
+    const timer = setInterval(() => {
+      const ageSeconds = Math.round((Date.now() - lastUpdate) / 1000);
+      
+      if (ageSeconds < 30) {
+        setDataFreshness('fresh');
+      } else if (ageSeconds < 120) {
+        setDataFreshness('recent');
+      } else {
+        setDataFreshness('stale');
+      }
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [live, lastUpdate]);
 
   const getRiskBadgeIcon = (type: string) => {
     switch (type) {
@@ -297,6 +357,20 @@ export default function TVLightweightChart({
               {badge.type.replace('_', ' ')}
             </Badge>
           ))}
+        </div>
+      )}
+      
+      {/* Live data freshness indicator */}
+      {live && (
+        <div className="absolute top-2 right-2 flex items-center gap-2 bg-background/80 backdrop-blur-sm px-2 py-1 rounded-md border">
+          <div className={`h-2 w-2 rounded-full ${
+            dataFreshness === 'fresh' ? 'bg-green-500 animate-pulse' :
+            dataFreshness === 'recent' ? 'bg-yellow-500' :
+            'bg-red-500'
+          }`} />
+          <span className="text-xs text-muted-foreground">
+            {Math.round((Date.now() - lastUpdate) / 1000)}s ago
+          </span>
         </div>
       )}
     </div>

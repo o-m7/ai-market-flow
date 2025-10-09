@@ -177,11 +177,14 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { symbol, timeframe, market, candles, currentPrice, news, quantMetrics, debug } = body || {};
+    const { symbol, timeframe, market, candles, currentPrice, snapshotTimeUTC, news, quantMetrics, debug } = body || {};
 
     console.log(`[ai-analyze v${FUNCTION_VERSION}] Processing analysis request: ${symbol} (${timeframe}, ${market})`);
     if (currentPrice) {
       console.log(`[ai-analyze] Live price provided: ${currentPrice}`);
+    }
+    if (snapshotTimeUTC) {
+      console.log(`[ai-analyze] Snapshot timestamp provided: ${snapshotTimeUTC}`);
     }
 
     // Debug endpoint
@@ -419,9 +422,32 @@ CRITICAL RULES:
     const dataAgeSeconds = Math.round((Date.now() - latestCandleTime) / 1000);
     const dataAgeMinutes = (dataAgeSeconds / 60).toFixed(2);
     
+    // Check for snapshot timestamp for more accurate freshness validation
+    let effectiveAgeSeconds = dataAgeSeconds;
+    let effectiveAgeMinutes = dataAgeMinutes;
+    
+    if (snapshotTimeUTC) {
+      const snapshotTime = new Date(snapshotTimeUTC).getTime();
+      const snapshotAgeSeconds = Math.round((Date.now() - snapshotTime) / 1000);
+      const snapshotAgeMinutes = (snapshotAgeSeconds / 60).toFixed(2);
+      
+      console.log(`[VALIDATION] 📸 Snapshot detected:`);
+      console.log(`  - Snapshot time: ${snapshotTimeUTC}`);
+      console.log(`  - Snapshot age: ${snapshotAgeSeconds}s (${snapshotAgeMinutes} minutes)`);
+      
+      // If snapshot is fresher than 2 minutes, use it for freshness validation
+      if (snapshotAgeSeconds < 120) {
+        console.log(`[VALIDATION] ✅ Using snapshot timestamp for freshness (< 2min old)`);
+        effectiveAgeSeconds = snapshotAgeSeconds;
+        effectiveAgeMinutes = snapshotAgeMinutes;
+      } else {
+        console.log(`[VALIDATION] ⚠️  Snapshot is stale (${snapshotAgeMinutes}min), using candle timestamp`);
+      }
+    }
+    
     console.log(`[VALIDATION] 📊 Data Freshness Check:`);
     console.log(`  - Latest candle: ${new Date(latestCandleTime).toISOString()}`);
-    console.log(`  - Data age: ${dataAgeSeconds}s (${dataAgeMinutes} minutes)`);
+    console.log(`  - Effective data age: ${effectiveAgeSeconds}s (${effectiveAgeMinutes} minutes)`);
     
     // TIMEFRAME-AWARE FRESHNESS CHECK
     // Adjust threshold based on timeframe (allow slightly more than the candle interval)
@@ -440,20 +466,20 @@ CRITICAL RULES:
     
     // Calculate freshness score relative to timeframe (lose 15 points per minute beyond half the threshold)
     const halfThreshold = maxAgeSeconds / 2;
-    const freshness_score = Math.max(0, 100 - Math.max(0, (dataAgeSeconds - halfThreshold) / 60) * 15);
+    const freshness_score = Math.max(0, 100 - Math.max(0, (effectiveAgeSeconds - halfThreshold) / 60) * 15);
     console.log(`  - Freshness score: ${freshness_score.toFixed(2)}/100 (${timeframe} threshold: ${freshnessThreshold.toFixed(1)}min)`);
     
     // Critical: Block analysis only if data is VERY stale (exceeds timeframe threshold)
-    if (dataAgeSeconds > maxAgeSeconds) {
-      console.error(`[VALIDATION] ❌ CRITICAL: Data is ${dataAgeMinutes} minutes old (>${freshnessThreshold.toFixed(1)}min threshold for ${timeframe}). Analysis blocked.`);
+    if (effectiveAgeSeconds > maxAgeSeconds) {
+      console.error(`[VALIDATION] ❌ CRITICAL: Data is ${effectiveAgeMinutes} minutes old (>${freshnessThreshold.toFixed(1)}min threshold for ${timeframe}). Analysis blocked.`);
       return new Response(JSON.stringify({ 
         error: "Data too stale for accurate analysis",
-        data_age_seconds: dataAgeSeconds,
-        data_age_minutes: parseFloat(dataAgeMinutes),
+        data_age_seconds: effectiveAgeSeconds,
+        data_age_minutes: parseFloat(effectiveAgeMinutes),
         freshness_score: Math.round(freshness_score),
         timeframe,
         max_age_minutes: freshnessThreshold,
-        message: `Market data is ${dataAgeMinutes} minutes old. For ${timeframe} analysis, data must be less than ${freshnessThreshold.toFixed(1)} minutes old. Please refresh and try again.`,
+        message: `Market data is ${effectiveAgeMinutes} minutes old. For ${timeframe} analysis, data must be less than ${freshnessThreshold.toFixed(1)} minutes old. Please refresh and try again.`,
         timestamp: new Date().toISOString()
       }), {
         status: 422,
@@ -462,7 +488,7 @@ CRITICAL RULES:
     }
     
     if (freshness_score < 70) {
-      console.warn(`[VALIDATION] ⚠️  DATA STALENESS WARNING: Score ${freshness_score.toFixed(2)} < 70 (data is ${dataAgeMinutes} minutes old for ${timeframe} timeframe)`);
+      console.warn(`[VALIDATION] ⚠️  DATA STALENESS WARNING: Score ${freshness_score.toFixed(2)} < 70 (data is ${effectiveAgeMinutes} minutes old for ${timeframe} timeframe)`);
     } else {
       console.log(`[VALIDATION] ✅ Data is fresh for ${timeframe} timeframe`);
     }
