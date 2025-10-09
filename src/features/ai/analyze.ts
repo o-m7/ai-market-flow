@@ -147,7 +147,7 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
   console.log('[analyze] Calling ai-analyze with', freshCandles.length, 'candles, currentPrice:', currentPrice);
 
   const analysisController = new AbortController();
-  const analysisTimeout = setTimeout(() => analysisController.abort(), 45000); // 45s timeout for AI analysis
+  const analysisTimeout = setTimeout(() => analysisController.abort(), 90000); // 90s timeout for AI analysis
 
   try {
     const r = await fetch(url, { 
@@ -170,7 +170,7 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
   } catch (err) {
     clearTimeout(analysisTimeout);
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('AI analysis timed out after 45 seconds. Please try again.');
+      throw new Error('AI analysis is taking longer than expected. The analysis is still processing. Please wait a moment and check your analysis history.');
     }
     throw err;
   }

@@ -573,8 +573,10 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
 
     console.log('[ai-analyze] Calling OpenAI with function calling...');
     
-    const response = await client.chat.completions.create({
-      model: "gpt-4o",
+    // Add timeout wrapper for OpenAI call
+    const openaiTimeout = 60000; // 60 second timeout for OpenAI
+    const openaiPromise = client.chat.completions.create({
+      model: "gpt-4o-mini", // Use faster model to reduce latency
       messages: [
         { 
           role: "system", 
@@ -590,6 +592,12 @@ CRITICAL: You MUST provide a trade_idea with direction "long" or "short" (never 
       max_tokens: 4096,
       temperature: 0.7,
     });
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('OpenAI API timeout after 60 seconds')), openaiTimeout);
+    });
+
+    const response = await Promise.race([openaiPromise, timeoutPromise]);
 
     const toolCall = response.choices?.[0]?.message?.tool_calls?.[0];
     
