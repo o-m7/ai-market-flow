@@ -551,8 +551,8 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </CardContent>
       </Card>
 
-      {/* Trading Signals - Only show once using fresh AI data */}
-      {includeQuantSignals && (
+      {/* Trading Signals - Only show when data exists and is not hold */}
+      {includeQuantSignals && data.timeframe_profile && data.recommendation !== 'hold' && data.action !== 'hold' && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
@@ -560,24 +560,10 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
               TRADING SIGNALS - ALL TIMEFRAMES
             </CardTitle>
             <p className="text-xs font-mono-tabular text-terminal-secondary mt-2">
-              {data.timestamp ? `Generated: ${new Date(data.timestamp).toLocaleTimeString()}` : 'Awaiting analysis'}
+              Generated: {new Date(data.timestamp).toLocaleTimeString()}
             </p>
           </CardHeader>
           <CardContent className="pt-4">
-            {/* Show message if no signals available (market closed, hold signal, or error) */}
-            {(!data.timeframe_profile && !data.trade_idea?.entry) || data.recommendation === 'hold' || data.action === 'hold' ? (
-              <div className="py-6 text-center space-y-2">
-                <TrendingUp className="h-8 w-8 mx-auto opacity-50 text-terminal-secondary" />
-                <p className="text-sm font-mono-tabular text-terminal-secondary">
-                  {data.holdReason || data.analysis || 'No trading signals - Market conditions unclear or market closed'}
-                </p>
-                {(data.analysis?.includes('closed') || data.analysis?.includes('weekend')) && (
-                  <p className="text-xs font-mono-tabular text-terminal-secondary/70 mt-2">
-                    💡 Try a 24/7 crypto symbol like BTC/USD or ETH/USD
-                  </p>
-                )}
-              </div>
-            ) : (
             <div className="space-y-4">
               {/* Helper function to determine if signal is long or short */}
               {(() => {
@@ -846,10 +832,9 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                       </div>
                     )}
                   </>
-                  );
-                })()}
-              </div>
-            )}
+                );
+              })()}
+            </div>
           </CardContent>
         </Card>
       )}
