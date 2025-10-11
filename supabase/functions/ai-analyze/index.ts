@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.7.1"; // Added lenient forex data freshness thresholds (24/5 markets)
+const FUNCTION_VERSION = "2.7.2"; // Force redeploy - forex 6x threshold multiplier
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
