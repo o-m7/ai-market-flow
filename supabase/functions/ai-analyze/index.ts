@@ -332,15 +332,21 @@ AI DECISION-MAKING INSTRUCTIONS:
    ⚪ Major event risk with unclear impact
 
 5. SET ENTRY/STOP/TARGETS:
-   For LONG trades:
-   - Entry: At or slightly above current price (buy breakout) or at support below
-   - Stop: Below recent swing low minus 1.5 ATR
-   - Targets: At resistance levels above entry (R:R ≥ 2.0)
-   
-   For SHORT trades:
-   - Entry: At or slightly below current price (sell breakdown) or at resistance above
-   - Stop: Above recent swing high plus 1.5 ATR
-   - Targets: At support levels below entry (R:R ≥ 2.0)
+    For LONG trades (BUY):
+    - Entry: At or slightly above current price
+    - Stop: Below recent swing low minus 1.5 ATR
+    - Target 1: Nearest resistance above entry (R:R ≥ 2.0)
+    - Target 2: Next major resistance above Target 1 (R:R ≥ 3.0)
+    - Target 3: Major resistance or extension level (R:R ≥ 4.0)
+    - ALL TARGETS MUST BE ABOVE ENTRY PRICE
+    
+    For SHORT trades (SELL):
+    - Entry: At or slightly below current price
+    - Stop: Above recent swing high plus 1.5 ATR
+    - Target 1: Nearest support below entry (R:R ≥ 2.0)
+    - Target 2: Next major support below Target 1 (R:R ≥ 3.0)
+    - Target 3: Major support or extension level (R:R ≥ 4.0)
+    - ALL TARGETS MUST BE BELOW ENTRY PRICE
 
 CRITICAL VALIDATION RULES:
 ✅ LONG means BUYING (expecting UP) - entry ≤ current price, targets > entry

@@ -24,51 +24,55 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
   const [quantSignals, setQuantSignals] = React.useState<any>(null);
   const [quantMetrics, setQuantMetrics] = React.useState<any>(null);
   
+  // Don't fetch separate quant signals - use data from AI analysis
+  // This prevents showing stale/cached data
   React.useEffect(() => {
     if (includeQuantSignals) {
-      const fetchQuantSignals = async () => {
-        try {
-          const { supabase } = await import('@/integrations/supabase/client');
-          const timeframeMap: Record<string, string> = {
-            '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
-            '60': '1h', '240': '4h', 'D': '1d'
-          };
-          console.log('[AnalysisResults] Fetching quant-data for', symbol, timeframeMap[timeframe]);
-          const { data: response, error } = await supabase.functions.invoke('quant-data', {
-            body: { symbol, tf: timeframeMap[timeframe] || '1h', withSummary: false }
-          });
-          console.log('[AnalysisResults] Quant-data response:', response, 'Error:', error);
-          
-          if (!error && response) {
-            setQuantSignals(response.timeframe_profile);
-            // Store all the raw quant data including variance
-            const metrics = {
-              rsi14: response.rsi14,
-              ema20: response.ema?.['20'],
-              ema50: response.ema?.['50'],
-              ema200: response.ema?.['200'],
-              atr14: response.atr14,
-              zscore20: response.zscore20,
-              vol20_annual: response.vol20_annual,
-              vwap: response.vwap,
-              macd: response.macd,
-              bb20: response.bb20,
-              donchian20: response.donchian20,
-              ...response.quant_metrics // sharpe, sortino, alpha, beta, std_dev, etc.
+      // Only fetch quant metrics if they're not already in the analysis data
+      if (!data.technical) {
+        const fetchQuantMetrics = async () => {
+          try {
+            const { supabase } = await import('@/integrations/supabase/client');
+            const timeframeMap: Record<string, string> = {
+              '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
+              '60': '1h', '240': '4h', 'D': '1d'
             };
-            console.log('[AnalysisResults] Setting quant metrics:', metrics);
-            setQuantMetrics(metrics);
+            const { data: response, error } = await supabase.functions.invoke('quant-data', {
+              body: { symbol, tf: timeframeMap[timeframe] || '1h', withSummary: false }
+            });
+            
+            if (!error && response) {
+              const metrics = {
+                rsi14: response.rsi14,
+                ema20: response.ema?.['20'],
+                ema50: response.ema?.['50'],
+                ema200: response.ema?.['200'],
+                atr14: response.atr14,
+                zscore20: response.zscore20,
+                vol20_annual: response.vol20_annual,
+                vwap: response.vwap,
+                macd: response.macd,
+                bb20: response.bb20,
+                donchian20: response.donchian20,
+                ...response.quant_metrics
+              };
+              setQuantMetrics(metrics);
+            }
+          } catch (e) {
+            console.error('Failed to fetch quant metrics:', e);
           }
-        } catch (e) {
-          console.error('Failed to fetch quant signals:', e);
-        }
-      };
-      fetchQuantSignals();
+        };
+        fetchQuantMetrics();
+      } else {
+        // Use technical data from AI analysis
+        setQuantMetrics(null);
+      }
     } else {
-      setQuantSignals(null);
       setQuantMetrics(null);
     }
-  }, [symbol, timeframe, includeQuantSignals]);
+    // Always clear quantSignals - use AI analysis data instead
+    setQuantSignals(null);
+  }, [symbol, timeframe, includeQuantSignals, data.technical]);
   
   const getRecommendationColor = (rec: string) => {
     switch (rec) {
@@ -178,7 +182,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                  '⏸️ HOLD'}
               </Badge>
               <div className="text-xs font-mono-tabular text-terminal-secondary">
-                CONFIDENCE: {data.recommendation === 'hold' ? '0' : Math.round((data.confidence_calibrated || data.confidence || 50) * 100)}%
+                CONFIDENCE: {data.recommendation === 'hold' ? '0' : Math.round((data.confidence_calibrated || data.confidence || 0.5))}%
               </div>
             </div>
           </div>
@@ -573,9 +577,25 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
             <div className="space-y-4">
               {/* Helper function to determine if signal is long or short */}
               {(() => {
-                // Use quant signals
-                const signalsToUse = quantSignals;
-                if (!signalsToUse) return null;
+                // CRITICAL: Only use fresh AI analysis data, never cached quant signals
+                const signalsToUse: any = {};
+                
+                if (data.timeframe_profile) {
+                  // Use AI-generated timeframe profile from the fresh analysis
+                  signalsToUse.scalp = data.timeframe_profile.scalp;
+                  signalsToUse.intraday = data.timeframe_profile.intraday;
+                  signalsToUse.swing = data.timeframe_profile.swing;
+                } else if (data.trade_idea && data.trade_idea.entry) {
+                  // Fallback: Use main trade idea for all timeframes
+                  signalsToUse.scalp = data.trade_idea;
+                  signalsToUse.intraday = data.trade_idea;
+                  signalsToUse.swing = data.trade_idea;
+                }
+                
+                // If no signals available, don't show this section
+                if (!signalsToUse.scalp && !signalsToUse.intraday && !signalsToUse.swing) {
+                  return null;
+                }
                 
                 // Check for hold signal first - if recommendation is hold, don't show signals
                 if (data.recommendation === 'hold' || data.action === 'hold') {
