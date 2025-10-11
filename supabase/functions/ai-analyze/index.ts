@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.7.3"; // Fixed response field names - added 'signal' field for frontend compatibility
+const FUNCTION_VERSION = "2.7.4"; // Fixed forex candle data undefined checks
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -565,6 +565,24 @@ AI DECISION-MAKING INSTRUCTIONS:
       return new Response(JSON.stringify({ 
         error: "AI returned invalid function arguments",
         details: toolCall.function.arguments.slice(0, 200)
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Validate that parsed result has required fields
+    if (!parsed.trade_idea || !parsed.trade_idea.direction) {
+      console.error('[ai-analyze] AI response missing trade_idea or direction:', JSON.stringify(parsed, null, 2).slice(0, 500));
+      return new Response(JSON.stringify({ 
+        error: "AI response missing trade_idea structure",
+        details: "The AI model did not return a properly structured trade recommendation. This may be due to insufficient data or model constraints.",
+        debug: {
+          hasSummary: !!parsed.summary,
+          hasAction: !!parsed.action,
+          hasTradeIdea: !!parsed.trade_idea,
+          hasDirection: !!parsed.trade_idea?.direction
+        }
       }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -1736,8 +1754,16 @@ function findSupportLevels(candles: any[], currentPrice: number): number[] {
   const pivots: Array<{price: number, strength: number}> = [];
   for (let i = 3; i < recentCandles.length - 3; i++) {
     const candle = recentCandles[i];
-    const prevCandles = recentCandles.slice(i-3, i);
-    const nextCandles = recentCandles.slice(i+1, i+4);
+    
+    // Safety check: ensure candle has required properties
+    if (!candle || typeof candle.l !== 'number' || typeof candle.c !== 'number') {
+      continue;
+    }
+    
+    const prevCandles = recentCandles.slice(i-3, i).filter(c => c && typeof c.l === 'number');
+    const nextCandles = recentCandles.slice(i+1, i+4).filter(c => c && typeof c.l === 'number' && typeof c.c === 'number');
+    
+    if (prevCandles.length === 0 || nextCandles.length === 0) continue;
     
     // Check if it's a swing low
     if (candle.l < Math.min(...prevCandles.map(c => c.l)) && 
