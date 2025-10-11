@@ -771,41 +771,35 @@ function generateTradingSignals(
   const majorSupport = recentLows[Math.floor(recentLows.length * 0.25)]; // 25th percentile
   const majorResistance = recentHighs[Math.floor(recentHighs.length * 0.25)];
 
-  // === STEP 3: REALISTIC entries based on CURRENT LIVE PRICE ===
+  // === STEP 3: REALISTIC entries based on ACTUAL LIVE PRICE ===
   const direction = isLong ? 'LONG' : 'SHORT';
   
-  // SCALP: Entry VERY close to current market price (within 0.1%)
-  const scalpEntry = isLong 
-    ? Math.min(price, price * 1.001) // At or slightly above current
-    : Math.max(price, price * 0.999); // At or slightly below current
+  // SCALP: Entry AT current live market price (immediate execution)
+  const scalpEntry = price; // Enter AT current live price
   const scalpStop = isLong 
-    ? Math.max(scalpEntry - (atr * 0.3), nearestSupport * 0.998) // Near support OR 0.3 ATR
-    : Math.min(scalpEntry + (atr * 0.3), nearestResistance * 1.002);
+    ? Math.max(scalpEntry - (atr * 0.5), nearestSupport) // 0.5 ATR or nearest support
+    : Math.min(scalpEntry + (atr * 0.5), nearestResistance);
   const scalpTargets = isLong
-    ? [price + (atr * 0.8), price + (atr * 1.2), bb.upper * 0.998]
-    : [price - (atr * 0.8), price - (atr * 1.2), bb.lower * 1.002];
+    ? [scalpEntry + (atr * 1.0), scalpEntry + (atr * 1.5), scalpEntry + (atr * 2.0)]
+    : [scalpEntry - (atr * 1.0), scalpEntry - (atr * 1.5), scalpEntry - (atr * 2.0)];
   
-  // INTRADAY: Entry at pullback to EMA20 or current price (within 0.5%)
-  const intradayEntry = isLong 
-    ? Math.min(price * 1.003, ema20, bb.mid) // Max 0.3% above current
-    : Math.max(price * 0.997, ema20, bb.mid); // Max 0.3% below current
+  // INTRADAY: Entry AT current price, stop at structure
+  const intradayEntry = price; // Enter AT current live price
   const intradayStop = isLong
-    ? Math.max(intradayEntry - (atr * 1.2), majorSupport * 0.997) // At major support
-    : Math.min(intradayEntry + (atr * 1.2), majorResistance * 1.003);
+    ? Math.max(intradayEntry - (atr * 1.5), majorSupport) // 1.5 ATR or major support
+    : Math.min(intradayEntry + (atr * 1.5), majorResistance);
   const intradayTargets = isLong
-    ? [price + (atr * 2), majorResistance * 0.995, bb.upper]
-    : [price - (atr * 2), majorSupport * 1.005, bb.lower];
+    ? [intradayEntry + (atr * 2.0), intradayEntry + (atr * 3.0), intradayEntry + (atr * 4.0)]
+    : [intradayEntry - (atr * 2.0), intradayEntry - (atr * 3.0), intradayEntry - (atr * 4.0)];
   
-  // SWING: Entry at major structure point (within 2% of current)
-  const swingEntry = isLong 
-    ? Math.min(price * 1.01, ema50, majorSupport * 1.003) // Max 1% above current
-    : Math.max(price * 0.99, ema50, majorResistance * 0.997); // Max 1% below current
+  // SWING: Entry AT current price, wider stops
+  const swingEntry = price; // Enter AT current live price
   const swingStop = isLong
-    ? Math.max(swingEntry - (atr * 2), donchian.low * 0.995) // At Donchian low
-    : Math.min(swingEntry + (atr * 2), donchian.high * 1.005);
+    ? Math.max(swingEntry - (atr * 2.5), donchian.low) // 2.5 ATR or Donchian low
+    : Math.min(swingEntry + (atr * 2.5), donchian.high);
   const swingTargets = isLong
-    ? [majorResistance, donchian.high * 0.995, donchian.high * 1.01]
-    : [majorSupport, donchian.low * 1.005, donchian.low * 0.99];
+    ? [swingEntry + (atr * 3.5), swingEntry + (atr * 5.0), swingEntry + (atr * 7.0)]
+    : [swingEntry - (atr * 3.5), swingEntry - (atr * 5.0), swingEntry - (atr * 7.0)];
 
   const trendDesc = isLong ? 'uptrend' : 'downtrend';
   

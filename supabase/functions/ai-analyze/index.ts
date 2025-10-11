@@ -930,39 +930,33 @@ AI DECISION-MAKING INSTRUCTIONS:
       console.log(`  - Original Stop: ${tfStop?.toFixed(2)}`);
       console.log(`  - Original Targets: [${tfTargets.map((t: number) => t?.toFixed(2)).join(', ')}]`);
       
-      // Check if entry is too far from current price using strict thresholds per timeframe
+      // ALWAYS correct entries to use EXACT live price regardless of how close AI got
+      // This ensures all signals are executable at current market conditions
       const entryDiffPercent = Math.abs((tfEntry - livePrice) / livePrice * 100);
-      console.log(`  - Entry difference from current: ${entryDiffPercent.toFixed(2)}%`);
-      console.log(`  - Current live price for validation: ${livePrice.toFixed(2)}`);
+      console.log(`  - Entry difference from current: ${entryDiffPercent.toFixed(3)}%`);
+      console.log(`  - Current live price: ${livePrice.toFixed(2)}`);
+      console.log(`  - FORCING entry to match live price for accurate signals`);
       
-      // Strict thresholds matching prompt: SCALP 0.1%, INTRADAY 0.3%, SWING 0.5%
-      const maxAllowedPercent = tf === 'scalp' ? 0.1 : tf === 'intraday' ? 0.3 : 0.5;
-      console.log(`  - Max allowed deviation for ${tf.toUpperCase()}: ${maxAllowedPercent}%`);
-      
-      if (entryDiffPercent > maxAllowedPercent) {
-        console.warn(`[VALIDATION] ❌ ${tf.toUpperCase()} entry ${tfEntry?.toFixed(2)} is ${entryDiffPercent.toFixed(2)}% away from current price ${livePrice.toFixed(2)} - CORRECTING`);
+      if (true) { // Always correct to ensure accuracy
+        console.log(`[VALIDATION] 🔧 ${tf.toUpperCase()} CORRECTING entry from ${tfEntry?.toFixed(2)} to live price ${livePrice.toFixed(2)}`);
         
-        // Correct entry to be near current price based on trade direction
-        let correctedEntry = livePrice;
-        if (tradeDirection === 'long') {
-          // For LONG, entry should be at or slightly below current
-          correctedEntry = livePrice * 0.999; // 0.1% below
-        } else if (tradeDirection === 'short') {
-          // For SHORT, entry should be at or slightly above current
-          correctedEntry = livePrice * 1.001; // 0.1% above
-        }
+        // Set entry to EXACT live price for immediate market execution
+        const correctedEntry = livePrice;
         
-        // Recalculate stop and targets based on trade direction and timeframe
-        const atrMultiplier = tf === 'scalp' ? 0.4 : tf === 'intraday' ? 1.2 : 1.8;
-        const targetPercents = tf === 'scalp' ? [0.5, 1.0, 1.5] : tf === 'intraday' ? [1.5, 2.5, 3.5] : [3.0, 5.0, 7.0];
+        // Calculate stop and targets from current price using ATR
+        const atrValue = atr || (livePrice * 0.02); // Use 2% if ATR is 0
+        const atrMultiplier = tf === 'scalp' ? 0.5 : tf === 'intraday' ? 1.5 : 2.5;
+        const targetMultipliers = tf === 'scalp' ? [1.0, 1.5, 2.0] : tf === 'intraday' ? [2.0, 3.0, 4.0] : [3.5, 5.0, 7.0];
         
         let correctedStop, correctedTargets;
         if (tradeDirection === 'long') {
-          correctedStop = correctedEntry * (1 - (atr / correctedEntry) * atrMultiplier);
-          correctedTargets = targetPercents.map(pct => correctedEntry * (1 + pct/100));
+          // LONG: stop below, targets above
+          correctedStop = correctedEntry - (atrValue * atrMultiplier);
+          correctedTargets = targetMultipliers.map(mult => correctedEntry + (atrValue * mult));
         } else {
-          correctedStop = correctedEntry * (1 + (atr / correctedEntry) * atrMultiplier);
-          correctedTargets = targetPercents.map(pct => correctedEntry * (1 - pct/100));
+          // SHORT: stop above, targets below
+          correctedStop = correctedEntry + (atrValue * atrMultiplier);
+          correctedTargets = targetMultipliers.map(mult => correctedEntry - (atrValue * mult));
         }
         
         console.log(`[VALIDATION] 🔧 ${tf.toUpperCase()} CORRECTED:`);
@@ -978,9 +972,6 @@ AI DECISION-MAKING INSTRUCTIONS:
         };
         
         timeframeCorrections++;
-      } else {
-        console.log(`[VALIDATION] ✅ ${tf.toUpperCase()} signal is valid (within 2% of current price)`);
-        correctedTimeframeProfile[tf] = signal;
       }
     });
     
