@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.6.4"; // Fixed duplicate variable declarations
+const FUNCTION_VERSION = "2.6.5"; // Fixed undefined template variable examples in prompt
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -424,7 +424,7 @@ AI DECISION-MAKING INSTRUCTIONS:
    - Targets: 2-3 levels within 0.5-1.5% of entry (quick profits)
    - Strategy: Describe current micro-momentum and immediate price action expected
    - Probability: 60-75% (higher confidence for short-term moves)
-   - Example SHORT: entry=${livePrice}, stop=${livePrice + atr*0.4}, targets=[${livePrice - livePrice*0.005}, ${livePrice - livePrice*0.01}]
+   - Example SHORT: entry at current price, stop 0.4 ATR above entry, targets 0.5% and 1.0% below entry
    
    **INTRADAY (15min-4hr):**
    - Entry: ${livePrice} ± 0.3% (near current price)
@@ -432,7 +432,7 @@ AI DECISION-MAKING INSTRUCTIONS:
    - Targets: 2-3 levels at key support/resistance (1-3% moves)
    - Strategy: Describe current trend and session expectations
    - Probability: 55-70% (moderate confidence)
-   - Example SHORT: entry=${livePrice}, stop=${livePrice + atr*1.2}, targets=[${support1}, ${support2}] where supports are BELOW ${livePrice}
+   - Example SHORT: entry at current price, stop 1.2 ATR above entry, targets at nearest support levels BELOW current price
    
    **SWING (4hr-Daily):**
    - Entry: ${livePrice} ± 0.5% (reasonable distance from current)
@@ -440,7 +440,7 @@ AI DECISION-MAKING INSTRUCTIONS:
    - Targets: 2-3 major levels (3-8% moves)
    - Strategy: Describe current structure and multi-day outlook
    - Probability: 50-65% (lower confidence for longer-term)
-   - Example SHORT: entry=${livePrice}, stop=${livePrice + atr*1.8}, targets=[${majorSupport1}, ${majorSupport2}, ${majorSupport3}] where ALL are BELOW ${livePrice}
+   - Example SHORT: entry at current price, stop 1.8 ATR above entry, targets at major support levels ALL BELOW current price
    
    ⚠️ FOR SHORT TRADES: ALL targets must be BELOW entry/current price
    ⚠️ FOR LONG TRADES: ALL targets must be ABOVE entry/current price
