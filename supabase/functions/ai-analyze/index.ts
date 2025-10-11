@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.6.3"; // Fixed undefined template variables in prompt
+const FUNCTION_VERSION = "2.6.4"; // Fixed duplicate variable declarations
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -896,11 +896,8 @@ AI DECISION-MAKING INSTRUCTIONS:
     // ==================== SIGNAL CONFIDENCE AGREEMENT SCORE ====================
     console.log(`[VALIDATION] 🎯 Signal Confidence Agreement Analysis:`);
     
-    const ema20 = features.technical.ema20;
-    const ema50 = features.technical.ema50;
-    const ema200 = features.technical.ema200;
+    // Use already-declared variables from earlier in the function
     const macd_hist = features.technical.macd.hist;
-    const rsi = features.technical.rsi14;
     
     console.log(`  - Technical Indicators:`);
     console.log(`    • Current Price: ${livePrice.toFixed(2)}`);
