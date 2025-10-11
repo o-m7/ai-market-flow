@@ -93,6 +93,24 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
     } else {
       const errorText = await liveDataResponse.text();
       console.error('[analyze] Live data fetch failed:', liveDataResponse.status, errorText);
+      
+      // Check if it's a "no data available" error from Polygon
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error === 'polygon_no_results') {
+          throw new Error(`No market data available for ${payload.symbol}. This symbol may not be trading right now (market closed or weekend).`);
+        }
+      } catch (parseErr) {
+        // If we can't parse the error, throw a generic message
+        if (parseErr instanceof Error && parseErr.message.includes('No market data')) {
+          throw parseErr; // Re-throw our custom error
+        }
+      }
+      
+      // If we have no candles at all, we can't proceed
+      if (!payload.candles || payload.candles.length === 0) {
+        throw new Error(`Unable to fetch market data for ${payload.symbol}. The market may be closed or data unavailable.`);
+      }
     }
   } catch (err) {
     console.error('[analyze] Failed to fetch fresh candles:', err);
