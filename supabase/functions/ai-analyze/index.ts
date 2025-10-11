@@ -292,6 +292,14 @@ serve(async (req) => {
     const latestCandleTime = candles[candles.length - 1]?.t || Date.now();
     const candleAge = Math.round((Date.now() - latestCandleTime) / 1000); // seconds
     
+    // Extract technical indicators for template variables
+    const ema20 = features.technical.ema20 || 0;
+    const ema50 = features.technical.ema50 || 0;
+    const ema200 = features.technical.ema200 || 0;
+    const rsi = features.technical.rsi14 || 50;
+    const macd = features.technical.macd?.hist || 0;
+    const atr = features.technical.atr14 || 0;
+    
     console.log(`[ai-analyze] Using ${candles.length} candles, latest from ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)`);
     
     // AI-Driven prompt integrating news sentiment into signals
@@ -333,7 +341,7 @@ CRITICAL DIRECTION DEFINITIONS:
 
 CURRENT MARKET STATE (AS OF RIGHT NOW):
 - Live Price: ${livePrice} (THIS IS THE CURRENT PRICE - DO NOT USE OLD PRICES)
-- Latest Candle Time: ${candleTime} (THIS IS THE MOST RECENT DATA POINT)
+- Latest Candle Time: ${new Date(latestCandleTime).toISOString()} (THIS IS THE MOST RECENT DATA POINT)
 - Current Technical Readings: EMA20=${ema20}, EMA50=${ema50}, EMA200=${ema200}, RSI=${rsi}, MACD=${macd}
 
 ⚠️ YOU MUST GENERATE PREDICTIONS FOR THE FUTURE BASED ON THE CURRENT STATE ABOVE
