@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.6.7"; // Fixed timeframe_profile signals using old prices - added validation and correction
+const FUNCTION_VERSION = "2.6.8"; // Fixed timeframe validation - always apply corrected profile, tightened threshold to 2%
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -837,11 +837,11 @@ AI DECISION-MAKING INSTRUCTIONS:
       console.log(`  - Original Stop: ${tfStop?.toFixed(2)}`);
       console.log(`  - Original Targets: [${tfTargets.map((t: number) => t?.toFixed(2)).join(', ')}]`);
       
-      // Check if entry is too far from current price (more than 5% away)
+      // Check if entry is too far from current price (more than 2% away)
       const entryDiffPercent = Math.abs((tfEntry - livePrice) / livePrice * 100);
       console.log(`  - Entry difference from current: ${entryDiffPercent.toFixed(2)}%`);
       
-      if (entryDiffPercent > 5) {
+      if (entryDiffPercent > 2) {
         console.warn(`[VALIDATION] ❌ ${tf.toUpperCase()} entry ${tfEntry?.toFixed(2)} is ${entryDiffPercent.toFixed(2)}% away from current price ${livePrice.toFixed(2)} - CORRECTING`);
         
         // Correct entry to be near current price based on trade direction
@@ -881,16 +881,18 @@ AI DECISION-MAKING INSTRUCTIONS:
         
         timeframeCorrections++;
       } else {
-        console.log(`[VALIDATION] ✅ ${tf.toUpperCase()} signal is valid (within 5% of current price)`);
+        console.log(`[VALIDATION] ✅ ${tf.toUpperCase()} signal is valid (within 2% of current price)`);
         correctedTimeframeProfile[tf] = signal;
       }
     });
     
+    // ALWAYS apply the corrected profile (even if no corrections, to ensure consistency)
+    parsed.timeframe_profile = correctedTimeframeProfile;
+    
     if (timeframeCorrections > 0) {
       console.log(`[VALIDATION] 🔧 Applied ${timeframeCorrections} timeframe signal corrections`);
-      parsed.timeframe_profile = correctedTimeframeProfile;
     } else {
-      console.log(`[VALIDATION] ✅ All timeframe signals are valid`);
+      console.log(`[VALIDATION] ✅ All timeframe signals were already valid`);
     }
     
     // ==================== ENTRY PRICE CORRECTION ====================
