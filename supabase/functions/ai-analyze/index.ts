@@ -147,12 +147,63 @@ const InstitutionalTaResultSchema = {
       confidence_calibrated: { type: "number", minimum: 0, maximum: 100 },
       evidence: { type: "array", items: { type: "string" }, description: "Supporting evidence" },
       risks: { type: "string", description: "Risk factors and mitigation" },
+      timeframe_profile: {
+        type: "object",
+        description: "Timeframe-specific trade predictions based on CURRENT price and indicators",
+        properties: {
+          scalp: {
+            type: "object",
+            properties: {
+              entry: { type: "number", description: "Entry near current price for scalp trade" },
+              stop: { type: "number", description: "Stop loss for scalp timeframe" },
+              targets: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 3, description: "2-3 targets in correct direction from entry" },
+              strategy: { type: "string", description: "Scalp strategy based on CURRENT momentum" },
+              probability: { type: "number", minimum: 0, maximum: 100, description: "Win probability %" }
+            },
+            required: ["entry", "stop", "targets", "strategy", "probability"]
+          },
+          intraday: {
+            type: "object",
+            properties: {
+              entry: { type: "number", description: "Entry near current price for intraday trade" },
+              stop: { type: "number", description: "Stop loss for intraday timeframe" },
+              targets: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 3, description: "2-3 targets in correct direction from entry" },
+              strategy: { type: "string", description: "Intraday strategy based on CURRENT trend" },
+              probability: { type: "number", minimum: 0, maximum: 100, description: "Win probability %" }
+            },
+            required: ["entry", "stop", "targets", "strategy", "probability"]
+          },
+          swing: {
+            type: "object",
+            properties: {
+              entry: { type: "number", description: "Entry near current price for swing trade" },
+              stop: { type: "number", description: "Stop loss for swing timeframe" },
+              targets: { type: "array", items: { type: "number" }, minItems: 2, maxItems: 3, description: "2-3 targets in correct direction from entry" },
+              strategy: { type: "string", description: "Swing strategy based on CURRENT structure" },
+              probability: { type: "number", minimum: 0, maximum: 100, description: "Win probability %" }
+            },
+            required: ["entry", "stop", "targets", "strategy", "probability"]
+          }
+        },
+        required: ["scalp", "intraday", "swing"]
+      },
+      quantitative_metrics: {
+        type: "object",
+        description: "Quantitative risk metrics calculated from price data",
+        properties: {
+          sharpe_ratio: { type: "number", description: "Risk-adjusted return metric" },
+          sortino_ratio: { type: "number", description: "Downside risk-adjusted return" },
+          max_drawdown: { type: "number", description: "Maximum peak-to-trough decline" },
+          volatility: { type: "number", description: "Annualized volatility" }
+        },
+        required: ["sharpe_ratio", "sortino_ratio", "max_drawdown", "volatility"]
+      },
       json_version: { type: "string" }
     },
     required: [
       "summary", "action", "action_text", "outlook", "news_impact", "market_structure", 
       "levels", "fibonacci", "trade_idea", "technical", "confidence_model", 
-      "confidence_calibrated", "evidence", "risks", "json_version"
+      "confidence_calibrated", "evidence", "risks", "timeframe_profile", "quantitative_metrics", "json_version"
     ]
   }
 };
@@ -357,16 +408,61 @@ AI DECISION-MAKING INSTRUCTIONS:
 
 6. GENERATE TIMEFRAME-SPECIFIC PREDICTIONS:
    
-   For each timeframe (scalp/intraday/swing), use CURRENT price ${livePrice} and CURRENT indicators:
-   - Scalp (minutes): Predict immediate price action from ${livePrice} based on current momentum
-   - Intraday (hours): Predict session price action from ${livePrice} based on current trend
-   - Swing (days): Predict multi-day price action from ${livePrice} based on current structure
+   🔴 CRITICAL: Generate UNIQUE predictions for each timeframe using CURRENT price ${livePrice}
    
-   Each must have:
-   - Entry near ${livePrice} (current price)
-   - Stop based on current ATR and structure
-   - Targets in correct direction from ${livePrice}
-   - Strategy explaining prediction from CURRENT state
+   **SCALP (1-15 minutes):**
+   - Entry: ${livePrice} ± 0.1% (extremely tight to current price)
+   - Stop: 0.3-0.5 ATR from entry (tight stop for quick trades)
+   - Targets: 2-3 levels within 0.5-1.5% of entry (quick profits)
+   - Strategy: Describe current micro-momentum and immediate price action expected
+   - Probability: 60-75% (higher confidence for short-term moves)
+   - Example SHORT: entry=${livePrice}, stop=${livePrice + atr*0.4}, targets=[${livePrice - livePrice*0.005}, ${livePrice - livePrice*0.01}]
+   
+   **INTRADAY (15min-4hr):**
+   - Entry: ${livePrice} ± 0.3% (near current price)
+   - Stop: 1.0-1.5 ATR from entry (moderate stop)
+   - Targets: 2-3 levels at key support/resistance (1-3% moves)
+   - Strategy: Describe current trend and session expectations
+   - Probability: 55-70% (moderate confidence)
+   - Example SHORT: entry=${livePrice}, stop=${livePrice + atr*1.2}, targets=[${support1}, ${support2}] where supports are BELOW ${livePrice}
+   
+   **SWING (4hr-Daily):**
+   - Entry: ${livePrice} ± 0.5% (reasonable distance from current)
+   - Stop: 1.5-2.0 ATR from entry (wider stop for bigger moves)
+   - Targets: 2-3 major levels (3-8% moves)
+   - Strategy: Describe current structure and multi-day outlook
+   - Probability: 50-65% (lower confidence for longer-term)
+   - Example SHORT: entry=${livePrice}, stop=${livePrice + atr*1.8}, targets=[${majorSupport1}, ${majorSupport2}, ${majorSupport3}] where ALL are BELOW ${livePrice}
+   
+   ⚠️ FOR SHORT TRADES: ALL targets must be BELOW entry/current price
+   ⚠️ FOR LONG TRADES: ALL targets must be ABOVE entry/current price
+   ⚠️ Each timeframe must have DIFFERENT entry/stop/target values
+   ⚠️ Tighter stops and targets for shorter timeframes
+   ⚠️ NEVER use old price levels from past candles - calculate from ${livePrice}
+
+7. CALCULATE QUANTITATIVE METRICS:
+   
+   Based on the price series provided, calculate:
+   - sharpe_ratio: (annualized return - risk_free_rate) / volatility
+     * Use recent 20-50 period returns
+     * Typical range: -2.0 to +3.0 (not -0.000!)
+     * Positive = good risk-adjusted returns, negative = poor performance
+   
+   - sortino_ratio: (annualized return - risk_free_rate) / downside_deviation
+     * Similar to Sharpe but only penalizes downside volatility
+     * Typical range: -2.0 to +4.0
+   
+   - max_drawdown: Maximum peak-to-trough decline
+     * Express as decimal (e.g., 0.15 for 15% drawdown)
+     * Typical range: 0.05 to 0.40 for crypto
+   
+   - volatility: Annualized standard deviation of returns
+     * Express as decimal (e.g., 0.65 for 65% annual volatility)
+     * Typical range: 0.30 to 1.50 for crypto
+   
+   ⚠️ DO NOT return -0.000 or 0.000 for all metrics
+   ⚠️ Calculate from actual price data provided
+   ⚠️ These metrics help assess risk-adjusted performance
 
 🔴 CRITICAL VALIDATION RULES:
 ✅ ALL prices/targets must be relative to CURRENT price ${livePrice}
@@ -375,11 +471,13 @@ AI DECISION-MAKING INSTRUCTIONS:
 ✅ Use ONLY current indicator readings, not historical patterns
 ✅ Generate FORWARD-LOOKING predictions, not backward analysis
 ✅ Each timeframe must have unique, fresh predictions from current state
+✅ Calculate proper quantitative metrics (not zeros)
 ❌ NEVER use old prices from past candles as entry/targets
 ❌ NEVER reference past trades or historical analysis
 ❌ NEVER generate LONG with targets below ${livePrice}
 ❌ NEVER generate SHORT with targets above ${livePrice}
-❌ NEVER copy/paste same levels across different timeframes`;
+❌ NEVER copy/paste same levels across different timeframes
+❌ NEVER return -0.000 or all zeros for quant metrics`;
 
     console.log('[ai-analyze] Calling OpenAI with news-integrated analysis...');
     
