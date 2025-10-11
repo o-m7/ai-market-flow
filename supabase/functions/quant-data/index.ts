@@ -771,35 +771,40 @@ function generateTradingSignals(
   const majorSupport = recentLows[Math.floor(recentLows.length * 0.25)]; // 25th percentile
   const majorResistance = recentHighs[Math.floor(recentHighs.length * 0.25)];
 
-  // === STEP 3: REALISTIC entries based on ACTUAL LIVE PRICE ===
+  // === STEP 3: UNIQUE entries per timeframe with ATR-only stops ===
   const direction = isLong ? 'LONG' : 'SHORT';
   
-  // SCALP: Entry AT current live market price (immediate execution)
-  const scalpEntry = price; // Enter AT current live price
+  // SCALP: Aggressive - Entry AT CURRENT PRICE (immediate execution)
+  const scalpEntry = price; // Instant market entry
   const scalpStop = isLong 
-    ? Math.max(scalpEntry - (atr * 0.5), nearestSupport) // 0.5 ATR or nearest support
-    : Math.min(scalpEntry + (atr * 0.5), nearestResistance);
+    ? scalpEntry - (atr * 0.5)  // Tight 0.5 ATR stop
+    : scalpEntry + (atr * 0.5);
   const scalpTargets = isLong
-    ? [scalpEntry + (atr * 1.0), scalpEntry + (atr * 1.5), scalpEntry + (atr * 2.0)]
-    : [scalpEntry - (atr * 1.0), scalpEntry - (atr * 1.5), scalpEntry - (atr * 2.0)];
+    ? [scalpEntry + (atr * 1.0), scalpEntry + (atr * 1.5), scalpEntry + (atr * 2.5)]
+    : [scalpEntry - (atr * 1.0), scalpEntry - (atr * 1.5), scalpEntry - (atr * 2.5)];
   
-  // INTRADAY: Entry AT current price, stop at structure
-  const intradayEntry = price; // Enter AT current live price
+  // INTRADAY: Pullback - Entry AT EMA20 (wait for pullback)
+  const intradayEntry = ema20; // Wait for price to pull back to EMA20
   const intradayStop = isLong
-    ? Math.max(intradayEntry - (atr * 1.5), majorSupport) // 1.5 ATR or major support
-    : Math.min(intradayEntry + (atr * 1.5), majorResistance);
+    ? intradayEntry - (atr * 1.5)  // Moderate 1.5 ATR stop
+    : intradayEntry + (atr * 1.5);
   const intradayTargets = isLong
-    ? [intradayEntry + (atr * 2.0), intradayEntry + (atr * 3.0), intradayEntry + (atr * 4.0)]
-    : [intradayEntry - (atr * 2.0), intradayEntry - (atr * 3.0), intradayEntry - (atr * 4.0)];
+    ? [intradayEntry + (atr * 3.0), intradayEntry + (atr * 4.5), intradayEntry + (atr * 6.0)]
+    : [intradayEntry - (atr * 3.0), intradayEntry - (atr * 4.5), intradayEntry - (atr * 6.0)];
   
-  // SWING: Entry AT current price, wider stops
-  const swingEntry = price; // Enter AT current live price
+  // SWING: Position - Entry AT EMA50 or Fib 38.2% (strategic entry)
+  const fib382 = isLong 
+    ? donchian.low + ((donchian.high - donchian.low) * 0.382)
+    : donchian.high - ((donchian.high - donchian.low) * 0.382);
+  const swingEntry = isLong 
+    ? Math.min(ema50, fib382)  // Best of EMA50 or Fib level
+    : Math.max(ema50, fib382);
   const swingStop = isLong
-    ? Math.max(swingEntry - (atr * 2.5), donchian.low) // 2.5 ATR or Donchian low
-    : Math.min(swingEntry + (atr * 2.5), donchian.high);
+    ? swingEntry - (atr * 2.0)  // Wide 2.0 ATR stop (better R:R than 2.5)
+    : swingEntry + (atr * 2.0);
   const swingTargets = isLong
-    ? [swingEntry + (atr * 3.5), swingEntry + (atr * 5.0), swingEntry + (atr * 7.0)]
-    : [swingEntry - (atr * 3.5), swingEntry - (atr * 5.0), swingEntry - (atr * 7.0)];
+    ? [swingEntry + (atr * 4.0), swingEntry + (atr * 6.0), swingEntry + (atr * 8.0)]
+    : [swingEntry - (atr * 4.0), swingEntry - (atr * 6.0), swingEntry - (atr * 8.0)];
 
   const trendDesc = isLong ? 'uptrend' : 'downtrend';
   
@@ -808,21 +813,21 @@ function generateTradingSignals(
       entry: Number(scalpEntry.toFixed(2)),
       stop: Number(scalpStop.toFixed(2)),
       targets: scalpTargets.map(t => Number(t.toFixed(2))),
-      strategy: `${direction}: Entry near price, stop at ${isLong ? 'micro support' : 'micro resistance'} (${scalpStop.toFixed(2)}). ${trendStrength}/6 indicators confirm ${trendDesc}.`,
+      strategy: `${direction}: Instant market entry at ${scalpEntry.toFixed(2)}, tight 0.5 ATR stop. ${trendStrength}/6 indicators confirm ${trendDesc}. Quick scalp setup.`,
       probability: Math.min(confidence + 5, 85)
     },
     intraday: {
       entry: Number(intradayEntry.toFixed(2)),
       stop: Number(intradayStop.toFixed(2)),
       targets: intradayTargets.map(t => Number(t.toFixed(2))),
-      strategy: `${direction}: Entry at EMA20 (${ema20.toFixed(2)}), stop at ${isLong ? 'major support' : 'major resistance'} (${intradayStop.toFixed(2)}). ${trendDesc} confirmed.`,
+      strategy: `${direction}: Entry at EMA20 pullback (${ema20.toFixed(2)}), 1.5 ATR stop. ${trendDesc} confirmed with ${trendStrength}/6 signals. Better R:R than scalp.`,
       probability: confidence
     },
     swing: {
       entry: Number(swingEntry.toFixed(2)),
       stop: Number(swingStop.toFixed(2)),
       targets: swingTargets.map(t => Number(t.toFixed(2))),
-      strategy: `${direction}: Entry at EMA50 (${ema50.toFixed(2)}), stop at ${isLong ? 'Donchian low' : 'Donchian high'} (${swingStop.toFixed(2)}). Strong ${trendDesc} with RSI ${rsi.toFixed(1)}.`,
+      strategy: `${direction}: Strategic entry at EMA50 (${ema50.toFixed(2)}) or Fib 38.2%, 2.0 ATR stop. Strong ${trendDesc} with RSI ${rsi.toFixed(1)}. Position trade.`,
       probability: Math.max(confidence - 5, 45)
     }
   };

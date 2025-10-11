@@ -365,8 +365,8 @@ serve(async (req) => {
     
     console.log(`[ai-analyze] Using ${candles.length} candles, latest from ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)`);
     
-    // AI-Driven prompt integrating news sentiment into signals
-    const comprehensivePrompt = `You are an elite AI trading analyst. Analyze real market data AND news sentiment to generate ONE optimized trading signal.
+    // AI-Driven prompt with CRITICAL trading rules
+    const comprehensivePrompt = `You are an elite AI trading analyst. Generate smart, executable trading signals based on price structure and technical confluence.
 
 LIVE MARKET DATA:
 Symbol: ${symbol} | Timeframe: ${timeframe} | Asset: ${market}
@@ -394,6 +394,48 @@ MACD: line=${quantMetrics.indicators?.macd?.line}, signal=${quantMetrics.indicat
 Bollinger Bands: mid=${quantMetrics.indicators?.bb20?.mid}, upper=${quantMetrics.indicators?.bb20?.upper}, lower=${quantMetrics.indicators?.bb20?.lower}
 ATR(14): ${quantMetrics.indicators?.atr14}
 VWAP: ${quantMetrics.indicators?.vwap}` : ''}
+
+═══════════════════════════════════════════════════════════════
+CRITICAL TRADING RULES - FOLLOW EXACTLY OR REJECT WITH "hold"
+═══════════════════════════════════════════════════════════════
+
+1. ENTRY SELECTION (MOST IMPORTANT):
+   ✓ LONG entries MUST be near support, Fibonacci retracement (38.2%, 50%, 61.8%), or bullish pivot
+   ✓ SHORT entries MUST be near resistance, Fibonacci extension, or bearish pivot
+   ✗ NEVER place entries in "no man's land" between levels
+   ✗ NEVER use exact current price UNLESS current price IS AT a key level
+
+2. STOP LOSS PLACEMENT:
+   ✓ LONG stops: Below nearest support or swing low (use ATR for buffer)
+   ✓ SHORT stops: Above nearest resistance or swing high (use ATR for buffer)
+   ✗ NEVER place stops based solely on percentage (must be structure-based)
+
+3. TARGET SELECTION:
+   ✓ Targets MUST align with resistance (LONG) or support (SHORT) levels
+   ✓ Minimum 2:1 R:R for first target (validate: |target - entry| / |entry - stop| >= 2.0)
+   ✗ NEVER place targets at random ATR multiples without considering structure
+
+4. SIGNAL QUALITY CHECKS (If ANY fail, return action="hold"):
+   ✓ Entry is within 1.5% of a key level (support/resistance/pivot/EMA)
+   ✓ Trend confluence: At least 4 out of 6 indicators agree (RSI, MACD, EMAs, price action)
+   ✓ Volatility is reasonable: ATR < 3% of price (high volatility = unsafe)
+   ✓ Stop is logical: Not inverted, not too wide (< 5% of entry), structure-based
+
+5. REJECTION CRITERIA (Return "hold" if ANY true):
+   ✗ No clear support/resistance near entry
+   ✗ Mixed signals: Indicators conflicting (e.g., RSI bullish but MACD bearish)
+   ✗ High volatility: ATR > 3% of price
+   ✗ Weak trend: < 4 indicators confirming direction
+   ✗ Entry not near any key level (> 1.5% away from nearest level)
+
+EXAMPLE GOOD ENTRIES:
+  LONG: Price 3780 (at EMA20 support + Fib 38.2%), Stop 3760 (below swing low), Target 3820 (resistance) → R:R 2.0 ✓
+  SHORT: Price 3850 (at resistance + overbought RSI), Stop 3870 (above swing high), Target 3810 (support) → R:R 2.0 ✓
+
+EXAMPLE BAD ENTRIES (REJECT):
+  ❌ Entry at 3816.46 (not near any level, random price)
+  ❌ Stop at 4064 (way too far, inverted direction)
+  ❌ Targets without structure alignment (random ATR multiples)
 
 CRITICAL DIRECTION DEFINITIONS:
 🟢 LONG = BUY signal = Expecting price to GO UP = Bullish = Enter below current price, target above
@@ -909,10 +951,9 @@ AI DECISION-MAKING INSTRUCTIONS:
     // ==================== TIMEFRAME PROFILE VALIDATION ====================
     console.log(`[VALIDATION] 📅 Validating timeframe_profile signals...`);
     
-    // Validate and correct timeframe_profile entries to ensure they use current prices
+    // Only validate R:R ratios - DON'T overwrite AI decisions with live prices
     const timeframeProfile = parsed.timeframe_profile || {};
-    const correctedTimeframeProfile: any = {};
-    let timeframeCorrections = 0;
+    let rejectedSignals = 0;
     
     ['scalp', 'intraday', 'swing'].forEach(tf => {
       const signal = timeframeProfile[tf];
@@ -926,62 +967,27 @@ AI DECISION-MAKING INSTRUCTIONS:
       const tfTargets = signal.targets || [];
       
       console.log(`[VALIDATION] 📊 ${tf.toUpperCase()} Signal:`);
-      console.log(`  - Original Entry: ${tfEntry?.toFixed(2)}`);
-      console.log(`  - Original Stop: ${tfStop?.toFixed(2)}`);
-      console.log(`  - Original Targets: [${tfTargets.map((t: number) => t?.toFixed(2)).join(', ')}]`);
+      console.log(`  - Entry: ${tfEntry?.toFixed(2)}`);
+      console.log(`  - Stop: ${tfStop?.toFixed(2)}`);
+      console.log(`  - Targets: [${tfTargets.map((t: number) => t?.toFixed(2)).join(', ')}]`);
       
-      // ALWAYS correct entries to use EXACT live price regardless of how close AI got
-      // This ensures all signals are executable at current market conditions
-      const entryDiffPercent = Math.abs((tfEntry - livePrice) / livePrice * 100);
-      console.log(`  - Entry difference from current: ${entryDiffPercent.toFixed(3)}%`);
-      console.log(`  - Current live price: ${livePrice.toFixed(2)}`);
-      console.log(`  - FORCING entry to match live price for accurate signals`);
+      // Check if R:R is valid (>= 2.0)
+      const risk = Math.abs(tfEntry - tfStop);
+      const reward = Math.abs(tfTargets[0] - tfEntry);
+      const rrRatio = risk > 0 ? reward / risk : 0;
       
-      if (true) { // Always correct to ensure accuracy
-        console.log(`[VALIDATION] 🔧 ${tf.toUpperCase()} CORRECTING entry from ${tfEntry?.toFixed(2)} to live price ${livePrice.toFixed(2)}`);
-        
-        // Set entry to EXACT live price for immediate market execution
-        const correctedEntry = livePrice;
-        
-        // Calculate stop and targets from current price using ATR
-        const atrValue = atr || (livePrice * 0.02); // Use 2% if ATR is 0
-        const atrMultiplier = tf === 'scalp' ? 0.5 : tf === 'intraday' ? 1.5 : 2.5;
-        const targetMultipliers = tf === 'scalp' ? [1.0, 1.5, 2.0] : tf === 'intraday' ? [2.0, 3.0, 4.0] : [3.5, 5.0, 7.0];
-        
-        let correctedStop, correctedTargets;
-        if (tradeDirection === 'long') {
-          // LONG: stop below, targets above
-          correctedStop = correctedEntry - (atrValue * atrMultiplier);
-          correctedTargets = targetMultipliers.map(mult => correctedEntry + (atrValue * mult));
-        } else {
-          // SHORT: stop above, targets below
-          correctedStop = correctedEntry + (atrValue * atrMultiplier);
-          correctedTargets = targetMultipliers.map(mult => correctedEntry - (atrValue * mult));
-        }
-        
-        console.log(`[VALIDATION] 🔧 ${tf.toUpperCase()} CORRECTED:`);
-        console.log(`  - New Entry: ${correctedEntry.toFixed(2)}`);
-        console.log(`  - New Stop: ${correctedStop.toFixed(2)}`);
-        console.log(`  - New Targets: [${correctedTargets.map(t => t.toFixed(2)).join(', ')}]`);
-        
-        correctedTimeframeProfile[tf] = {
-          ...signal,
-          entry: correctedEntry,
-          stop: correctedStop,
-          targets: correctedTargets
-        };
-        
-        timeframeCorrections++;
+      console.log(`  - R:R Ratio: ${rrRatio.toFixed(2)}`);
+      
+      if (rrRatio < 2.0) {
+        console.warn(`[VALIDATION] ❌ ${tf.toUpperCase()} signal rejected - R:R ${rrRatio.toFixed(2)} < 2.0`);
+        rejectedSignals++;
+      } else {
+        console.log(`[VALIDATION] ✅ ${tf.toUpperCase()} signal valid - R:R ${rrRatio.toFixed(2)} >= 2.0`);
       }
     });
     
-    // ALWAYS apply the corrected profile (even if no corrections, to ensure consistency)
-    parsed.timeframe_profile = correctedTimeframeProfile;
-    
-    if (timeframeCorrections > 0) {
-      console.log(`[VALIDATION] 🔧 Applied ${timeframeCorrections} timeframe signal corrections`);
-    } else {
-      console.log(`[VALIDATION] ✅ All timeframe signals were already valid`);
+    if (rejectedSignals === 3) {
+      console.warn(`[VALIDATION] ⚠️  All timeframe signals rejected due to poor R:R`);
     }
     
     // ==================== ENTRY PRICE CORRECTION ====================
@@ -1316,7 +1322,7 @@ AI DECISION-MAKING INSTRUCTIONS:
         news_impact: parsed.news_impact,
         keyLevels: {
           support: parsed.levels?.support?.filter((s: number) => typeof s === 'number' && isFinite(s) && s < livePrice) || [],
-          resistance: parsed.levels?.resistance?.filter((r: number) => typeof r === 'number' && isFinite(r) && r > livePrice) || []
+          resistance: parsed.levels?.resistance?.filter((r: number) => typeof r === 'number' && isFinite(s) && r > livePrice) || []
         },
         technicalIndicators: {
           rsi: parsed.technical?.rsi14 || 50,
@@ -1408,6 +1414,129 @@ AI DECISION-MAKING INSTRUCTIONS:
       
       console.log(`[VALIDATION] ✅ R:R ratio passed: ${rrRatio.toFixed(2)} (minimum 2.0)`);
     }
+    
+    // ==================== ADDITIONAL QUALITY FILTERS ====================
+    
+    // Check 1: Entry proximity to key levels
+    if (entryPrice) {
+      const allLevels = [
+        ...support,
+        ...resistance,
+        ema20,
+        ema50,
+        ema200
+      ].filter(level => typeof level === 'number' && isFinite(level));
+      
+      if (allLevels.length > 0) {
+        const nearestLevel = allLevels.reduce((prev, curr) => 
+          Math.abs(curr - entryPrice) < Math.abs(prev - entryPrice) ? curr : prev
+        );
+        const distanceToLevel = Math.abs(entryPrice - nearestLevel) / entryPrice;
+        const distancePercent = distanceToLevel * 100;
+        
+        console.log(`[VALIDATION] 📍 Entry Level Proximity Check:`);
+        console.log(`  - Entry: ${entryPrice.toFixed(2)}`);
+        console.log(`  - Nearest level: ${nearestLevel.toFixed(2)}`);
+        console.log(`  - Distance: ${distancePercent.toFixed(2)}%`);
+        
+        if (distanceToLevel > 0.015) { // Entry > 1.5% from any key level
+          console.warn(`[VALIDATION] ⚠️  Signal rejected: Entry ${entryPrice.toFixed(2)} is ${distancePercent.toFixed(2)}% away from nearest level (max 1.5%)`);
+          
+          const holdResponse = {
+            symbol,
+            timestamp: new Date().toISOString(),
+            recommendation: 'hold',
+            signal: 'hold',
+            confidence: 0,
+            holdReason: `Entry at ${entryPrice.toFixed(2)} is not near any key level. Nearest level is ${nearestLevel.toFixed(2)} (${distancePercent.toFixed(2)}% away). For high-probability trades, entry must be within 1.5% of support/resistance/EMAs.`,
+            analysis: parsed.summary || `${tradeDirection.toUpperCase()} signal identified but entry lacks structural support. Wait for price to reach a key level before entering.`,
+            outlook: parsed.outlook || 'neutral',
+            action: 'hold',
+            action_text: `Wait for better entry near support, resistance, or major EMAs`,
+            keyLevels: {
+              support: parsed.levels?.support?.filter((s: number) => typeof s === 'number' && isFinite(s) && s < livePrice) || [],
+              resistance: parsed.levels?.resistance?.filter((r: number) => typeof r === 'number' && isFinite(r) && r > livePrice) || []
+            },
+            technicalIndicators: {
+              rsi: parsed.technical?.rsi14 || 50,
+              trend: parsed.outlook === 'bullish' ? 'bullish' : parsed.outlook === 'bearish' ? 'bearish' : 'neutral',
+              momentum: 'neutral'
+            },
+            chartPatterns: [],
+            priceTargets: { bullish: 0, bearish: 0 },
+            riskAssessment: {
+              level: 'high',
+              factors: [`Entry not near key level`, `${distancePercent.toFixed(2)}% from nearest structural point`]
+            },
+            rejectionDetails: {
+              _type: 'entry_proximity',
+              value: distancePercent.toFixed(2),
+              threshold: 1.5,
+              entry: entryPrice,
+              nearest_level: nearestLevel
+            }
+          };
+          
+          return new Response(JSON.stringify(holdResponse), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        console.log(`[VALIDATION] ✅ Entry proximity passed: ${distancePercent.toFixed(2)}% from level (max 1.5%)`);
+      }
+    }
+    
+    // Check 2: Volatility check (ATR)
+    const atrPercent = (atr / livePrice) * 100;
+    console.log(`[VALIDATION] 📊 Volatility Check:`);
+    console.log(`  - ATR: ${atr.toFixed(2)}`);
+    console.log(`  - ATR %: ${atrPercent.toFixed(2)}%`);
+    
+    if (atrPercent > 3.0) { // ATR > 3% of price = too volatile
+      console.warn(`[VALIDATION] ⚠️  Signal rejected: High volatility detected (ATR ${atrPercent.toFixed(2)}% > 3.0%)`);
+      
+      const holdResponse = {
+        symbol,
+        timestamp: new Date().toISOString(),
+        recommendation: 'hold',
+        signal: 'hold',
+        confidence: 0,
+        holdReason: `High volatility detected (ATR ${atrPercent.toFixed(2)}% of price). Market is too unstable for safe entry. Wait for volatility to decrease below 3% before trading.`,
+        analysis: parsed.summary || `Market showing excessive volatility with ATR at ${atrPercent.toFixed(2)}%. Risk of large adverse moves is too high for entry at this time.`,
+        outlook: parsed.outlook || 'neutral',
+        action: 'hold',
+        action_text: `Wait for calmer market conditions (lower volatility)`,
+        keyLevels: {
+          support: parsed.levels?.support?.filter((s: number) => typeof s === 'number' && isFinite(s) && s < livePrice) || [],
+          resistance: parsed.levels?.resistance?.filter((r: number) => typeof r === 'number' && isFinite(r) && r > livePrice) || []
+        },
+        technicalIndicators: {
+          rsi: parsed.technical?.rsi14 || 50,
+          trend: parsed.outlook === 'bullish' ? 'bullish' : parsed.outlook === 'bearish' ? 'bearish' : 'neutral',
+          momentum: 'neutral'
+        },
+        chartPatterns: [],
+        priceTargets: { bullish: 0, bearish: 0 },
+        riskAssessment: {
+          level: 'extreme',
+          factors: [`High volatility: ATR ${atrPercent.toFixed(2)}%`, 'Unsafe trading conditions']
+        },
+        rejectionDetails: {
+          _type: 'volatility',
+          value: atrPercent.toFixed(2),
+          threshold: 3.0,
+          atr: atr
+        }
+      };
+      
+      return new Response(JSON.stringify(holdResponse), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    console.log(`[VALIDATION] ✅ Volatility check passed: ATR ${atrPercent.toFixed(2)}% (max 3.0%)`);
     
     console.log(`[VALIDATION] ✅ All signal quality filters passed`);
     

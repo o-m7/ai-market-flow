@@ -633,7 +633,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
 
                 return (
                   <>
-                    {/* Scalp Signals - Quick exits, tight stops, 1-5 min holding */}
+                    {/* Scalp Signals - INSTANT MARKET ENTRY */}
                     {signalsToUse.scalp && signalsToUse.scalp.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
@@ -642,7 +642,9 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                               {directionIcon}
                               {direction}
                             </Badge>
-                            <span className="text-xs font-mono-tabular text-terminal-accent uppercase">SCALP</span>
+                            <span className="text-xs font-mono-tabular text-yellow-400 uppercase flex items-center gap-1">
+                              ⚡ SCALP
+                            </span>
                             {signalsToUse.scalp.strategy && (
                               <Badge variant="outline" className="text-xs font-mono-tabular">
                                 {signalsToUse.scalp.strategy}
@@ -662,8 +664,11 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                             </div>
                           )}
                         </div>
+                        <div className="text-xs font-mono-tabular text-yellow-400/80 mb-2 font-semibold">
+                          ⚡ INSTANT MARKET EXECUTION • Entry at current price • Tight 0.5 ATR stop
+                        </div>
                         <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
-                          Timeframe: 1-5 min • Tight stops • Quick profit taking • Est. Duration: 1-15 minutes
+                          Best for: Fast momentum trades • 1-15 min duration • R:R 2.0+ • Quick scalp exits
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div>
@@ -701,7 +706,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                       </div>
                     )}
 
-                    {/* Intraday Signals - Same-day exits, moderate stops, 15min-4hr holding */}
+                    {/* Intraday Signals - EMA20 PULLBACK ENTRY */}
                     {signalsToUse.intraday && signalsToUse.intraday.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
@@ -710,7 +715,9 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                               {directionIcon}
                               {direction}
                             </Badge>
-                            <span className="text-xs font-mono-tabular text-terminal-accent uppercase">INTRADAY</span>
+                            <span className="text-xs font-mono-tabular text-blue-400 uppercase flex items-center gap-1">
+                              📊 INTRADAY
+                            </span>
                             {signalsToUse.intraday.strategy && (
                               <Badge variant="outline" className="text-xs font-mono-tabular">
                                 {signalsToUse.intraday.strategy}
@@ -730,8 +737,11 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                             </div>
                           )}
                         </div>
+                        <div className="text-xs font-mono-tabular text-blue-400/80 mb-2 font-semibold">
+                          📊 EMA20 PULLBACK STRATEGY • Wait for price to retrace to EMA20 • 1.5 ATR stop
+                        </div>
                         <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
-                          Timeframe: 15min-4hr • Same-day exit • Moderate risk/reward • Est. Duration: 1-8 hours
+                          Best for: Swing trades within trend • 1-8 hr duration • Better R:R than scalp • Same-day exits
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div>
@@ -769,7 +779,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                       </div>
                     )}
 
-                    {/* Swing Signals - Multi-day holds, wider stops, larger targets */}
+                    {/* Swing Signals - EMA50/FIB POSITION ENTRY */}
                     {signalsToUse.swing && signalsToUse.swing.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
@@ -778,7 +788,9 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                               {directionIcon}
                               {direction}
                             </Badge>
-                            <span className="text-xs font-mono-tabular text-terminal-accent uppercase">SWING</span>
+                            <span className="text-xs font-mono-tabular text-purple-400 uppercase flex items-center gap-1">
+                              🎯 SWING
+                            </span>
                             {signalsToUse.swing.strategy && (
                               <Badge variant="outline" className="text-xs font-mono-tabular">
                                 {signalsToUse.swing.strategy}
@@ -798,8 +810,11 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                             </div>
                           )}
                         </div>
+                        <div className="text-xs font-mono-tabular text-purple-400/80 mb-2 font-semibold">
+                          🎯 POSITION TRADE • Entry at EMA50 or Fib 38.2% • 2.0 ATR stop for optimal R:R
+                        </div>
                         <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
-                          Timeframe: 4hr-Daily • Multi-day hold • Larger targets & stops • Est. Duration: 1-7 days
+                          Best for: Multi-day position trades • 1-7 day duration • Highest R:R potential • Patient entries
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div>
