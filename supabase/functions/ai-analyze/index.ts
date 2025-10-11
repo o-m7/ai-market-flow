@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.7.6"; // Added validation for technical indicators before OpenAI call
+const FUNCTION_VERSION = "2.7.7"; // Added forex market hours validation to prevent wasted OpenAI calls
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -274,6 +274,37 @@ serve(async (req) => {
     if (!symbol || !candles || candles.length === 0) {
       return new Response(JSON.stringify({ 
         error: "symbol and candles are required" 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // CRITICAL: Validate candle data quality BEFORE expensive API calls
+    const lastCandle = candles[candles.length - 1];
+    const candleAgeMinutes = (Date.now() - lastCandle.t) / (1000 * 60);
+    
+    // For FOREX: Reject if market is likely closed (data older than 30 minutes)
+    if (market?.toUpperCase() === 'FOREX' && candleAgeMinutes > 30) {
+      console.error(`[ai-analyze] FOREX market appears closed - last candle is ${candleAgeMinutes.toFixed(1)} minutes old`);
+      return new Response(JSON.stringify({ 
+        error: "Forex market is closed",
+        details: `The last available data is ${candleAgeMinutes.toFixed(0)} minutes old. Forex markets are closed on weekends and outside trading hours. Please try again when the market is open.`,
+        symbol,
+        lastDataTime: new Date(lastCandle.t).toISOString()
+      }), {
+        status: 503, // Service Unavailable
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Validate candles have valid price data
+    if (!lastCandle.c || !lastCandle.o || !lastCandle.h || !lastCandle.l) {
+      console.error('[ai-analyze] Invalid candle data - missing OHLC prices');
+      return new Response(JSON.stringify({ 
+        error: "Invalid market data",
+        details: "The provided candle data is incomplete or corrupted.",
+        symbol
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
