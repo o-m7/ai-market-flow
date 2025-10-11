@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.7.0"; // Fixed validation thresholds to match prompt ranges exactly
+const FUNCTION_VERSION = "2.7.1"; // Added lenient forex data freshness thresholds (24/5 markets)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -607,19 +607,28 @@ AI DECISION-MAKING INSTRUCTIONS:
     console.log(`  - Effective data age: ${effectiveAgeSeconds}s (${effectiveAgeMinutes} minutes)`);
     
     // TIMEFRAME-AWARE FRESHNESS CHECK
-    // Adjust threshold based on timeframe (allow slightly more than the candle interval)
+    // Adjust threshold based on timeframe AND market type
+    // Forex trades 24/5 (closed weekends), crypto trades 24/7, stocks trade market hours
+    const isForex = market?.toLowerCase() === 'forex' || symbol?.includes('/');
+    const isCrypto = market?.toLowerCase() === 'crypto' || market?.toLowerCase() === 'cryptocurrency';
+    
     const timeframeThresholds: Record<string, number> = {
-      '1m': 90,     // 1.5 minutes (tightened from 2)
-      '5m': 360,    // 6 minutes (tightened from 10)
-      '15m': 900,   // 15 minutes (tightened from 20)
-      '30m': 1800,  // 30 minutes (tightened from 35)
-      '1h': 4200,   // 70 minutes - allows current hour + buffer (was 65, then 20 which was too strict)
-      '4h': 15600,  // 4.3 hours (tightened from 250 min)
-      '1d': 28800   // 8 hours (tightened from 1500 min)
+      '1m': 90,     // 1.5 minutes
+      '5m': 360,    // 6 minutes
+      '15m': 900,   // 15 minutes
+      '30m': 1800,  // 30 minutes
+      '1h': 4200,   // 70 minutes
+      '4h': 15600,  // 4.3 hours
+      '1d': 28800   // 8 hours
     };
     
-    const maxAgeSeconds = timeframeThresholds[timeframe] || 300; // default 5min for unknown
+    // For forex, use much more lenient thresholds since data can be delayed and markets close on weekends
+    const forexMultiplier = isForex ? 6 : 1; // 6x more lenient for forex (handles weekends, quiet periods)
+    const maxAgeSeconds = (timeframeThresholds[timeframe] || 300) * forexMultiplier;
     const freshnessThreshold = maxAgeSeconds / 60;
+    
+    console.log(`  - Market type: ${market} (isForex: ${isForex}, isCrypto: ${isCrypto})`);
+    console.log(`  - Using ${forexMultiplier}x multiplier for freshness threshold`);
     
     // Calculate freshness score relative to timeframe (lose 15 points per minute beyond half the threshold)
     const halfThreshold = maxAgeSeconds / 2;
