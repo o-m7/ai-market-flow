@@ -551,8 +551,13 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </CardContent>
       </Card>
 
-      {/* Trading Signals - Only show when data exists and is not hold */}
-      {includeQuantSignals && data.timeframe_profile && data.recommendation !== 'hold' && data.action !== 'hold' && (
+      {/* Trading Signals - Only show with valid signals (not hold/unclear) */}
+      {includeQuantSignals && 
+       data.timeframe_profile && 
+       Object.keys(data.timeframe_profile).length > 0 &&
+       data.recommendation !== 'hold' && 
+       data.action !== 'hold' &&
+       !data.holdReason && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
