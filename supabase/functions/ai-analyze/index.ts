@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.6.8"; // Fixed timeframe validation - always apply corrected profile, tightened threshold to 2%
+const FUNCTION_VERSION = "2.6.9"; // Made timeframe_profile prompt extremely explicit about exact price ranges
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -416,37 +416,40 @@ AI DECISION-MAKING INSTRUCTIONS:
 
 6. GENERATE TIMEFRAME-SPECIFIC PREDICTIONS:
    
-   🔴 CRITICAL: Generate UNIQUE predictions for each timeframe using CURRENT price ${livePrice}
+   🚨 MANDATORY: ALL ENTRIES MUST USE CURRENT LIVE PRICE ${livePrice}
+   🚨 DO NOT use historical prices, do not use prices from past candles
+   🚨 If entry deviates more than specified % from ${livePrice}, it will be REJECTED
    
    **SCALP (1-15 minutes):**
-   - Entry: ${livePrice} ± 0.1% (extremely tight to current price)
+   📍 ENTRY MUST BE: ${(livePrice * 0.999).toFixed(2)} to ${(livePrice * 1.001).toFixed(2)} (${livePrice} ± 0.1%)
+   - Entry: Exactly ${livePrice} or within 0.1% (${(livePrice * 0.999).toFixed(2)}-${(livePrice * 1.001).toFixed(2)})
    - Stop: 0.3-0.5 ATR from entry (tight stop for quick trades)
    - Targets: 2-3 levels within 0.5-1.5% of entry (quick profits)
    - Strategy: Describe current micro-momentum and immediate price action expected
    - Probability: 60-75% (higher confidence for short-term moves)
-   - Example SHORT: entry at current price, stop 0.4 ATR above entry, targets 0.5% and 1.0% below entry
    
    **INTRADAY (15min-4hr):**
-   - Entry: ${livePrice} ± 0.3% (near current price)
+   📍 ENTRY MUST BE: ${(livePrice * 0.997).toFixed(2)} to ${(livePrice * 1.003).toFixed(2)} (${livePrice} ± 0.3%)
+   - Entry: Exactly ${livePrice} or within 0.3% (${(livePrice * 0.997).toFixed(2)}-${(livePrice * 1.003).toFixed(2)})
    - Stop: 1.0-1.5 ATR from entry (moderate stop)
    - Targets: 2-3 levels at key support/resistance (1-3% moves)
    - Strategy: Describe current trend and session expectations
    - Probability: 55-70% (moderate confidence)
-   - Example SHORT: entry at current price, stop 1.2 ATR above entry, targets at nearest support levels BELOW current price
    
    **SWING (4hr-Daily):**
-   - Entry: ${livePrice} ± 0.5% (reasonable distance from current)
+   📍 ENTRY MUST BE: ${(livePrice * 0.995).toFixed(2)} to ${(livePrice * 1.005).toFixed(2)} (${livePrice} ± 0.5%)
+   - Entry: Exactly ${livePrice} or within 0.5% (${(livePrice * 0.995).toFixed(2)}-${(livePrice * 1.005).toFixed(2)})
    - Stop: 1.5-2.0 ATR from entry (wider stop for bigger moves)
    - Targets: 2-3 major levels (3-8% moves)
    - Strategy: Describe current structure and multi-day outlook
    - Probability: 50-65% (lower confidence for longer-term)
-   - Example SHORT: entry at current price, stop 1.8 ATR above entry, targets at major support levels ALL BELOW current price
    
+   🚨 VALIDATION RULES (violations will cause function rejection):
+   ⛔ SCALP entry outside ${(livePrice * 0.999).toFixed(2)}-${(livePrice * 1.001).toFixed(2)} = INVALID
+   ⛔ INTRADAY entry outside ${(livePrice * 0.997).toFixed(2)}-${(livePrice * 1.003).toFixed(2)} = INVALID
+   ⛔ SWING entry outside ${(livePrice * 0.995).toFixed(2)}-${(livePrice * 1.005).toFixed(2)} = INVALID
    ⚠️ FOR SHORT TRADES: ALL targets must be BELOW entry/current price
    ⚠️ FOR LONG TRADES: ALL targets must be ABOVE entry/current price
-   ⚠️ Each timeframe must have DIFFERENT entry/stop/target values
-   ⚠️ Tighter stops and targets for shorter timeframes
-   ⚠️ NEVER use old price levels from past candles - calculate from ${livePrice}
 
 7. CALCULATE QUANTITATIVE METRICS:
    
