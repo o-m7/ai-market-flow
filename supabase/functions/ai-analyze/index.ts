@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.6.9"; // Made timeframe_profile prompt extremely explicit about exact price ranges
+const FUNCTION_VERSION = "2.7.0"; // Fixed validation thresholds to match prompt ranges exactly
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -840,11 +840,16 @@ AI DECISION-MAKING INSTRUCTIONS:
       console.log(`  - Original Stop: ${tfStop?.toFixed(2)}`);
       console.log(`  - Original Targets: [${tfTargets.map((t: number) => t?.toFixed(2)).join(', ')}]`);
       
-      // Check if entry is too far from current price (more than 2% away)
+      // Check if entry is too far from current price using strict thresholds per timeframe
       const entryDiffPercent = Math.abs((tfEntry - livePrice) / livePrice * 100);
       console.log(`  - Entry difference from current: ${entryDiffPercent.toFixed(2)}%`);
+      console.log(`  - Current live price for validation: ${livePrice.toFixed(2)}`);
       
-      if (entryDiffPercent > 2) {
+      // Strict thresholds matching prompt: SCALP 0.1%, INTRADAY 0.3%, SWING 0.5%
+      const maxAllowedPercent = tf === 'scalp' ? 0.1 : tf === 'intraday' ? 0.3 : 0.5;
+      console.log(`  - Max allowed deviation for ${tf.toUpperCase()}: ${maxAllowedPercent}%`);
+      
+      if (entryDiffPercent > maxAllowedPercent) {
         console.warn(`[VALIDATION] ❌ ${tf.toUpperCase()} entry ${tfEntry?.toFixed(2)} is ${entryDiffPercent.toFixed(2)}% away from current price ${livePrice.toFixed(2)} - CORRECTING`);
         
         // Correct entry to be near current price based on trade direction
