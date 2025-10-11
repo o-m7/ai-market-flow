@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.7.2"; // Force redeploy - forex 6x threshold multiplier
+const FUNCTION_VERSION = "2.7.3"; // Fixed response field names - added 'signal' field for frontend compatibility
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1182,6 +1182,7 @@ AI DECISION-MAKING INSTRUCTIONS:
         symbol,
         timestamp: new Date().toISOString(),
         recommendation: 'hold',
+        signal: 'hold', // Add for frontend compatibility
         confidence: 0, // Hold signals have 0 confidence for trading
         holdReason: parsed.trade_idea?.rationale || parsed.action_text || 'Market conditions are unclear or conflicting. Waiting for better setup.',
         analysis: parsed.summary || 'Technical indicators do not show strong directional bias. Recommend waiting for clearer signals.',
@@ -1233,6 +1234,7 @@ AI DECISION-MAKING INSTRUCTIONS:
         symbol,
         timestamp: new Date().toISOString(),
         recommendation: 'hold',
+        signal: 'hold', // Add for frontend compatibility
         confidence: 0,
         holdReason: `Only ${agreementCount}/${totalChecks} indicators agree on ${tradeDirection.toUpperCase()} direction. Need at least 4 out of 6 indicators to confirm before generating trade signal.`,
         analysis: parsed.summary || `Insufficient indicator confluence for ${tradeDirection} trade. ${conflictingSignals.length} conflicting signal(s) detected.`,
@@ -1292,6 +1294,7 @@ AI DECISION-MAKING INSTRUCTIONS:
           symbol,
           timestamp: new Date().toISOString(),
           recommendation: 'hold',
+          signal: 'hold', // Add for frontend compatibility
           confidence: 0,
           holdReason: `Risk:Reward ratio of ${rrRatio.toFixed(2)} is too low (minimum 2.0 required). Trade setup does not offer sufficient reward for the risk taken.`,
           analysis: parsed.summary || `${tradeDirection.toUpperCase()} setup identified but rejected due to poor risk:reward profile.`,
@@ -1378,6 +1381,7 @@ AI DECISION-MAKING INSTRUCTIONS:
     // Validate and ensure all required fields - with filtered support/resistance
     const result = {
       ...parsed,
+      signal: parsed.action === 'long' ? 'long' : parsed.action === 'short' ? 'short' : 'hold', // Add for frontend compatibility
       symbol,
       timeframe,
       market,
