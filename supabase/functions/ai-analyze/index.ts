@@ -278,87 +278,108 @@ CRITICAL DIRECTION DEFINITIONS:
 🔴 SHORT = SELL signal = Expecting price to GO DOWN = Bearish = Enter above current price, target below
 ⚪ HOLD = Uncertain/Conflicting = Wait for clearer setup
 
+🔴 CRITICAL: THIS IS A LIVE TRADING ANALYSIS - USE ONLY CURRENT DATA FOR FUTURE PREDICTIONS
+
+CURRENT MARKET STATE (AS OF RIGHT NOW):
+- Live Price: ${livePrice} (THIS IS THE CURRENT PRICE - DO NOT USE OLD PRICES)
+- Latest Candle Time: ${candleTime} (THIS IS THE MOST RECENT DATA POINT)
+- Current Technical Readings: EMA20=${ema20}, EMA50=${ema50}, EMA200=${ema200}, RSI=${rsi}, MACD=${macd}
+
+⚠️ YOU MUST GENERATE PREDICTIONS FOR THE FUTURE BASED ON THE CURRENT STATE ABOVE
+⚠️ DO NOT REFERENCE PAST TRADES OR HISTORICAL ANALYSIS
+⚠️ DO NOT USE OLD PRICE LEVELS FROM PREVIOUS CANDLES UNLESS THEY ARE RELEVANT SUPPORT/RESISTANCE
+
 AI DECISION-MAKING INSTRUCTIONS:
 
-1. ANALYZE MARKET STRUCTURE:
-   - Trend: Is price making higher highs/lows (bullish) or lower highs/lows (bearish)?
-   - Price vs EMAs: Above all EMAs = bullish structure, Below all EMAs = bearish structure
-   - MACD Histogram: Positive = bullish momentum, Negative = bearish momentum
-   - RSI: Above 50 = bullish bias, Below 50 = bearish bias
-   - Volume: Increasing on moves = confirming trend
+1. ANALYZE CURRENT MARKET STRUCTURE (RIGHT NOW):
+   - Where is price NOW relative to EMAs? (${livePrice} vs EMA20=${ema20}, EMA50=${ema50})
+   - What is the CURRENT trend direction from recent candles?
+   - What is the CURRENT MACD reading? (${macd})
+   - What is the CURRENT RSI? (${rsi})
+   - What is the CURRENT volume pattern?
 
-2. CHECK INDICATOR CONFLUENCE:
-   Count how many indicators agree on direction:
+2. CHECK CURRENT INDICATOR CONFLUENCE:
+   Count how many indicators agree on CURRENT direction:
    ✅ At least 4 out of 6 indicators must agree → Proceed with signal
    ❌ Less than 4 indicators agree → Return "hold"
    
-   6 Key Indicators to check:
-   1. Price vs EMA20
-   2. Price vs EMA50/200  
-   3. MACD histogram sign
-   4. RSI above/below 50
-   5. Price vs recent swing high/low
-   6. News sentiment alignment
+   6 Key Indicators to check (CURRENT readings):
+   1. Current price ${livePrice} vs EMA20 ${ema20}
+   2. Current price ${livePrice} vs EMA50/200
+   3. CURRENT MACD histogram sign
+   4. CURRENT RSI above/below 50
+   5. Current price vs recent swing high/low
+   6. CURRENT news sentiment alignment
 
-3. INTEGRATE NEWS SENTIMENT:
-   - Bullish news + Bullish technicals → LONG signal with higher confidence
-   - Bearish news + Bearish technicals → SHORT signal with higher confidence
-   - News conflicts with technicals → Reduce confidence OR return "hold"
-   - High event risk + unclear direction → Return "hold"
+3. INTEGRATE CURRENT NEWS SENTIMENT:
+   - Bullish news NOW + Bullish technicals NOW → LONG signal
+   - Bearish news NOW + Bearish technicals NOW → SHORT signal
+   - Current news conflicts with current technicals → "hold"
 
-4. DETERMINE TRADE DIRECTION:
+4. DETERMINE FUTURE DIRECTION (PREDICTION FROM CURRENT STATE):
    
-   Return "long" when:
-   ✅ Price is making higher lows and higher highs
-   ✅ Price above EMA20 and EMA50
-   ✅ MACD histogram positive (or turning positive)
-   ✅ RSI above 50 (bullish momentum)
-   ✅ At least 4/6 indicators bullish
-   ✅ Entry near support, targets at resistance above
+   Return "long" (BUY) when CURRENTLY:
+   ✅ Price ${livePrice} is above EMA20 ${ema20} and showing bullish momentum
+   ✅ MACD ${macd} is positive or turning positive NOW
+   ✅ RSI ${rsi} shows bullish bias (>50) or oversold bounce potential
+   ✅ At least 4/6 CURRENT indicators are bullish
+   ✅ PREDICT price will move UP from current level ${livePrice}
    
-   Return "short" when:
-   ✅ Price is making lower highs and lower lows
-   ✅ Price below EMA20 and EMA50
-   ✅ MACD histogram negative (or turning negative)
-   ✅ RSI below 50 (bearish momentum)
-   ✅ At least 4/6 indicators bearish
-   ✅ Entry near resistance, targets at support below
+   Return "short" (SELL) when CURRENTLY:
+   ✅ Price ${livePrice} is below EMA20 ${ema20} and showing bearish momentum
+   ✅ MACD ${macd} is negative or turning negative NOW
+   ✅ RSI ${rsi} shows bearish bias (<50) or overbought rejection potential
+   ✅ At least 4/6 CURRENT indicators are bearish
+   ✅ PREDICT price will move DOWN from current level ${livePrice}
    
    Return "hold" when:
-   ⚪ Less than 4 indicators agree on direction
-   ⚪ News strongly conflicts with technicals
-   ⚪ Price is choppy/ranging with no clear trend
-   ⚪ High volatility with no directional bias
-   ⚪ Major event risk with unclear impact
+   ⚪ Current indicators are mixed or conflicting
+   ⚪ Current news conflicts with current technicals
+   ⚪ No clear directional bias RIGHT NOW
 
-5. SET ENTRY/STOP/TARGETS:
-    For LONG trades (BUY):
-    - Entry: At or slightly above current price
-    - Stop: Below recent swing low minus 1.5 ATR
-    - Target 1: Nearest resistance above entry (R:R ≥ 2.0)
-    - Target 2: Next major resistance above Target 1 (R:R ≥ 3.0)
-    - Target 3: Major resistance or extension level (R:R ≥ 4.0)
-    - ALL TARGETS MUST BE ABOVE ENTRY PRICE
+5. SET FUTURE TARGETS FROM CURRENT PRICE ${livePrice}:
     
-    For SHORT trades (SELL):
-    - Entry: At or slightly below current price
-    - Stop: Above recent swing high plus 1.5 ATR
-    - Target 1: Nearest support below entry (R:R ≥ 2.0)
-    - Target 2: Next major support below Target 1 (R:R ≥ 3.0)
-    - Target 3: Major support or extension level (R:R ≥ 4.0)
-    - ALL TARGETS MUST BE BELOW ENTRY PRICE
+    For LONG trades (predicting UP movement):
+    - Entry: ${livePrice} (or slightly above, within 0.5% of current price)
+    - Stop: Below current price minus 1.5 ATR (protecting against DOWN move)
+    - Target 1: Above ${livePrice} at nearest resistance (predict UP move, R:R ≥ 2.0)
+    - Target 2: Above Target 1 at next resistance (predict further UP, R:R ≥ 3.0)
+    - Target 3: Above Target 2 at major resistance (predict extended UP, R:R ≥ 4.0)
+    - VERIFY: ALL TARGETS > ${livePrice} (must be higher prices for UP move)
+    
+    For SHORT trades (predicting DOWN movement):
+    - Entry: ${livePrice} (or slightly below, within 0.5% of current price)
+    - Stop: Above current price plus 1.5 ATR (protecting against UP move)
+    - Target 1: Below ${livePrice} at nearest support (predict DOWN move, R:R ≥ 2.0)
+    - Target 2: Below Target 1 at next support (predict further DOWN, R:R ≥ 3.0)
+    - Target 3: Below Target 2 at major support (predict extended DOWN, R:R ≥ 4.0)
+    - VERIFY: ALL TARGETS < ${livePrice} (must be lower prices for DOWN move)
 
-CRITICAL VALIDATION RULES:
-✅ LONG means BUYING (expecting UP) - entry ≤ current price, targets > entry
-✅ SHORT means SELLING (expecting DOWN) - entry ≥ current price, targets < entry
-✅ Minimum Risk:Reward ratio of 2.0 for Target 1
-✅ Stop must be at least 1.5 ATR from entry
-✅ Default to "hold" when in doubt - quality over quantity
-✅ News sentiment MUST be factored into final decision
-❌ Never generate LONG with targets below entry
-❌ Never generate SHORT with targets above entry
-❌ Never generate signal with conflicting indicators
-❌ Never ignore low indicator confluence (<4/6)`;
+6. GENERATE TIMEFRAME-SPECIFIC PREDICTIONS:
+   
+   For each timeframe (scalp/intraday/swing), use CURRENT price ${livePrice} and CURRENT indicators:
+   - Scalp (minutes): Predict immediate price action from ${livePrice} based on current momentum
+   - Intraday (hours): Predict session price action from ${livePrice} based on current trend
+   - Swing (days): Predict multi-day price action from ${livePrice} based on current structure
+   
+   Each must have:
+   - Entry near ${livePrice} (current price)
+   - Stop based on current ATR and structure
+   - Targets in correct direction from ${livePrice}
+   - Strategy explaining prediction from CURRENT state
+
+🔴 CRITICAL VALIDATION RULES:
+✅ ALL prices/targets must be relative to CURRENT price ${livePrice}
+✅ LONG = predict UP → entry ≈ ${livePrice}, targets > ${livePrice}
+✅ SHORT = predict DOWN → entry ≈ ${livePrice}, targets < ${livePrice}
+✅ Use ONLY current indicator readings, not historical patterns
+✅ Generate FORWARD-LOOKING predictions, not backward analysis
+✅ Each timeframe must have unique, fresh predictions from current state
+❌ NEVER use old prices from past candles as entry/targets
+❌ NEVER reference past trades or historical analysis
+❌ NEVER generate LONG with targets below ${livePrice}
+❌ NEVER generate SHORT with targets above ${livePrice}
+❌ NEVER copy/paste same levels across different timeframes`;
 
     console.log('[ai-analyze] Calling OpenAI with news-integrated analysis...');
     
