@@ -20,58 +20,48 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
   // Fetch historical accuracy for this symbol
   const { data: historicalData } = useHistoricalAccuracy(symbol, 30);
   
-  // Fetch quant signals and metrics for this symbol and timeframe
-  const [quantSignals, setQuantSignals] = React.useState<any>(null);
+  // Only fetch quant metrics if needed and not already in AI analysis
   const [quantMetrics, setQuantMetrics] = React.useState<any>(null);
   
-  // Don't fetch separate quant signals - use data from AI analysis
-  // This prevents showing stale/cached data
   React.useEffect(() => {
-    if (includeQuantSignals) {
-      // Only fetch quant metrics if they're not already in the analysis data
-      if (!data.technical) {
-        const fetchQuantMetrics = async () => {
-          try {
-            const { supabase } = await import('@/integrations/supabase/client');
-            const timeframeMap: Record<string, string> = {
-              '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
-              '60': '1h', '240': '4h', 'D': '1d'
+    if (includeQuantSignals && !data.technical) {
+      // Only fetch if technical data not already in analysis
+      const fetchQuantMetrics = async () => {
+        try {
+          const { supabase } = await import('@/integrations/supabase/client');
+          const timeframeMap: Record<string, string> = {
+            '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
+            '60': '1h', '240': '4h', 'D': '1d'
+          };
+          const { data: response, error } = await supabase.functions.invoke('quant-data', {
+            body: { symbol, tf: timeframeMap[timeframe] || '1h', withSummary: false }
+          });
+          
+          if (!error && response) {
+            const metrics = {
+              rsi14: response.rsi14,
+              ema20: response.ema?.['20'],
+              ema50: response.ema?.['50'],
+              ema200: response.ema?.['200'],
+              atr14: response.atr14,
+              zscore20: response.zscore20,
+              vol20_annual: response.vol20_annual,
+              vwap: response.vwap,
+              macd: response.macd,
+              bb20: response.bb20,
+              donchian20: response.donchian20,
+              ...response.quant_metrics
             };
-            const { data: response, error } = await supabase.functions.invoke('quant-data', {
-              body: { symbol, tf: timeframeMap[timeframe] || '1h', withSummary: false }
-            });
-            
-            if (!error && response) {
-              const metrics = {
-                rsi14: response.rsi14,
-                ema20: response.ema?.['20'],
-                ema50: response.ema?.['50'],
-                ema200: response.ema?.['200'],
-                atr14: response.atr14,
-                zscore20: response.zscore20,
-                vol20_annual: response.vol20_annual,
-                vwap: response.vwap,
-                macd: response.macd,
-                bb20: response.bb20,
-                donchian20: response.donchian20,
-                ...response.quant_metrics
-              };
-              setQuantMetrics(metrics);
-            }
-          } catch (e) {
-            console.error('Failed to fetch quant metrics:', e);
+            setQuantMetrics(metrics);
           }
-        };
-        fetchQuantMetrics();
-      } else {
-        // Use technical data from AI analysis
-        setQuantMetrics(null);
-      }
+        } catch (e) {
+          console.error('Failed to fetch quant metrics:', e);
+        }
+      };
+      fetchQuantMetrics();
     } else {
       setQuantMetrics(null);
     }
-    // Always clear quantSignals - use AI analysis data instead
-    setQuantSignals(null);
   }, [symbol, timeframe, includeQuantSignals, data.technical]);
   
   const getRecommendationColor = (rec: string) => {
@@ -561,8 +551,9 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </CardContent>
       </Card>
 
-      {/* Trading Signals - All Timeframes (Quantitative Analysis) */}
-      {quantSignals && (
+      {/* Trading Signals - Only show once using fresh AI data */}
+      {data.recommendation !== 'hold' && data.action !== 'hold' && 
+       (data.timeframe_profile || data.trade_idea) && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
@@ -570,7 +561,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
               TRADING SIGNALS - ALL TIMEFRAMES
             </CardTitle>
             <p className="text-xs font-mono-tabular text-terminal-secondary mt-2">
-              Quantitative Analysis Signals
+              Live AI Analysis • Generated: {new Date(data.timestamp).toLocaleTimeString()}
             </p>
           </CardHeader>
           <CardContent className="pt-4">
@@ -1624,135 +1615,16 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </Card>
       )}
 
-      {/* Quantitative Trading Signals */}
-      {includeQuantSignals && quantSignals && (
+      {/* Analysis Text Section */}
+      {data.analysis && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2 mb-2">
-                  <Activity className="h-4 w-4" />
-                  ALGORITHMIC TRADING SIGNALS
-                </CardTitle>
-                <p className="text-xs font-mono-tabular text-terminal-secondary">
-                  Reference signals from technical confluence • Compare with AI Analysis above
-                </p>
-              </div>
-            </div>
+            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">ANALYSIS SUMMARY</CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="space-y-6">
-              {/* Scalp Signal */}
-              {quantSignals.scalp && (
-                <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-xs font-mono-tabular text-terminal-accent font-bold">SCALP (1-15m)</div>
-                    <Badge className="bg-terminal-accent/20 text-terminal-accent font-mono-tabular">
-                      {quantSignals.scalp.probability}% PROBABILITY
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                    <div>
-                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
-                      <div className="text-sm font-mono-tabular text-terminal-accent font-bold">
-                        {safeFormatNumber(quantSignals.scalp.entry, 2)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP</div>
-                      <div className="text-sm font-mono-tabular text-terminal-red font-bold">
-                        {safeFormatNumber(quantSignals.scalp.stop, 2)}
-                      </div>
-                    </div>
-                    {quantSignals.scalp.targets?.slice(0, 2).map((target: number, idx: number) => (
-                      <div key={idx}>
-                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">T{idx + 1}</div>
-                        <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                          {safeFormatNumber(target, 2)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="text-xs font-mono text-terminal-secondary">
-                    {quantSignals.scalp.strategy}
-                  </div>
-                </div>
-              )}
-
-              {/* Intraday Signal */}
-              {quantSignals.intraday && (
-                <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-xs font-mono-tabular text-terminal-accent font-bold">INTRADAY (30m-4h)</div>
-                    <Badge className="bg-terminal-accent/20 text-terminal-accent font-mono-tabular">
-                      {quantSignals.intraday.probability}% PROBABILITY
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                    <div>
-                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
-                      <div className="text-sm font-mono-tabular text-terminal-accent font-bold">
-                        {safeFormatNumber(quantSignals.intraday.entry, 2)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP</div>
-                      <div className="text-sm font-mono-tabular text-terminal-red font-bold">
-                        {safeFormatNumber(quantSignals.intraday.stop, 2)}
-                      </div>
-                    </div>
-                    {quantSignals.intraday.targets?.slice(0, 2).map((target: number, idx: number) => (
-                      <div key={idx}>
-                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">T{idx + 1}</div>
-                        <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                          {safeFormatNumber(target, 2)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="text-xs font-mono text-terminal-secondary">
-                    {quantSignals.intraday.strategy}
-                  </div>
-                </div>
-              )}
-
-              {/* Swing Signal */}
-              {quantSignals.swing && (
-                <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-xs font-mono-tabular text-terminal-accent font-bold">SWING (1D-1W)</div>
-                    <Badge className="bg-terminal-accent/20 text-terminal-accent font-mono-tabular">
-                      {quantSignals.swing.probability}% PROBABILITY
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                    <div>
-                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
-                      <div className="text-sm font-mono-tabular text-terminal-accent font-bold">
-                        {safeFormatNumber(quantSignals.swing.entry, 2)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP</div>
-                      <div className="text-sm font-mono-tabular text-terminal-red font-bold">
-                        {safeFormatNumber(quantSignals.swing.stop, 2)}
-                      </div>
-                    </div>
-                    {quantSignals.swing.targets?.slice(0, 2).map((target: number, idx: number) => (
-                      <div key={idx}>
-                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">T{idx + 1}</div>
-                        <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                          {safeFormatNumber(target, 2)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="text-xs font-mono text-terminal-secondary">
-                    {quantSignals.swing.strategy}
-                  </div>
-                </div>
-              )}
-            </div>
+            <p className="text-sm font-mono leading-relaxed text-terminal-foreground whitespace-pre-wrap">
+              {data.analysis}
+            </p>
           </CardContent>
         </Card>
       )}

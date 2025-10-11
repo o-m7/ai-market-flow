@@ -597,11 +597,62 @@ CRITICAL VALIDATION RULES:
     
     console.log(`[VALIDATION] 📊 Entry Validity Score: ${entry_validity}/100`);
     
+    // Target validation - Check EACH target for proper direction
+    console.log(`[VALIDATION] 🎯 Target Validation for ${tradeDirection?.toUpperCase()} trade:`);
+    const targets = parsed.trade_idea?.targets || [];
+    if (targets.length > 0) {
+      targets.forEach((target: number, idx: number) => {
+        console.log(`  - Target ${idx + 1}: ${target?.toFixed(2)}`);
+        
+        if (tradeDirection === 'long') {
+          // LONG: ALL targets must be ABOVE entry
+          if (target <= entryPrice) {
+            const penalty = 50;
+            entry_validity -= penalty;
+            const warning = `⚠️ LONG Target ${idx + 1} (${target?.toFixed(2)}) is at or below entry (${entryPrice?.toFixed(2)}) - targets must be ABOVE entry for long trades`;
+            validationNotes.push(warning);
+            console.error(`[VALIDATION] ❌ Target ${idx + 1} Invalid (-${penalty} points): ${warning}`);
+          } else {
+            console.log(`[VALIDATION] ✅ Target ${idx + 1} Valid: Above entry`);
+          }
+          
+          // Verify targets are in ascending order
+          if (idx > 0 && target <= targets[idx - 1]) {
+            const penalty = 20;
+            entry_validity -= penalty;
+            const warning = `⚠️ LONG targets not in ascending order: Target ${idx + 1} (${target?.toFixed(2)}) should be > Target ${idx} (${targets[idx - 1]?.toFixed(2)})`;
+            validationNotes.push(warning);
+            console.error(`[VALIDATION] ❌ Target Ordering Invalid (-${penalty} points): ${warning}`);
+          }
+        } else if (tradeDirection === 'short') {
+          // SHORT: ALL targets must be BELOW entry
+          if (target >= entryPrice) {
+            const penalty = 50;
+            entry_validity -= penalty;
+            const warning = `⚠️ SHORT Target ${idx + 1} (${target?.toFixed(2)}) is at or above entry (${entryPrice?.toFixed(2)}) - targets must be BELOW entry for short trades`;
+            validationNotes.push(warning);
+            console.error(`[VALIDATION] ❌ Target ${idx + 1} Invalid (-${penalty} points): ${warning}`);
+          } else {
+            console.log(`[VALIDATION] ✅ Target ${idx + 1} Valid: Below entry`);
+          }
+          
+          // Verify targets are in descending order
+          if (idx > 0 && target >= targets[idx - 1]) {
+            const penalty = 20;
+            entry_validity -= penalty;
+            const warning = `⚠️ SHORT targets not in descending order: Target ${idx + 1} (${target?.toFixed(2)}) should be < Target ${idx} (${targets[idx - 1]?.toFixed(2)})`;
+            validationNotes.push(warning);
+            console.error(`[VALIDATION] ❌ Target Ordering Invalid (-${penalty} points): ${warning}`);
+          }
+        }
+      });
+    }
+    
     // Validate support levels are below current price
     console.log(`[VALIDATION] 🔽 Support Level Validation:`);
     const support = parsed.levels?.support || [];
     console.log(`  - Total support levels: ${support.length}`);
-    console.log(`  - Support prices: [${support.map(s => s.toFixed(2)).join(', ')}]`);
+    console.log(`  - Support prices: [${support.map((s: number) => s?.toFixed?.(2) || 'invalid').join(', ')}]`);
     
     const invalidSupport = support.filter((s: number) => s > livePrice * 1.01);
     if (invalidSupport.length > 0) {
@@ -610,7 +661,7 @@ CRITICAL VALIDATION RULES:
       const warning = `⚠️ ${invalidSupport.length} support level(s) above current price - support should be below price`;
       validationNotes.push(warning);
       console.warn(`[VALIDATION] ❌ Invalid Support (-${penalty} points): ${warning}`);
-      console.warn(`  - Invalid levels: [${invalidSupport.map(s => s.toFixed(2)).join(', ')}]`);
+      console.warn(`  - Invalid levels: [${invalidSupport.map((s: number) => s?.toFixed?.(2) || 'invalid').join(', ')}]`);
     } else {
       console.log(`[VALIDATION] ✅ All support levels valid (below price)`);
     }
@@ -619,7 +670,7 @@ CRITICAL VALIDATION RULES:
     console.log(`[VALIDATION] 🔼 Resistance Level Validation:`);
     const resistance = parsed.levels?.resistance || [];
     console.log(`  - Total resistance levels: ${resistance.length}`);
-    console.log(`  - Resistance prices: [${resistance.map(r => r.toFixed(2)).join(', ')}]`);
+    console.log(`  - Resistance prices: [${resistance.map((r: number) => r?.toFixed?.(2) || 'invalid').join(', ')}]`);
     
     const invalidResistance = resistance.filter((r: number) => r < livePrice * 0.99);
     if (invalidResistance.length > 0) {
@@ -628,7 +679,7 @@ CRITICAL VALIDATION RULES:
       const warning = `⚠️ ${invalidResistance.length} resistance level(s) below current price - resistance should be above price`;
       validationNotes.push(warning);
       console.warn(`[VALIDATION] ❌ Invalid Resistance (-${penalty} points): ${warning}`);
-      console.warn(`  - Invalid levels: [${invalidResistance.map(r => r.toFixed(2)).join(', ')}]`);
+      console.warn(`  - Invalid levels: [${invalidResistance.map((r: number) => r?.toFixed?.(2) || 'invalid').join(', ')}]`);
     } else {
       console.log(`[VALIDATION] ✅ All resistance levels valid (above price)`);
     }
@@ -917,8 +968,8 @@ CRITICAL VALIDATION RULES:
         news_impact: parsed.news_impact,
         market_structure: parsed.market_structure,
         keyLevels: {
-          support: parsed.levels?.support || [],
-          resistance: parsed.levels?.resistance || []
+          support: parsed.levels?.support?.filter((s: number) => typeof s === 'number' && isFinite(s) && s < livePrice) || [],
+          resistance: parsed.levels?.resistance?.filter((r: number) => typeof r === 'number' && isFinite(r) && r > livePrice) || []
         },
         technicalIndicators: {
           rsi: parsed.technical?.rsi14 || 50,
@@ -967,8 +1018,8 @@ CRITICAL VALIDATION RULES:
         action_text: `Indicators show mixed signals (${signal_confidence_agreement}% agreement). Wait for stronger confluence before entering.`,
         news_impact: parsed.news_impact,
         keyLevels: {
-          support: parsed.levels?.support || [],
-          resistance: parsed.levels?.resistance || []
+          support: parsed.levels?.support?.filter((s: number) => typeof s === 'number' && isFinite(s) && s < livePrice) || [],
+          resistance: parsed.levels?.resistance?.filter((r: number) => typeof r === 'number' && isFinite(r) && r > livePrice) || []
         },
         technicalIndicators: {
           rsi: parsed.technical?.rsi14 || 50,
@@ -1025,8 +1076,8 @@ CRITICAL VALIDATION RULES:
           action: 'hold',
           action_text: `Wait for better entry point with improved R:R ratio`,
           keyLevels: {
-            support: parsed.levels?.support || [],
-            resistance: parsed.levels?.resistance || []
+            support: parsed.levels?.support?.filter((s: number) => typeof s === 'number' && isFinite(s) && s < livePrice) || [],
+            resistance: parsed.levels?.resistance?.filter((r: number) => typeof r === 'number' && isFinite(r) && r > livePrice) || []
           },
           technicalIndicators: {
             rsi: parsed.technical?.rsi14 || 50,
@@ -1101,7 +1152,7 @@ CRITICAL VALIDATION RULES:
       recommendation: "Consider refreshing data for more reliable analysis"
     } : null;
     
-    // Validate and ensure all required fields
+    // Validate and ensure all required fields - with filtered support/resistance
     const result = {
       ...parsed,
       symbol,
@@ -1119,6 +1170,15 @@ CRITICAL VALIDATION RULES:
         corrections: entryCorrections,
         reason: "Entry outside valid price range (±3% of current price)"
       } : null,
+      // Override levels with filtered values to ensure support is below price and resistance is above
+      levels: {
+        support: parsed.levels?.support?.filter((s: number) => typeof s === 'number' && isFinite(s) && s < livePrice) || [],
+        resistance: parsed.levels?.resistance?.filter((r: number) => typeof r === 'number' && isFinite(r) && r > livePrice) || [],
+        vwap: parsed.levels?.vwap || features.technical.vwap || null,
+        liquidity_zones: features.liquidity_zones || [],
+        breakout_zones: features.breakout_zones || [],
+        order_blocks: features.order_blocks || []
+      },
       input_features: features,
       input_news: news || { event_risk: false, headline_hits_30m: 0 },
       accuracy_metrics: {
