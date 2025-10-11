@@ -774,8 +774,12 @@ function generateTradingSignals(
   // === STEP 3: UNIQUE entries per timeframe with ATR-only stops ===
   const direction = isLong ? 'LONG' : 'SHORT';
   
+  console.log(`🎯 SIGNAL GENERATION: price=${price}, ema20=${ema20.toFixed(2)}, ema50=${ema50.toFixed(2)}, atr=${atr.toFixed(2)}`);
+  
   // SCALP: Aggressive - Entry AT CURRENT PRICE (immediate execution)
   const scalpEntry = price; // Instant market entry
+  console.log(`⚡ SCALP: entry=${scalpEntry.toFixed(2)}`);
+  
   const scalpStop = isLong 
     ? scalpEntry - (atr * 0.5)  // Tight 0.5 ATR stop
     : scalpEntry + (atr * 0.5);
@@ -785,6 +789,8 @@ function generateTradingSignals(
   
   // INTRADAY: Pullback - Entry AT EMA20 (wait for pullback)
   const intradayEntry = ema20; // Wait for price to pull back to EMA20
+  console.log(`📊 INTRADAY: entry=${intradayEntry.toFixed(2)} (EMA20)`);
+  
   const intradayStop = isLong
     ? intradayEntry - (atr * 1.5)  // Moderate 1.5 ATR stop
     : intradayEntry + (atr * 1.5);
@@ -799,6 +805,8 @@ function generateTradingSignals(
   const swingEntry = isLong 
     ? Math.min(ema50, fib382)  // Best of EMA50 or Fib level
     : Math.max(ema50, fib382);
+  console.log(`🎯 SWING: entry=${swingEntry.toFixed(2)} (EMA50 or Fib 38.2%)`);
+  
   const swingStop = isLong
     ? swingEntry - (atr * 2.0)  // Wide 2.0 ATR stop (better R:R than 2.5)
     : swingEntry + (atr * 2.0);
