@@ -2,8 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Brain, Target, AlertTriangle, Clock, TrendingUp, TrendingDown, Activity, Award, BarChart3 } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { Brain, Target, AlertTriangle, Clock, TrendingUp, TrendingDown, Activity, Award } from "lucide-react";
 import { useHistoricalAccuracy } from "@/hooks/useHistoricalAccuracy";
 
 interface AnalysisResultsProps {
@@ -14,55 +13,7 @@ interface AnalysisResultsProps {
 }
 
 export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSignals = true }: AnalysisResultsProps) => {
-  // Log the data structure for debugging
-  console.log('AnalysisResults data:', data);
-  
-  // Fetch historical accuracy for this symbol
   const { data: historicalData } = useHistoricalAccuracy(symbol, 30);
-  
-  // Only fetch quant metrics if needed and not already in AI analysis
-  const [quantMetrics, setQuantMetrics] = React.useState<any>(null);
-  
-  React.useEffect(() => {
-    if (includeQuantSignals && !data.technical) {
-      // Only fetch if technical data not already in analysis
-      const fetchQuantMetrics = async () => {
-        try {
-          const { supabase } = await import('@/integrations/supabase/client');
-          const timeframeMap: Record<string, string> = {
-            '1': '1m', '5': '5m', '15': '15m', '30': '30m', 
-            '60': '1h', '240': '4h', 'D': '1d'
-          };
-          const { data: response, error } = await supabase.functions.invoke('quant-data', {
-            body: { symbol, tf: timeframeMap[timeframe] || '1h', withSummary: false }
-          });
-          
-          if (!error && response) {
-            const metrics = {
-              rsi14: response.rsi14,
-              ema20: response.ema?.['20'],
-              ema50: response.ema?.['50'],
-              ema200: response.ema?.['200'],
-              atr14: response.atr14,
-              zscore20: response.zscore20,
-              vol20_annual: response.vol20_annual,
-              vwap: response.vwap,
-              macd: response.macd,
-              bb20: response.bb20,
-              donchian20: response.donchian20,
-              ...response.quant_metrics
-            };
-            setQuantMetrics(metrics);
-          }
-        } catch (e) {
-          console.error('Failed to fetch quant metrics:', e);
-        }
-      };
-      fetchQuantMetrics();
-    } else {
-      setQuantMetrics(null);
-    }
-  }, [symbol, timeframe, includeQuantSignals, data.technical]);
   
   const getRecommendationColor = (rec: string) => {
     switch (rec) {
@@ -73,7 +24,6 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
     }
   };
 
-  // Safe formatting function
   const safeFormatNumber = (value: any, decimals: number = 2): string => {
     if (value === null || value === undefined || typeof value !== 'number' || !isFinite(value)) {
       return '—';
@@ -81,7 +31,6 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
     return value.toFixed(decimals);
   };
 
-  // Extract analysis text - check multiple possible fields
   const analysisText = data.analysis || data.action_text || data.summary || 'No analysis available';
   
   return (
@@ -149,7 +98,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </Card>
       )}
 
-      {/* Header Card - Action & Confidence */}
+      {/* SECTION 1: SUMMARY - Header Card */}
       <Card className="bg-terminal border-terminal-border">
         <CardHeader className="bg-terminal-darker border-b border-terminal-border">
           <div className="flex items-start justify-between">
@@ -177,42 +126,25 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
             </div>
           </div>
         </CardHeader>
+        <CardContent className="pt-4">
+          <p className="text-sm font-mono leading-relaxed text-terminal-foreground whitespace-pre-wrap">
+            {analysisText}
+          </p>
+        </CardContent>
       </Card>
 
-      {/* Hold Signal Notice - Shows when AI returns "hold" */}
-      {data.recommendation === 'hold' && (data.holdReason || data.rejectionDetails) && (
+      {/* Hold Signal Notice */}
+      {data.recommendation === 'hold' && data.holdReason && (
         <Card className="border-2 bg-terminal-accent/5 border-terminal-accent">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
               <Activity className="h-5 w-5 flex-shrink-0 mt-0.5 text-terminal-accent" />
               <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-2">
                 <Badge className="font-mono-tabular bg-terminal-accent/20 text-terminal-accent border-terminal-accent">
                   ⏸️ HOLD - NO TRADE
                 </Badge>
-                <span className="text-xs font-mono-tabular text-terminal-secondary">
-                  MARKET CONDITIONS UNCERTAIN OR TOO RISKY
-                </span>
-                </div>
                 <p className="text-sm font-mono-tabular text-terminal-text">
-                  {data.holdReason || 'Conditions unclear - waiting for better setup'}
-                </p>
-                {data.rejectionDetails && (
-                  <div className="mt-2 space-y-1">
-                    {data.rejectionDetails.confidence_agreement !== undefined && (
-                      <p className="text-xs font-mono-tabular text-terminal-secondary">
-                        • Confidence Agreement: {data.rejectionDetails.confidence_agreement}% (Minimum: {data.rejectionDetails.threshold}%)
-                      </p>
-                    )}
-                    {data.rejectionDetails.rr_ratio && (
-                      <p className="text-xs font-mono-tabular text-terminal-secondary">
-                        • Risk:Reward Ratio: {data.rejectionDetails.rr_ratio} (Minimum: {data.rejectionDetails.threshold})
-                      </p>
-                    )}
-                  </div>
-                )}
-                <p className="text-xs font-mono-tabular text-terminal-accent mt-2">
-                  💡 Waiting for clearer setup with better risk:reward and stronger indicator confluence. Goal: Maximize profit while minimizing risk.
+                  {data.holdReason}
                 </p>
               </div>
             </div>
@@ -220,344 +152,82 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </Card>
       )}
 
-      {/* Data Staleness Warning - Critical Alert */}
-      {data.data_staleness_warning && (
-        <Card className={`border-2 ${
-          data.data_staleness_warning.severity === 'HIGH' 
-            ? 'bg-terminal-red/5 border-terminal-red' 
-            : 'bg-terminal-accent/5 border-terminal-accent'
-        }`}>
-          <CardContent className="pt-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
-                data.data_staleness_warning.severity === 'HIGH' 
-                  ? 'text-terminal-red' 
-                  : 'text-terminal-accent'
-              }`} />
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge className={`font-mono-tabular ${
-                    data.data_staleness_warning.severity === 'HIGH' 
-                      ? 'bg-terminal-red/20 text-terminal-red border-terminal-red' 
-                      : 'bg-terminal-accent/20 text-terminal-accent border-terminal-accent'
-                  }`}>
-                    {data.data_staleness_warning.severity} SEVERITY
-                  </Badge>
-                  <span className="text-xs font-mono-tabular text-terminal-secondary">
-                    DATA AGE: {data.data_staleness_warning.data_age_seconds}s ({data.accuracy_metrics?.data_age_info?.age_minutes || 0}m)
-                  </span>
-                </div>
-                <p className="text-sm font-mono-tabular text-terminal-text">
-                  {data.data_staleness_warning.message}
-                </p>
-                <p className="text-xs font-mono-tabular text-terminal-secondary">
-                  💡 {data.data_staleness_warning.recommendation}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Entry Price Correction Notice */}
-      {data.entry_correction_applied && data.entry_correction_details && (
-        <Card className="border-2 bg-terminal-accent/5 border-terminal-accent">
-          <CardContent className="pt-4">
-            <div className="flex items-start gap-3">
-              <Target className="h-5 w-5 flex-shrink-0 mt-0.5 text-terminal-accent" />
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge className="font-mono-tabular bg-terminal-accent/20 text-terminal-accent border-terminal-accent">
-                    AUTO-CORRECTED
-                  </Badge>
-                  <span className="text-xs font-mono-tabular text-terminal-secondary">
-                    ENTRY PRICE VALIDATION
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-mono-tabular text-terminal-text">
-                    Original Entry: <span className="text-terminal-red line-through">{safeFormatNumber(data.entry_correction_details.original_entry)}</span>
-                  </p>
-                  <p className="text-sm font-mono-tabular text-terminal-text">
-                    Corrected Entry: <span className="text-terminal-green font-bold">{safeFormatNumber(data.entry_correction_details.corrected_entry)}</span>
-                  </p>
-                </div>
-                <p className="text-xs font-mono-tabular text-terminal-secondary">
-                  🔧 {data.entry_correction_details.reason}
-                </p>
-                {data.entry_correction_details.corrections.map((correction: string, idx: number) => (
-                  <p key={idx} className="text-xs font-mono-tabular text-terminal-accent">
-                    ✓ {correction}
-                  </p>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Signal Confidence Agreement Analysis */}
-      {data.accuracy_metrics?.indicator_agreement && (
-        <Card className={`border-2 ${
-          data.accuracy_metrics.signal_confidence_agreement >= 75 ? 'bg-terminal-green/5 border-terminal-green' :
-          data.accuracy_metrics.signal_confidence_agreement >= 50 ? 'bg-terminal-accent/5 border-terminal-accent' :
-          'bg-terminal-red/5 border-terminal-red'
-        }`}>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-mono-tabular flex items-center gap-2">
-                <Activity className={`h-4 w-4 ${
-                  data.accuracy_metrics.signal_confidence_agreement >= 75 ? 'text-terminal-green' :
-                  data.accuracy_metrics.signal_confidence_agreement >= 50 ? 'text-terminal-accent' :
-                  'text-terminal-red'
-                }`} />
-                SIGNAL CONFIDENCE AGREEMENT
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge className={`font-mono-tabular ${
-                  data.accuracy_metrics.signal_quality === 'STRONG' ? 'bg-terminal-green/20 text-terminal-green border-terminal-green' :
-                  data.accuracy_metrics.signal_quality === 'MODERATE' ? 'bg-terminal-accent/20 text-terminal-accent border-terminal-accent' :
-                  'bg-terminal-red/20 text-terminal-red border-terminal-red'
-                }`}>
-                  {data.accuracy_metrics.signal_quality}
-                </Badge>
-                <span className={`text-2xl font-mono-tabular font-bold ${
-                  data.accuracy_metrics.signal_confidence_agreement >= 75 ? 'text-terminal-green' :
-                  data.accuracy_metrics.signal_confidence_agreement >= 50 ? 'text-terminal-accent' :
-                  'text-terminal-red'
-                }`}>
-                  {data.accuracy_metrics.signal_confidence_agreement}%
-                </span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="space-y-3">
-              <div className="text-xs font-mono-tabular text-terminal-secondary mb-2">
-                INDICATOR AGREEMENT: {data.accuracy_metrics.indicator_agreement.agreement_count}/{data.accuracy_metrics.indicator_agreement.total_checks} checks passed
-              </div>
-              
-              {/* Indicator Checks */}
-              <div className="space-y-2">
-                {data.accuracy_metrics.indicator_agreement.checks.map((check: any, idx: number) => (
-                  <div key={idx} className={`flex items-center justify-between p-2 border-l-2 text-xs font-mono ${
-                    check.status === 'AGREE' ? 'bg-terminal-green/5 border-terminal-green text-terminal-green' :
-                    check.status === 'CONFLICT' ? 'bg-terminal-red/5 border-terminal-red text-terminal-red' :
-                    'bg-terminal-accent/5 border-terminal-accent text-terminal-accent'
-                  }`}>
-                    <span className="font-bold">{check.indicator}</span>
-                    <span>{check.detail}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Conflicting Signals Warning */}
-              {data.accuracy_metrics.indicator_agreement.conflicting_signals.length > 0 && (
-                <div className="bg-terminal-red/10 border-2 border-terminal-red p-3 space-y-2 mt-3">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-terminal-red flex-shrink-0" />
-                    <span className="text-xs font-mono-tabular font-bold text-terminal-red">
-                      {data.accuracy_metrics.indicator_agreement.conflicting_signals.length} CONFLICTING SIGNAL(S) DETECTED
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {data.accuracy_metrics.indicator_agreement.conflicting_signals.map((signal: string, idx: number) => (
-                      <p key={idx} className="text-xs font-mono-tabular text-terminal-red pl-6">
-                        • {signal}
-                      </p>
-                    ))}
-                  </div>
-                  <p className="text-xs font-mono-tabular text-terminal-red/80 pt-2 border-t border-terminal-red/30">
-                    ⚠️ Trade with caution: Indicators are not aligned with the signal direction. Consider waiting for better confluence or reducing position size.
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Accuracy Metrics - Quantitative Validation */}
-      {data.accuracy_metrics && (
+      {/* SECTION 2: MAIN TRADE - Primary Trade Idea */}
+      {data.trade_idea && data.trade_idea.entry && data.recommendation !== 'hold' && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              ACCURACY & VALIDATION METRICS
+              <Target className="h-4 w-4" />
+              MAIN TRADE SETUP
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
-                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">DATA FRESHNESS</div>
-                <div className={`text-2xl font-mono-tabular font-bold ${
-                  data.accuracy_metrics.data_freshness_score >= 80 ? 'text-terminal-green' :
-                  data.accuracy_metrics.data_freshness_score >= 60 ? 'text-terminal-accent' :
-                  'text-terminal-red'
-                }`}>
-                  {data.accuracy_metrics.data_freshness_score}%
-                </div>
+            <div className="space-y-4">
+              {/* Trade Direction */}
+              <div className="flex items-center gap-2">
+                <Badge className={`${
+                  data.trade_idea.direction === 'long' || data.recommendation === 'buy' 
+                    ? 'bg-terminal-green/20 text-terminal-green border-terminal-green' 
+                    : 'bg-terminal-red/20 text-terminal-red border-terminal-red'
+                } font-mono-tabular flex items-center gap-1`}>
+                  {data.trade_idea.direction === 'long' || data.recommendation === 'buy' ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                  {data.trade_idea.direction === 'long' || data.recommendation === 'buy' ? 'LONG' : 'SHORT'}
+                </Badge>
               </div>
-              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
-                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">SIGNAL CLARITY</div>
-                <div className={`text-2xl font-mono-tabular font-bold ${
-                  data.accuracy_metrics.signal_clarity_score >= 80 ? 'text-terminal-green' :
-                  data.accuracy_metrics.signal_clarity_score >= 60 ? 'text-terminal-accent' :
-                  'text-terminal-red'
-                }`}>
-                  {data.accuracy_metrics.signal_clarity_score}%
-                </div>
-              </div>
-              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
-                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">LEVEL PRECISION</div>
-                <div className={`text-2xl font-mono-tabular font-bold ${
-                  data.accuracy_metrics.level_precision_score >= 80 ? 'text-terminal-green' :
-                  data.accuracy_metrics.level_precision_score >= 60 ? 'text-terminal-accent' :
-                  'text-terminal-red'
-                }`}>
-                  {data.accuracy_metrics.level_precision_score}%
-                </div>
-              </div>
-              <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
-                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY VALIDITY</div>
-                <div className={`text-2xl font-mono-tabular font-bold ${
-                  data.accuracy_metrics.entry_validity_score >= 80 ? 'text-terminal-green' :
-                  data.accuracy_metrics.entry_validity_score >= 60 ? 'text-terminal-accent' :
-                  'text-terminal-red'
-                }`}>
-                  {data.accuracy_metrics.entry_validity_score}%
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-terminal-darker p-4 border-2 border-terminal-accent/30 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-mono-tabular text-terminal-secondary">OVERALL ACCURACY SCORE</div>
-                <div className={`text-3xl font-mono-tabular font-bold ${
-                  data.accuracy_metrics.overall_accuracy >= 80 ? 'text-terminal-green' :
-                  data.accuracy_metrics.overall_accuracy >= 60 ? 'text-terminal-accent' :
-                  'text-terminal-red'
-                }`}>
-                  {data.accuracy_metrics.overall_accuracy}%
-                </div>
-              </div>
-              <div className="h-3 bg-terminal-darker rounded-full overflow-hidden border border-terminal-border">
-                <div 
-                  className={`h-full ${
-                    data.accuracy_metrics.overall_accuracy >= 80 ? 'bg-terminal-green' :
-                    data.accuracy_metrics.overall_accuracy >= 60 ? 'bg-terminal-accent' :
-                    'bg-terminal-red'
-                  }`}
-                  style={{ width: `${data.accuracy_metrics.overall_accuracy}%` }}
-                />
-              </div>
-            </div>
 
-            {data.accuracy_metrics.validation_notes && data.accuracy_metrics.validation_notes.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-xs font-mono-tabular text-terminal-secondary mb-2">VALIDATION NOTES:</div>
-                {data.accuracy_metrics.validation_notes.map((note: string, idx: number) => {
-                  const isWarning = note.includes('⚠️');
-                  const isSuccess = note.includes('✓');
-                  const isCorrection = note.includes('🔧');
-                  return (
-                    <div key={idx} className={`flex items-start gap-2 p-2 border-l-2 text-xs font-mono ${
-                      isWarning ? 'bg-terminal-red/5 border-terminal-red text-terminal-red' :
-                      isSuccess ? 'bg-terminal-green/5 border-terminal-green text-terminal-green' :
-                      isCorrection ? 'bg-terminal-accent/5 border-terminal-accent text-terminal-accent' :
-                      'bg-terminal-accent/5 border-terminal-accent text-terminal-accent'
-                    }`}>
-                      {note}
+              {/* Trade Levels */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">ENTRY</div>
+                  <div className="text-lg font-mono-tabular text-terminal-foreground font-bold">
+                    {safeFormatNumber(data.trade_idea.entry)}
+                  </div>
+                </div>
+                <div className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
+                  <div className="text-lg font-mono-tabular text-terminal-red font-bold">
+                    {safeFormatNumber(data.trade_idea.stop)}
+                  </div>
+                </div>
+                {data.trade_idea.targets?.slice(0, 2).map((target: number, idx: number) => (
+                  <div key={idx} className="bg-terminal-darker/50 p-3 border border-terminal-border/30">
+                    <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TARGET {idx + 1}</div>
+                    <div className="text-lg font-mono-tabular text-terminal-green font-bold">
+                      {safeFormatNumber(target)}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
-            )}
+
+              {/* Signal Confidence */}
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono-tabular text-terminal-secondary">SIGNAL STRENGTH</span>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-32 bg-terminal-darker rounded-full overflow-hidden border border-terminal-border/50">
+                    <div 
+                      className={`h-full ${
+                        (data.confidence_calibrated || data.confidence || 0.5) > 0.7 ? 'bg-terminal-green' :
+                        (data.confidence_calibrated || data.confidence || 0.5) > 0.5 ? 'bg-terminal-accent' :
+                        'bg-terminal-red'
+                      }`}
+                      style={{ width: `${((data.confidence_calibrated || data.confidence || 0.5) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono-tabular text-terminal-accent">
+                    {Math.round((data.confidence_calibrated || data.confidence || 0.5) * 100)}%
+                  </span>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Main Analysis Summary */}
-      <Card className="bg-terminal border-terminal-border">
-        <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
-          <CardTitle className="text-sm font-mono-tabular text-terminal-accent">ANALYSIS SUMMARY</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          <p className="leading-relaxed font-mono text-sm text-terminal-foreground whitespace-pre-wrap">{analysisText}</p>
-        </CardContent>
-      </Card>
-
-      {/* Main Signal - Detailed Recommendation */}
-      <Card className="bg-terminal border-terminal-border">
-        <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
-          <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            MAIN SIGNAL & REASONING
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4">
-          <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-mono-tabular text-terminal-secondary">SIGNAL STRENGTH</div>
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-32 bg-terminal-darker rounded-full overflow-hidden border border-terminal-border/50">
-                  <div 
-                    className={`h-full ${
-                      (data.confidence_calibrated || data.confidence || 0.5) > 0.7 ? 'bg-terminal-green' :
-                      (data.confidence_calibrated || data.confidence || 0.5) > 0.5 ? 'bg-terminal-accent' :
-                      'bg-terminal-red'
-                    }`}
-                    style={{ width: `${((data.confidence_calibrated || data.confidence || 0.5) * 100)}%` }}
-                  />
-                </div>
-                <span className="text-xs font-mono-tabular text-terminal-accent">
-                  {Math.round((data.confidence_calibrated || data.confidence || 0.5) * 100)}%
-                </span>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-start gap-3">
-                <span className="text-xs font-mono-tabular text-terminal-secondary min-w-24">ACTION:</span>
-                <span className="text-sm font-mono-tabular text-terminal-foreground uppercase font-bold">
-                  {data.recommendation === 'buy' ? 'LONG (BUY)' : 
-                   data.recommendation === 'sell' ? 'SHORT (SELL)' : 
-                   data.recommendation === 'long' ? 'LONG (BUY)' : 
-                   data.recommendation === 'short' ? 'SHORT (SELL)' : 
-                   'HOLD - NO TRADE'}
-                </span>
-              </div>
-              
-              {data.action_text && (
-                <div className="flex items-start gap-3">
-                  <span className="text-xs font-mono-tabular text-terminal-secondary min-w-24">REASONING:</span>
-                  <span className="text-sm font-mono text-terminal-foreground flex-1">
-                    {data.action_text}
-                  </span>
-                </div>
-              )}
-              
-              {data.outlook && (
-                <div className="flex items-start gap-3">
-                  <span className="text-xs font-mono-tabular text-terminal-secondary min-w-24">OUTLOOK:</span>
-                  <span className="text-sm font-mono-tabular text-terminal-accent uppercase">
-                    {data.outlook}
-                  </span>
-                </div>
-              )}
-
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Trading Signals - Only show with valid signals (not hold/unclear) */}
+      {/* SECTION 3: SIGNALS - Timeframe Profiles (Scalp, Intraday, Swing) */}
       {includeQuantSignals && 
        data.timeframe_profile && 
        Object.keys(data.timeframe_profile).length > 0 &&
-       data.recommendation !== 'hold' && 
-       data.action !== 'hold' &&
-       !data.holdReason && (
+       data.recommendation !== 'hold' && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
             <CardTitle className="text-sm font-mono-tabular text-terminal-accent flex items-center gap-2">
@@ -565,75 +235,36 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
               TRADING SIGNALS - ALL TIMEFRAMES
             </CardTitle>
             <p className="text-xs font-mono-tabular text-terminal-secondary mt-2">
-              Generated: {new Date(data.timestamp).toLocaleTimeString()}
+              3 unique strategies for different trading styles
             </p>
           </CardHeader>
           <CardContent className="pt-4">
             <div className="space-y-4">
-              {/* Helper function to determine if signal is long or short */}
               {(() => {
-                // CRITICAL: Only use fresh AI analysis data, never cached quant signals
-                const signalsToUse: any = {};
+                const signalsToUse = data.timeframe_profile;
+                if (!signalsToUse.scalp && !signalsToUse.intraday && !signalsToUse.swing) return null;
                 
-                if (data.timeframe_profile) {
-                  // Use AI-generated timeframe profile from the fresh analysis
-                  signalsToUse.scalp = data.timeframe_profile.scalp;
-                  signalsToUse.intraday = data.timeframe_profile.intraday;
-                  signalsToUse.swing = data.timeframe_profile.swing;
-                } else if (data.trade_idea && data.trade_idea.entry) {
-                  // Fallback: Use main trade idea for all timeframes
-                  signalsToUse.scalp = data.trade_idea;
-                  signalsToUse.intraday = data.trade_idea;
-                  signalsToUse.swing = data.trade_idea;
-                }
-                
-                // If no signals available, don't show this section
-                if (!signalsToUse.scalp && !signalsToUse.intraday && !signalsToUse.swing) {
-                  return null;
-                }
-                
-                // Check for hold signal first - if recommendation is hold, don't show signals
-                if (data.recommendation === 'hold' || data.action === 'hold') {
-                  return null; // Don't show trading signals section for hold recommendations
-                }
-                
-                // Use trade_idea.direction for accurate signal direction
-                // Map buy -> long, sell -> short for clarity
-                let tradeDirection = data.trade_idea?.direction || data.recommendation || 'hold';
-                if (tradeDirection === 'buy') tradeDirection = 'long';
-                if (tradeDirection === 'sell') tradeDirection = 'short';
-                
-                // If still no clear direction or hold, don't show signals
-                if (tradeDirection === 'hold' || (!tradeDirection)) {
-                  return null;
-                }
-                
-                const isLong = tradeDirection === 'long';
+                const tradeDirection = data.trade_idea?.direction || data.recommendation || 'hold';
+                const isLong = tradeDirection === 'long' || tradeDirection === 'buy';
                 const direction = isLong ? 'LONG' : 'SHORT';
                 const directionColor = isLong ? 'text-terminal-green' : 'text-terminal-red';
                 const directionIcon = isLong ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />;
 
-                // Calculate risk/reward for display
                 const calculateRR = (entry: number, stop: number, target: number) => {
-                  if (!entry || !stop || !target || typeof entry !== 'number' || typeof stop !== 'number' || typeof target !== 'number') {
-                    return '0.00';
-                  }
+                  if (!entry || !stop || !target) return '0.00';
                   const risk = Math.abs(entry - stop);
                   const reward = Math.abs(target - entry);
                   return risk > 0 ? (reward / risk).toFixed(2) : '0.00';
                 };
 
-                // Calculate percentage move
                 const calculatePercent = (entry: number, target: number) => {
-                  if (!entry || !target || typeof entry !== 'number' || typeof target !== 'number' || entry === 0) {
-                    return '0.00';
-                  }
+                  if (!entry || !target || entry === 0) return '0.00';
                   return (((target - entry) / entry) * 100).toFixed(2);
                 };
 
                 return (
                   <>
-                    {/* Scalp Signals - INSTANT MARKET ENTRY */}
+                    {/* SCALP - Instant Execution */}
                     {signalsToUse.scalp && signalsToUse.scalp.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
@@ -645,30 +276,19 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                             <span className="text-xs font-mono-tabular text-yellow-400 uppercase flex items-center gap-1">
                               ⚡ SCALP
                             </span>
-                            {signalsToUse.scalp.strategy && (
-                              <Badge variant="outline" className="text-xs font-mono-tabular">
-                                {signalsToUse.scalp.strategy}
-                              </Badge>
-                            )}
                           </div>
                           {signalsToUse.scalp.probability && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
-                              <span className={`text-xs font-mono-tabular font-bold ${
-                                signalsToUse.scalp.probability >= 70 ? 'text-terminal-green' :
-                                signalsToUse.scalp.probability >= 50 ? 'text-terminal-accent' :
-                                'text-terminal-red'
-                              }`}>
-                                {signalsToUse.scalp.probability}%
-                              </span>
-                            </div>
+                            <span className={`text-xs font-mono-tabular font-bold ${
+                              signalsToUse.scalp.probability >= 70 ? 'text-terminal-green' :
+                              signalsToUse.scalp.probability >= 50 ? 'text-terminal-accent' :
+                              'text-terminal-red'
+                            }`}>
+                              {signalsToUse.scalp.probability}%
+                            </span>
                           )}
                         </div>
-                        <div className="text-xs font-mono-tabular text-yellow-400/80 mb-2 font-semibold">
+                        <div className="text-xs font-mono-tabular text-yellow-400/80 mb-2">
                           ⚡ INSTANT MARKET EXECUTION • Entry at current price • Tight 0.5 ATR stop
-                        </div>
-                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
-                          Best for: Fast momentum trades • 1-15 min duration • R:R 2.0+ • Quick scalp exits
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div>
@@ -678,35 +298,27 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
+                            <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP</div>
                             <div className="text-sm font-mono-tabular text-terminal-red font-bold">
                               {safeFormatNumber(signalsToUse.scalp.stop)}
                             </div>
-                            <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                              {calculatePercent(signalsToUse.scalp.entry, signalsToUse.scalp.stop)}%
-                            </div>
                           </div>
-                          {signalsToUse.scalp.targets?.map((target: number, idx: number) => {
-                            const timeEstimates = ['2-5 min', '5-10 min', '10-15 min'];
-                            return (
-                              <div key={idx}>
-                                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">
-                                  TP{idx + 1} • {timeEstimates[idx]}
-                                </div>
-                                <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                                  {safeFormatNumber(target)}
-                                </div>
-                                <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                                  {calculatePercent(signalsToUse.scalp.entry, target)}% • R:{calculateRR(signalsToUse.scalp.entry, signalsToUse.scalp.stop, target)}
-                                </div>
+                          {signalsToUse.scalp.targets?.map((target: number, idx: number) => (
+                            <div key={idx}>
+                              <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TP{idx + 1}</div>
+                              <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                                {safeFormatNumber(target)}
                               </div>
-                            );
-                          })}
+                              <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
+                                R:{calculateRR(signalsToUse.scalp.entry, signalsToUse.scalp.stop, target)}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Intraday Signals - EMA20 PULLBACK ENTRY */}
+                    {/* INTRADAY - EMA20 Pullback */}
                     {signalsToUse.intraday && signalsToUse.intraday.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
@@ -718,30 +330,19 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                             <span className="text-xs font-mono-tabular text-blue-400 uppercase flex items-center gap-1">
                               📊 INTRADAY
                             </span>
-                            {signalsToUse.intraday.strategy && (
-                              <Badge variant="outline" className="text-xs font-mono-tabular">
-                                {signalsToUse.intraday.strategy}
-                              </Badge>
-                            )}
                           </div>
                           {signalsToUse.intraday.probability && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
-                              <span className={`text-xs font-mono-tabular font-bold ${
-                                signalsToUse.intraday.probability >= 70 ? 'text-terminal-green' :
-                                signalsToUse.intraday.probability >= 50 ? 'text-terminal-accent' :
-                                'text-terminal-red'
-                              }`}>
-                                {signalsToUse.intraday.probability}%
-                              </span>
-                            </div>
+                            <span className={`text-xs font-mono-tabular font-bold ${
+                              signalsToUse.intraday.probability >= 70 ? 'text-terminal-green' :
+                              signalsToUse.intraday.probability >= 50 ? 'text-terminal-accent' :
+                              'text-terminal-red'
+                            }`}>
+                              {signalsToUse.intraday.probability}%
+                            </span>
                           )}
                         </div>
-                        <div className="text-xs font-mono-tabular text-blue-400/80 mb-2 font-semibold">
-                          📊 EMA20 PULLBACK STRATEGY • Wait for price to retrace to EMA20 • 1.5 ATR stop
-                        </div>
-                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
-                          Best for: Swing trades within trend • 1-8 hr duration • Better R:R than scalp • Same-day exits
+                        <div className="text-xs font-mono-tabular text-blue-400/80 mb-2">
+                          📊 EMA20 PULLBACK STRATEGY • Wait for EMA20 retest • Moderate 1.5 ATR stop
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div>
@@ -751,35 +352,27 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
+                            <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP</div>
                             <div className="text-sm font-mono-tabular text-terminal-red font-bold">
                               {safeFormatNumber(signalsToUse.intraday.stop)}
                             </div>
-                            <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                              {calculatePercent(signalsToUse.intraday.entry, signalsToUse.intraday.stop)}%
-                            </div>
                           </div>
-                          {signalsToUse.intraday.targets?.map((target: number, idx: number) => {
-                            const timeEstimates = ['1-3 hrs', '3-5 hrs', '5-8 hrs'];
-                            return (
-                              <div key={idx}>
-                                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">
-                                  TP{idx + 1} • {timeEstimates[idx]}
-                                </div>
-                                <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                                  {safeFormatNumber(target)}
-                                </div>
-                                <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                                  {calculatePercent(signalsToUse.intraday.entry, target)}% • R:{calculateRR(signalsToUse.intraday.entry, signalsToUse.intraday.stop, target)}
-                                </div>
+                          {signalsToUse.intraday.targets?.map((target: number, idx: number) => (
+                            <div key={idx}>
+                              <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TP{idx + 1}</div>
+                              <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                                {safeFormatNumber(target)}
                               </div>
-                            );
-                          })}
+                              <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
+                                R:{calculateRR(signalsToUse.intraday.entry, signalsToUse.intraday.stop, target)}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Swing Signals - EMA50/FIB POSITION ENTRY */}
+                    {/* SWING - Position Trade */}
                     {signalsToUse.swing && signalsToUse.swing.entry && (
                       <div className="bg-terminal-darker/50 p-4 border border-terminal-border/30">
                         <div className="flex items-center justify-between mb-3">
@@ -791,30 +384,19 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                             <span className="text-xs font-mono-tabular text-purple-400 uppercase flex items-center gap-1">
                               🎯 SWING
                             </span>
-                            {signalsToUse.swing.strategy && (
-                              <Badge variant="outline" className="text-xs font-mono-tabular">
-                                {signalsToUse.swing.strategy}
-                              </Badge>
-                            )}
                           </div>
                           {signalsToUse.swing.probability && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono-tabular text-terminal-secondary">CONFIDENCE:</span>
-                              <span className={`text-xs font-mono-tabular font-bold ${
-                                signalsToUse.swing.probability >= 70 ? 'text-terminal-green' :
-                                signalsToUse.swing.probability >= 50 ? 'text-terminal-accent' :
-                                'text-terminal-red'
-                              }`}>
-                                {signalsToUse.swing.probability}%
-                              </span>
-                            </div>
+                            <span className={`text-xs font-mono-tabular font-bold ${
+                              signalsToUse.swing.probability >= 70 ? 'text-terminal-green' :
+                              signalsToUse.swing.probability >= 50 ? 'text-terminal-accent' :
+                              'text-terminal-red'
+                            }`}>
+                              {signalsToUse.swing.probability}%
+                            </span>
                           )}
                         </div>
-                        <div className="text-xs font-mono-tabular text-purple-400/80 mb-2 font-semibold">
-                          🎯 POSITION TRADE • Entry at EMA50 or Fib 38.2% • 2.0 ATR stop for optimal R:R
-                        </div>
-                        <div className="text-xs font-mono-tabular text-terminal-secondary mb-3 italic">
-                          Best for: Multi-day position trades • 1-7 day duration • Highest R:R potential • Patient entries
+                        <div className="text-xs font-mono-tabular text-purple-400/80 mb-2">
+                          🎯 POSITION TRADE • Entry at EMA50 or Fib 38.2% • Wide 2.0 ATR stop
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                           <div>
@@ -824,30 +406,22 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP LOSS</div>
+                            <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">STOP</div>
                             <div className="text-sm font-mono-tabular text-terminal-red font-bold">
                               {safeFormatNumber(signalsToUse.swing.stop)}
                             </div>
-                            <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                              {calculatePercent(signalsToUse.swing.entry, signalsToUse.swing.stop)}%
-                            </div>
                           </div>
-                          {signalsToUse.swing.targets?.map((target: number, idx: number) => {
-                            const timeEstimates = ['1-2 days', '2-4 days', '4-7 days'];
-                            return (
-                              <div key={idx}>
-                                <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">
-                                  TP{idx + 1} • {timeEstimates[idx]}
-                                </div>
-                                <div className="text-sm font-mono-tabular text-terminal-green font-bold">
-                                  {safeFormatNumber(target)}
-                                </div>
-                                <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
-                                  {calculatePercent(signalsToUse.swing.entry, target)}% • R:{calculateRR(signalsToUse.swing.entry, signalsToUse.swing.stop, target)}
-                                </div>
+                          {signalsToUse.swing.targets?.map((target: number, idx: number) => (
+                            <div key={idx}>
+                              <div className="text-xs font-mono-tabular text-terminal-secondary mb-1">TP{idx + 1}</div>
+                              <div className="text-sm font-mono-tabular text-terminal-green font-bold">
+                                {safeFormatNumber(target)}
                               </div>
-                            );
-                          })}
+                              <div className="text-xs font-mono-tabular text-terminal-secondary mt-0.5">
+                                R:{calculateRR(signalsToUse.swing.entry, signalsToUse.swing.stop, target)}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -859,168 +433,7 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
         </Card>
       )}
 
-
-      {/* Key Levels */}
-      {data.keyLevels && (data.keyLevels.support?.length > 0 || data.keyLevels.resistance?.length > 0) && (
-        <Card className="bg-terminal border-terminal-border">
-          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
-            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">KEY LEVELS</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <TrendingUp className="h-4 w-4 text-terminal-green" />
-                  <div className="text-xs font-mono-tabular text-terminal-secondary">SUPPORT LEVELS</div>
-                </div>
-                <div className="space-y-2">
-                  {data.keyLevels.support?.map((level: number, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center bg-terminal-darker/50 p-2 border border-terminal-border/30">
-                      <span className="text-xs font-mono-tabular text-terminal-secondary">S{idx + 1}</span>
-                      <span className="text-sm font-mono-tabular text-terminal-green">{safeFormatNumber(level, 2)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <TrendingDown className="h-4 w-4 text-terminal-red" />
-                  <div className="text-xs font-mono-tabular text-terminal-secondary">RESISTANCE LEVELS</div>
-                </div>
-                <div className="space-y-2">
-                  {data.keyLevels.resistance?.map((level: number, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center bg-terminal-darker/50 p-2 border border-terminal-border/30">
-                      <span className="text-xs font-mono-tabular text-terminal-secondary">R{idx + 1}</span>
-                      <span className="text-sm font-mono-tabular text-terminal-red">{safeFormatNumber(level, 2)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Liquidity Zones */}
-      {data.keyLevels?.liquidity_zones && data.keyLevels.liquidity_zones.length > 0 && (
-        <Card className="bg-terminal border-terminal-border">
-          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
-            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">LIQUIDITY ZONES</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="space-y-3">
-              {data.keyLevels.liquidity_zones.map((zone: any, idx: number) => (
-                <div key={idx} className={`p-3 border-l-2 ${
-                  zone.type === 'buy' ? 'bg-terminal-green/5 border-terminal-green' : 'bg-terminal-red/5 border-terminal-red'
-                }`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge className={`${
-                        zone.type === 'buy' ? 'bg-terminal-green/20 text-terminal-green' : 'bg-terminal-red/20 text-terminal-red'
-                      } text-xs font-mono-tabular`}>
-                        {zone.type.toUpperCase()} SIDE
-                      </Badge>
-                      <Badge className="bg-terminal-darker text-terminal-secondary text-xs font-mono-tabular">
-                        {zone.strength.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <span className={`text-sm font-mono-tabular font-bold ${
-                      zone.type === 'buy' ? 'text-terminal-green' : 'text-terminal-red'
-                    }`}>
-                      {safeFormatNumber(zone.price, 2)}
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono text-terminal-secondary">
-                    {zone.description}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Breakout Zones */}
-      {data.keyLevels?.breakout_zones && data.keyLevels.breakout_zones.length > 0 && (
-        <Card className="bg-terminal border-terminal-border">
-          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
-            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">BREAKOUT ZONES</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="space-y-3">
-              {data.keyLevels.breakout_zones.map((zone: any, idx: number) => (
-                <div key={idx} className={`p-3 border-l-2 ${
-                  zone.type === 'bullish' ? 'bg-terminal-green/5 border-terminal-green' : 'bg-terminal-red/5 border-terminal-red'
-                }`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge className={`${
-                        zone.type === 'bullish' ? 'bg-terminal-green/20 text-terminal-green' : 'bg-terminal-red/20 text-terminal-red'
-                      } text-xs font-mono-tabular`}>
-                        {zone.type.toUpperCase()}
-                      </Badge>
-                      <Badge className="bg-terminal-darker text-terminal-secondary text-xs font-mono-tabular">
-                        {zone.strength.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <span className={`text-sm font-mono-tabular font-bold ${
-                      zone.type === 'bullish' ? 'text-terminal-green' : 'text-terminal-red'
-                    }`}>
-                      {safeFormatNumber(zone.price, 2)}
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono text-terminal-secondary">
-                    {zone.description}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Order Blocks */}
-      {data.keyLevels?.order_blocks && data.keyLevels.order_blocks.length > 0 && (
-        <Card className="bg-terminal border-terminal-border">
-          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
-            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">ORDER BLOCKS</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="space-y-3">
-              {data.keyLevels.order_blocks.map((block: any, idx: number) => (
-                <div key={idx} className={`p-3 border-l-2 ${
-                  block.type === 'bullish' ? 'bg-terminal-green/5 border-terminal-green' : 'bg-terminal-red/5 border-terminal-red'
-                }`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge className={`${
-                        block.type === 'bullish' ? 'bg-terminal-green/20 text-terminal-green' : 'bg-terminal-red/20 text-terminal-red'
-                      } text-xs font-mono-tabular`}>
-                        {block.type.toUpperCase()}
-                      </Badge>
-                      <Badge className="bg-terminal-darker text-terminal-secondary text-xs font-mono-tabular">
-                        {block.strength.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <span className={`text-xs font-mono-tabular ${
-                      block.type === 'bullish' ? 'text-terminal-green' : 'text-terminal-red'
-                    }`}>
-                      {safeFormatNumber(block.low, 2)} - {safeFormatNumber(block.high, 2)}
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono text-terminal-secondary">
-                    {block.description}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-
-
-      {/* Quantitative Metrics */}
+      {/* SECTION 4: QUANT METRICS - Quantitative Data */}
       {data.quantitative_metrics && Object.keys(data.quantitative_metrics).length > 0 && (
         <Card className="bg-terminal border-terminal-border">
           <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
@@ -1042,47 +455,6 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
           </CardContent>
         </Card>
       )}
-
-      {/* Fibonacci Levels */}
-      {data.fibonacci && (data.fibonacci.retracement || data.fibonacci.extension) && (
-        <Card className="bg-terminal border-terminal-border">
-          <CardHeader className="bg-terminal-darker border-b border-terminal-border pb-3">
-            <CardTitle className="text-sm font-mono-tabular text-terminal-accent">FIBONACCI LEVELS</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {data.fibonacci.retracement && (
-                <div>
-                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-3">RETRACEMENT</div>
-                  <div className="space-y-2">
-                    {Object.entries(data.fibonacci.retracement).map(([level, price]: [string, any]) => (
-                      <div key={level} className="flex justify-between items-center bg-terminal-darker/50 p-2 border border-terminal-border/30">
-                        <span className="text-xs font-mono-tabular text-terminal-secondary">{level}</span>
-                        <span className="text-sm font-mono-tabular text-terminal-accent">{safeFormatNumber(Number(price), 2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {data.fibonacci.extension && (
-                <div>
-                  <div className="text-xs font-mono-tabular text-terminal-secondary mb-3">EXTENSION</div>
-                  <div className="space-y-2">
-                    {Object.entries(data.fibonacci.extension).map(([level, price]: [string, any]) => (
-                      <div key={level} className="flex justify-between items-center bg-terminal-darker/50 p-2 border border-terminal-border/30">
-                        <span className="text-xs font-mono-tabular text-terminal-secondary">{level}</span>
-                        <span className="text-sm font-mono-tabular text-terminal-accent">{safeFormatNumber(Number(price), 2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-
 
       {/* Risk Assessment */}
       {data.riskAssessment && (
@@ -1108,23 +480,8 @@ export const AnalysisResults = ({ data, symbol, timeframe = '60', includeQuantSi
               {data.riskAssessment.factors && data.riskAssessment.factors.length > 0 && (
                 <div className="space-y-2">
                   {data.riskAssessment.factors.map((factor: any, idx: number) => (
-                    <div key={idx}>
-                      {typeof factor === 'string' ? (
-                        <div className="text-xs font-mono text-terminal-secondary">• {factor}</div>
-                      ) : (
-                        <div className="space-y-1">
-                          {factor.level && (
-                            <div className="text-xs font-mono-tabular text-terminal-accent uppercase">{factor.level}</div>
-                          )}
-                          {factor.bullets && factor.bullets.length > 0 && (
-                            <div className="space-y-1 ml-2">
-                              {factor.bullets.map((bullet: string, bIdx: number) => (
-                                <div key={bIdx} className="text-xs font-mono text-terminal-secondary">• {bullet}</div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                    <div key={idx} className="text-xs font-mono text-terminal-secondary">
+                      • {typeof factor === 'string' ? factor : JSON.stringify(factor)}
                     </div>
                   ))}
                 </div>
