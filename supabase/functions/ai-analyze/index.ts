@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.7.4"; // Fixed forex candle data undefined checks
+const FUNCTION_VERSION = "2.7.5"; // Added validation for livePrice to prevent toFixed() errors
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -289,6 +289,22 @@ serve(async (req) => {
 
     // Create comprehensive institutional analysis prompt
     const livePrice = currentPrice || features.technical.current;
+    
+    // Validate that we have a valid live price
+    if (!livePrice || typeof livePrice !== 'number' || isNaN(livePrice)) {
+      console.error('[ai-analyze] Invalid or missing live price:', { currentPrice, technicalCurrent: features.technical.current, livePrice });
+      return new Response(JSON.stringify({ 
+        error: "No market data available",
+        details: "Unable to determine current price. The market may be closed or data is unavailable for this symbol.",
+        symbol,
+        timeframe,
+        market
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
     const latestCandleTime = candles[candles.length - 1]?.t || Date.now();
     const candleAge = Math.round((Date.now() - latestCandleTime) / 1000); // seconds
     
