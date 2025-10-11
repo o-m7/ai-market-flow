@@ -902,8 +902,13 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   
   // Determine asset type
   const cryptoPairs = ['BTC', 'ETH', 'XRP', 'ADA', 'SOL', 'DOT', 'MATIC', 'AVAX', 'LINK', 'UNI', 'ATOM', 'ALGO', 'VET', 'ICP', 'FIL', 'THETA', 'TRX', 'ETC', 'XMR', 'BCH', 'LTC', 'DOGE', 'SHIB', 'NEAR', 'FTM', 'SAND', 'MANA', 'CRV', 'AAVE', 'BNB'];
+  const forexCurrencies = ['EUR', 'GBP', 'JPY', 'CHF', 'AUD', 'CAD', 'NZD', 'SEK', 'NOK', 'DKK'];
+  
   const isCrypto = cryptoPairs.some(pair => symbol.startsWith(pair)) && symbol.endsWith('USD');
-  const asset = isCrypto ? 'crypto' : 'stock';
+  const isForex = forexCurrencies.some(curr => symbol.startsWith(curr)) && 
+                  (symbol.includes('USD') || forexCurrencies.some(curr => symbol.includes(curr)));
+  
+  const asset = isCrypto ? 'crypto' : isForex ? 'forex' : 'stock';
   
   console.log(`📊 Fetching data via polygon-chart-data: ${symbol} (${asset}), timeframe=${timeframe}`);
   
@@ -924,6 +929,20 @@ async function fetchPolygonData(symbol: string, tf: string, polygonApiKey: strin
   if (!response.ok) {
     const errorText = await response.text();
     console.error(`polygon-chart-data error: ${response.status} - ${errorText}`);
+    
+    // Check if market is closed (forex weekend)
+    try {
+      const errorData = JSON.parse(errorText);
+      if (errorData.error === 'forex_market_closed') {
+        // Return a helpful message instead of failing
+        throw new Error(`Forex market is closed. ${errorData.details?.suggestion || 'Please try again when markets are open.'}`);
+      }
+    } catch (parseErr) {
+      if (parseErr instanceof Error && parseErr.message.includes('Forex market')) {
+        throw parseErr; // Re-throw forex closed error
+      }
+    }
+    
     throw new Error(`Failed to fetch chart data: ${response.statusText}`);
   }
   
