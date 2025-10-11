@@ -94,16 +94,23 @@ export async function analyzeWithAI(payload: AnalysisRequest) {
       const errorText = await liveDataResponse.text();
       console.error('[analyze] Live data fetch failed:', liveDataResponse.status, errorText);
       
-      // Check if it's a "no data available" error from Polygon - STOP HERE
+      // Check for specific error types from Polygon
       try {
         const errorData = JSON.parse(errorText);
+        
+        // Forex market closed
+        if (errorData.error === 'forex_market_closed') {
+          throw new Error(`Forex market is closed. ${errorData.details?.suggestion || 'Please try again when markets are open.'}`);
+        }
+        
+        // No results from Polygon
         if (errorData.error === 'polygon_no_results') {
-          throw new Error(`No market data available for ${payload.symbol}. The market is closed or data is unavailable. Please try a different symbol or wait until the market opens.`);
+          throw new Error(`No market data available for ${payload.symbol}. The market may be closed or data is unavailable.`);
         }
       } catch (parseErr) {
-        // If we can't parse the error, check if it's our custom error
-        if (parseErr instanceof Error && parseErr.message.includes('No market data')) {
-          throw parseErr; // Re-throw our custom error
+        // If we can't parse or it's our custom error, pass it through
+        if (parseErr instanceof Error && (parseErr.message.includes('market') || parseErr.message.includes('closed'))) {
+          throw parseErr;
         }
       }
     }

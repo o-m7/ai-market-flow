@@ -49,6 +49,33 @@ const requestData: ChartDataRequest = await req.json();
       lite = false 
     } = requestData;
 
+    // Check if forex market is open (avoid wasting API calls on weekends)
+    if (asset === 'forex') {
+      const now = new Date();
+      const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 6 = Saturday
+      const hourUTC = now.getUTCHours();
+      
+      // Forex markets are closed Saturday ~22:00 UTC to Sunday ~22:00 UTC
+      const isWeekend = dayOfWeek === 6 || dayOfWeek === 0;
+      
+      if (isWeekend) {
+        console.error(`[forex-closed] Forex market is closed on weekends. Current time: ${now.toISOString()}`);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'forex_market_closed',
+          details: {
+            reason: 'Forex markets are closed on weekends',
+            currentTime: now.toISOString(),
+            dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayOfWeek],
+            suggestion: 'Forex markets open Sunday 22:00 UTC and close Friday 22:00 UTC'
+          }
+        }), {
+          status: 503, // Service Unavailable
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     console.log(`Fetching ${asset} data for ${uiSymbol} (${tf}) with limit ${limit}`);
 
     // Map UI symbol to Polygon provider symbol
