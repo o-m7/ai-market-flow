@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.53.2";
 
-const FUNCTION_VERSION = "2.7.5"; // Added validation for livePrice to prevent toFixed() errors
+const FUNCTION_VERSION = "2.7.6"; // Added validation for technical indicators before OpenAI call
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -315,6 +315,22 @@ serve(async (req) => {
     const rsi = features.technical.rsi14 || 50;
     const macd = features.technical.macd?.hist || 0;
     const atr = features.technical.atr14 || 0;
+    
+    // Additional validation: ensure we have meaningful technical data
+    if (!features.technical.ema20 && !features.technical.ema50 && !features.technical.rsi14) {
+      console.error('[ai-analyze] No valid technical indicators - market may be closed or data unavailable');
+      return new Response(JSON.stringify({ 
+        error: "Insufficient market data for analysis",
+        details: "Technical indicators could not be calculated. The market may be closed or data is unavailable for this symbol.",
+        symbol,
+        timeframe,
+        market,
+        suggestion: "Try a different symbol or check if the market is currently open."
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
     console.log(`[ai-analyze] Using ${candles.length} candles, latest from ${new Date(latestCandleTime).toISOString()} (${candleAge}s ago)`);
     
